@@ -1,12 +1,12 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { ChatExporter } from './chatExporter';
+import { SessionExporter } from './sessionExporter';
 import { HeartbeatMonitor } from './HeartbeatMonitor';
 import { SoloModeController } from './SoloModeController';
 import { TelegraphWatcher } from './TelegraphWatcher';
 import { WorktreeManager } from './WorktreeManager';
 
-let exporter: ChatExporter;
+let exporter: SessionExporter;
 let heartbeatMonitor: HeartbeatMonitor;
 let telegraphWatcher: TelegraphWatcher;
 let soloModeController: SoloModeController;
@@ -19,7 +19,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // ── Core components ───────────────────────────────────────────────────────
   worktreeManager = new WorktreeManager();
-  exporter = new ChatExporter(context, outputChannel);
+  exporter = new SessionExporter(context, outputChannel);
   heartbeatMonitor = new HeartbeatMonitor(outputChannel, worktreeManager);
   telegraphWatcher = new TelegraphWatcher(outputChannel, worktreeManager, heartbeatMonitor);
   soloModeController = new SoloModeController(outputChannel, worktreeManager, heartbeatMonitor);

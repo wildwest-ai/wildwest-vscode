@@ -14,7 +14,7 @@ interface ChatSession {
   messages?: unknown[];
 }
 
-export class ChatExporter {
+export class SessionExporter {
   private watcher: chokidar.FSWatcher | null = null;
   private vscodeStoragePath: string;
   private exportPath: string;
@@ -40,7 +40,7 @@ export class ChatExporter {
     const minutes = String(timestamp.getMinutes()).padStart(2, '0');
     const seconds = String(timestamp.getSeconds()).padStart(2, '0');
     const ms = String(timestamp.getMilliseconds()).padStart(3, '0');
-    this.log(`${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${ms} [info] ChatExporter constructor called`);
+    this.log(`${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${ms} [info] SessionExporter constructor called`);
     
     this.statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
     // No command needed - hover will show actions
