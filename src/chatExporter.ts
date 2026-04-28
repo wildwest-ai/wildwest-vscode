@@ -687,7 +687,7 @@ export class ChatExporter {
         '⚠️ Git username not configured',
         {
           modal: false,
-          detail: 'Your chat exports will save to "docs/copilot-chats/unknown/". Configure your git username for proper organization.'
+          detail: 'Your Wild West exports will save to "docs/copilot-chats/unknown/". Configure your git username for proper organization.'
         },
         'Configure Now',
         'Ignore',
@@ -785,7 +785,7 @@ export class ChatExporter {
     this.log(`${this.getTimestamp()} start() called`);
     
     if (this.isWatching) {
-      vscode.window.showWarningMessage('Chat export watcher already running');
+      vscode.window.showWarningMessage('Wild West watcher already running');
       return;
     }
 
@@ -820,10 +820,10 @@ export class ChatExporter {
       // Start polling after any initial scan
       this.isWatching = true;
       this.updateStatusBar();
-      this.log(`${this.getTimestamp()} Chat export watcher started, polling every 5s`);
+      this.log(`${this.getTimestamp()} Wild West watcher started, polling every 5s`);
       this.startDatabasePolling();
 
-      vscode.window.showInformationMessage('Chat export watcher started');
+      vscode.window.showInformationMessage('Wild West watcher started');
     } catch (error) {
       vscode.window.showErrorMessage(`Failed to start watcher: ${error}`);
     }
@@ -844,7 +844,7 @@ export class ChatExporter {
     this.exportedFiles.clear();
     this.lastDbStats.clear();
     this.updateStatusBar();
-    vscode.window.showInformationMessage('Chat export watcher stopped');
+    vscode.window.showInformationMessage('Wild West watcher stopped');
   }
 
   private startDatabasePolling(): void {
