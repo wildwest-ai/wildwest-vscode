@@ -1,0 +1,113 @@
+{
+  "name": "wildwest-vscode",
+  "displayName": "Wild West",
+  "description": "Wild West governance framework for VSCode — heartbeat, telegraph, devPair activity log",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
+  },
+  "version": "0.1.0",
+  "publisher": "wildwest-ai",
+  "engines": {
+    "vscode": "^1.84.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:wildwest.startWatcher",
+    "onCommand:wildwest.stopWatcher",
+    "onCommand:wildwest.exportNow",
+    "onCommand:wildwest.batchConvert",
+    "onCommand:wildwest.convertToMarkdown",
+    "onCommand:wildwest.generateIndex"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "wildwest.startWatcher",
+        "title": "Start Watcher",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.stopWatcher",
+        "title": "Stop Watcher",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.exportNow",
+        "title": "Export devPair Log Now",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.batchConvert",
+        "title": "Batch Convert All Sessions",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.convertToMarkdown",
+        "title": "Convert Exports to Markdown",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.generateIndex",
+        "title": "Generate Index",
+        "category": "Wild West"
+      }
+    ],
+    "configuration": {
+      "title": "Wild West",
+      "properties": {
+        "wildwest.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Wild West framework on startup"
+        },
+        "wildwest.exportPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path where devPair logs should be saved. Leave empty to use default: ~/wildwest-logs/{git-username}/. Supports ${userHome} and ~ expansion."
+        },
+        "wildwest.watchInterval": {
+          "type": "number",
+          "default": 5000,
+          "description": "File watch interval in milliseconds"
+        },
+        "wildwest.autoExportOnChange": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically export devPair log when chat data changes"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run esbuild-base -- --minify",
+    "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --target=node18",
+    "esbuild": "npm run esbuild-base -- --sourcemap",
+    "esbuild-watch": "npm run esbuild-base -- --sourcemap --watch",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "jest"
+  },
+  "devDependencies": {
+    "@types/node": "^18.x",
+    "@types/vscode": "^1.84.0",
+    "@typescript-eslint/eslint-plugin": "^6.x",
+    "@typescript-eslint/parser": "^6.x",
+    "@vscode/vsce": "^2.22.0",
+    "esbuild": "^0.19.x",
+    "eslint": "^8.x",
+    "typescript": "^5.x",
+    "@types/jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "jest": "^29.5.0"
+  },
+  "dependencies": {
+    "chokidar": "^3.5.3"
+  }
+}
