@@ -485,12 +485,8 @@ class BatchChatConverter {
         };
       }
 
-      // Save exports (optionally skip .log)
-      let rawChatPath: string | undefined;
-      if (!this.jsonOnly) {
-        rawChatPath = path.join(this.outputDir, `${baseName}.log`);
-        converter.saveRawChatLog(rawChatPath);
-      }
+      // Save exports
+      const rawChatPath: string | undefined = undefined;
       if (!alreadyConverted) {
         converter.saveChatReplayJson(chatReplayPath);
       }
@@ -667,12 +663,10 @@ class BatchChatConverter {
 
     if (successful > 0) {
       // Count output files
-      const rawChatFiles = this.results.filter((r) => r.success && r.outputFiles?.rawChat).length;
       const chatReplayFiles = this.results.filter((r) => r.success && r.outputFiles?.chatReplay).length;
       const markdownFiles = this.results.filter((r) => r.success && r.outputFiles?.markdown).length;
 
       console.log('📊 Output Summary:');
-      console.log(`  Raw chat logs:     ${rawChatFiles} files${this.jsonOnly ? ' (skipped by --json-only)' : ''}`);
       console.log(`  Chat replay JSON:  ${chatReplayFiles} files`);
       console.log(`  Markdown files:    ${markdownFiles} files${this.withMarkdown ? '' : ' (use --with-markdown)'}`);
       console.log('');
@@ -680,20 +674,8 @@ class BatchChatConverter {
       // Show file sizes
       if (fs.existsSync(this.outputDir)) {
         const files = fs.readdirSync(this.outputDir);
-        const logFiles = files.filter((f) => f.endsWith('.log'));
         const jsonFiles = files.filter((f) => f.endsWith('.json'));
         const mdFiles = files.filter((f) => f.endsWith('.md'));
-
-        if (logFiles.length > 0) {
-          console.log('Raw chat log files:');
-          for (const file of logFiles) {
-            const filePath = path.join(this.outputDir, file);
-            const stats = fs.statSync(filePath);
-            const size = this.formatBytes(stats.size);
-            console.log(`  ${file} (${size})`);
-          }
-          console.log('');
-        }
 
         if (jsonFiles.length > 0) {
           console.log('Chat replay JSON files:');
