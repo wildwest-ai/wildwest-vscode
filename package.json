@@ -15,13 +15,7 @@
     "Other"
   ],
   "activationEvents": [
-    "onStartupFinished",
-    "onCommand:wildwest.startWatcher",
-    "onCommand:wildwest.stopWatcher",
-    "onCommand:wildwest.exportNow",
-    "onCommand:wildwest.batchConvert",
-    "onCommand:wildwest.convertToMarkdown",
-    "onCommand:wildwest.generateIndex"
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -55,6 +49,26 @@
         "command": "wildwest.generateIndex",
         "title": "Generate Index",
         "category": "Wild West"
+      },
+      {
+        "command": "wildwest.startHeartbeat",
+        "title": "Start Heartbeat",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.stopHeartbeat",
+        "title": "Stop Heartbeat",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.viewTelegraph",
+        "title": "View Telegraph",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.soloModeReport",
+        "title": "Solo Mode Report",
+        "category": "Wild West"
       }
     ],
     "configuration": {
@@ -79,6 +93,11 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically export devPair log when chat data changes"
+        },
+        "wildwest.heartbeatInterval": {
+          "type": "number",
+          "default": 300000,
+          "description": "Heartbeat interval in milliseconds (default: 300000 = 5 minutes)"
         }
       }
     }
