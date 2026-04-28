@@ -41,6 +41,38 @@ export function activate(context: vscode.ExtensionContext) {
     }),
   );
 
+  // ── Command — grouped quick-pick menu ────────────────────────────────────
+  context.subscriptions.push(
+    vscode.commands.registerCommand('wildwest.menu', async () => {
+      type MenuItem = { label: string; kind?: vscode.QuickPickItemKind; command?: string };
+      const ITEMS: MenuItem[] = [
+        { label: 'Sessions', kind: vscode.QuickPickItemKind.Separator },
+        { label: 'Start Watcher',             command: 'wildwest.startWatcher' },
+        { label: 'Stop Watcher',              command: 'wildwest.stopWatcher' },
+        { label: 'Export devPair Log Now',    command: 'wildwest.exportNow' },
+        { label: 'Batch Convert All Sessions',command: 'wildwest.batchConvert' },
+        { label: 'Convert Exports to Markdown', command: 'wildwest.convertToMarkdown' },
+        { label: 'Generate Index',            command: 'wildwest.generateIndex' },
+        { label: 'Governance', kind: vscode.QuickPickItemKind.Separator },
+        { label: 'Start Heartbeat',           command: 'wildwest.startHeartbeat' },
+        { label: 'Stop Heartbeat',            command: 'wildwest.stopHeartbeat' },
+        { label: 'View Telegraph',            command: 'wildwest.viewTelegraph' },
+        { label: 'Solo Mode Report',          command: 'wildwest.soloModeReport' },
+      ];
+      const commandMap = new Map(
+        ITEMS.filter((i) => i.command).map((i) => [i.label, i.command!]),
+      );
+      const pick = await vscode.window.showQuickPick(
+        ITEMS.map((i) => ({ label: i.label, kind: i.kind ?? vscode.QuickPickItemKind.Default })),
+        { placeHolder: 'Wild West — select an action' },
+      );
+      if (pick) {
+        const cmd = commandMap.get(pick.label);
+        if (cmd) vscode.commands.executeCommand(cmd);
+      }
+    }),
+  );
+
   // ── Commands — heartbeat ──────────────────────────────────────────────────
   context.subscriptions.push(
     vscode.commands.registerCommand('wildwest.startHeartbeat', () => {
