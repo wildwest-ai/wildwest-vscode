@@ -1,6 +1,17 @@
 # TODO — wildwest-vscode
 
-> **Last updated:** 2026-04-28 22:33 UTC (18:33 EDT)
+> **Last updated:** 2026-04-28 22:37 UTC (18:37 EDT)
+
+---
+
+## Command palette — category split
+
+Split the flat `Wild West` category into two groups so the palette is self-organizing:
+
+- [ ] **`Wild West: Sessions`** — Start/Stop Watcher, Export Now, Batch Convert, Convert to Markdown, Generate Index
+- [ ] **`Wild West: Governance`** — Start/Stop Heartbeat, View Telegraph, Solo Mode Report
+
+Change is purely in `package.json` `contributes.commands[*].category` — no code changes.
 
 ---
 
