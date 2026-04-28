@@ -16,7 +16,6 @@ let outputChannel: vscode.OutputChannel;
 export function activate(context: vscode.ExtensionContext) {
   outputChannel = vscode.window.createOutputChannel('Wild West');
   outputChannel.appendLine('Wild West extension activated');
-  outputChannel.show(true);
 
   // ── Core components ───────────────────────────────────────────────────────
   worktreeManager = new WorktreeManager();
