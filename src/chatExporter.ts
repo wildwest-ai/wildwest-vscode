@@ -1339,11 +1339,11 @@ export class ChatExporter {
 
   private updateStatusBar(): void {
     if (this.isWatching) {
-      this.statusBar.text = '$(eye) Chat Export: Watching';
+      this.statusBar.text = '$(eye) Wild West: Watching';
       this.statusBar.tooltip = this.createTooltip();
       this.statusBar.show();
     } else {
-      this.statusBar.text = '$(eye-closed) Chat Export: Stopped';
+      this.statusBar.text = '$(eye-closed) Wild West: Stopped';
       this.statusBar.tooltip = this.createTooltip();
       this.statusBar.show();
     }
