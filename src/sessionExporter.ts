@@ -43,7 +43,6 @@ export class SessionExporter {
     this.log(`${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${ms} [info] SessionExporter constructor called`);
     
     this.statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-    // No command needed - hover will show actions
     
     // Determine VS Code storage path based on platform
     this.userHome = process.env.HOME || process.env.USERPROFILE || '';
@@ -1371,10 +1370,17 @@ export class SessionExporter {
     }
 
     tooltip.appendMarkdown('---\n\n');
+    tooltip.appendMarkdown('**Sessions**\n\n');
     tooltip.appendMarkdown('[$(sync) Export Now](command:wildwest.exportNow)\n\n');
     tooltip.appendMarkdown('[$(package) Batch Convert to JSON](command:wildwest.batchConvert)\n\n');
     tooltip.appendMarkdown('[$(file-text) Convert to Markdown](command:wildwest.convertToMarkdown)\n\n');
-    tooltip.appendMarkdown('[$(list-unordered) Generate Markdown Index](command:wildwest.generateIndex)\n\n');
+    tooltip.appendMarkdown('[$(list-unordered) Generate Index](command:wildwest.generateIndex)\n\n');
+
+    tooltip.appendMarkdown('---\n\n');
+    tooltip.appendMarkdown('**Governance**\n\n');
+    tooltip.appendMarkdown('[$(radio-tower) View Telegraph](command:wildwest.viewTelegraph)\n\n');
+    tooltip.appendMarkdown('[$(pulse) Solo Mode Report](command:wildwest.soloModeReport)\n\n');
+
     tooltip.appendMarkdown('---\n\n');
     tooltip.appendMarkdown('[$(folder-opened) Open Export Folder](command:wildwest.openExportFolder)\n\n');
     tooltip.appendMarkdown('[$(output) View Output Log](command:wildwest.viewOutputLog)\n\n');
