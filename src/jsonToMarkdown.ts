@@ -106,7 +106,7 @@ function extractResponseFromRequest(req?: SessionRequest): string {
 export function generateMarkdown(data: ExportJson, inputAbs: string): string {
   const lines: string[] = [];
 
-  const title = safeText(data.sourceSession?.customTitle) || 'Chat Export';
+  const title = safeText(data.sourceSession?.customTitle) || 'Wild West Session';
   lines.push(`# ${title}`);
   lines.push('');
 

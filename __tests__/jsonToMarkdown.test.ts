@@ -50,7 +50,7 @@ describe('jsonToMarkdown', () => {
   it('converts replay JSON to Markdown', () => {
     const out = convertJsonFileToMarkdown(jsonPath, mdPath);
     const md = fs.readFileSync(out, 'utf8');
-    expect(md).toContain('# Chat Export');
+    expect(md).toContain('# Wild West Session');
     expect(md).toContain('testuser');
     expect(md).toContain('Prompt?');
     expect(md).toContain('Answer.');

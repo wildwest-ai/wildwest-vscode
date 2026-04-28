@@ -117,7 +117,7 @@ export function generateIndex(exportPath: string, stagedDirOverride?: string): s
   rows.sort((a, b) => b.dateMs - a.dateMs);
 
   const lines: string[] = [];
-  lines.push('# Copilot Chat Exports Index');
+  lines.push('# Wild West Session Index');
   lines.push('');
   lines.push(`Generated: ${new Date().toISOString()}`);
   lines.push('');
