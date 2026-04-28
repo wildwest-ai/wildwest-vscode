@@ -744,7 +744,13 @@ export class SessionExporter {
 
   private loadState(): { version: number; initialized: boolean; lastDbStats: Record<string, { mtime: number; size: number }> } {
     try {
-      const stateFilePath = path.join(this.exportPath, '.chatexport-state.json');
+      const stateFilePath = path.join(this.exportPath, '.wildwest-state.json');
+      const legacyFilePath = path.join(this.exportPath, '.chatexport-state.json');
+      // Migrate legacy state file from pre-0.1.3 installs
+      if (!fs.existsSync(stateFilePath) && fs.existsSync(legacyFilePath)) {
+        fs.renameSync(legacyFilePath, stateFilePath);
+        this.log(`${this.getTimestamp()} Migrated state file: .chatexport-state.json → .wildwest-state.json`);
+      }
       if (fs.existsSync(stateFilePath)) {
         const content = fs.readFileSync(stateFilePath, 'utf8');
         const loadedState = JSON.parse(content);
@@ -763,7 +769,7 @@ export class SessionExporter {
 
   private saveState(): void {
     try {
-      const stateFilePath = path.join(this.exportPath, '.chatexport-state.json');
+      const stateFilePath = path.join(this.exportPath, '.wildwest-state.json');
       // Ensure export directory exists
       if (!fs.existsSync(this.exportPath)) {
         fs.mkdirSync(this.exportPath, { recursive: true });
@@ -885,7 +891,7 @@ export class SessionExporter {
       // Save state after polling cycle (even if no activity)
       this.saveState();
       if (activity) {
-        this.log(`${this.getTimestamp()} State file saved: ${path.join(this.exportPath, '.chatexport-state.json')}`);
+        this.log(`${this.getTimestamp()} State file saved: ${path.join(this.exportPath, '.wildwest-state.json')}`);
       } else {
         // Only log heartbeat dot, do not log state file saves for idle cycles
         // (No state file log at all for idle cycles)
