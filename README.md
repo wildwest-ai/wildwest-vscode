@@ -31,6 +31,9 @@ Writes periodic heartbeat beats to the `_heartbeat` worktree of the active repo.
 ### Telegraph Watcher
 Monitors `_heartbeat/.wildwest/telegraph/` in the active repo's `_heartbeat` worktree for inter-actor messages. Flags new messages in the status bar.
 
+### Town Init
+Onboards any repo into the Wild West governance model via a guided wizard (`wildwest.initTown`). Creates the `.wildwest/` directory structure, sets up the `_heartbeat` worktree, and updates `.gitignore`. Designed to be run once per repo.
+
 ---
 
 ## Status Bar
@@ -60,6 +63,7 @@ All commands are available via `Cmd+Shift+P` → `Wild West: ...`
 | Batch Convert All Sessions | Normalize raw → staged |
 | Convert Exports to Markdown | Generate transcripts from staged JSON |
 | Generate Index | Create INDEX.md for staged transcripts |
+| Init Town | Initialize `.wildwest/` governance structure in the current repo |
 | Start Heartbeat | Start heartbeat monitor |
 | Stop Heartbeat | Stop heartbeat monitor |
 | View Telegraph | Open `_heartbeat/.wildwest/telegraph/` in Finder |

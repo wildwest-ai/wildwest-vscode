@@ -1,6 +1,23 @@
 # TODO — wildwest-vscode
 
-> **Last updated:** 2026-04-28 22:37 UTC (18:37 EDT)
+> **Last updated:** 2026-04-29 13:43 UTC (09:43 EDT)
+
+---
+
+## Town onboarding — `wildwest.initTown`
+
+Initialize any repo as a `.wildwest/` governed town via a guided wizard.
+
+- [ ] **`wildwest.initTown` command** — entry point; checks if `.wildwest/` already exists; if yes, reports current state; if no, launches wizard
+- [ ] **Wizard steps:**
+  1. Confirm repo is a git repo (bail early if not)
+  2. Create `.wildwest/` directory structure: `telegraph/`, `scripts/`, `docs/`
+  3. Create `_heartbeat` branch + worktree at `.wildwest/worktrees/_heartbeat/`
+  4. Add `.wildwest/worktrees/` to `.gitignore`
+  5. Summary: what was created, what the user should commit and push next
+- [ ] **Self-onboard wildwest-vscode** — run `wildwest.initTown` in this repo as the first real test
+
+Out of scope for v1: CLAUDE.md generation, registry.json, any git push.
 
 ---
 

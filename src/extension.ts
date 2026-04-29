@@ -5,6 +5,7 @@ import { HeartbeatMonitor } from './HeartbeatMonitor';
 import { SoloModeController } from './SoloModeController';
 import { TelegraphWatcher } from './TelegraphWatcher';
 import { WorktreeManager } from './WorktreeManager';
+import { initTown } from './TownInit';
 
 let exporter: SessionExporter;
 let heartbeatMonitor: HeartbeatMonitor;
@@ -54,6 +55,7 @@ export function activate(context: vscode.ExtensionContext) {
         { label: 'Convert Exports to Markdown', command: 'wildwest.convertToMarkdown' },
         { label: 'Generate Index',            command: 'wildwest.generateIndex' },
         { label: 'Governance', kind: vscode.QuickPickItemKind.Separator },
+        { label: 'Init Town',                 command: 'wildwest.initTown' },
         { label: 'Start Heartbeat',           command: 'wildwest.startHeartbeat' },
         { label: 'Stop Heartbeat',            command: 'wildwest.stopHeartbeat' },
         { label: 'View Telegraph',            command: 'wildwest.viewTelegraph' },
@@ -71,6 +73,11 @@ export function activate(context: vscode.ExtensionContext) {
         if (cmd) vscode.commands.executeCommand(cmd);
       }
     }),
+  );
+
+  // ── Command — town init ───────────────────────────────────────────────────
+  context.subscriptions.push(
+    vscode.commands.registerCommand('wildwest.initTown', () => initTown(outputChannel)),
   );
 
   // ── Commands — heartbeat ──────────────────────────────────────────────────
