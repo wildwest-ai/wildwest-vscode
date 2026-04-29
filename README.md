@@ -101,3 +101,13 @@ Then reload the VSCode window (`Cmd+Shift+P` → **Developer: Reload Window**).
 
 - VS Code `^1.84.0`
 - Git configured with `user.name` (used to organize export folders)
+
+---
+
+## Roadmap
+
+### MCP integration
+
+Wild West governance artifacts currently live as local files under `.wildwest/` (telegraph messages, scripts, docs). As the framework matures, these could migrate to an MCP server — exposing governance capabilities (`sendMessage`, `readTelegraph`, `reportHeartbeat`, etc.) as tools that any AI actor can call directly, regardless of editor or channel.
+
+wildwest-vscode would evolve into the MCP host/transport layer, bridging VSCode UI with an MCP server. The `.wildwest/` directory would shrink to the worktree runtime only (fully gitignored), and Wild West would become a true actor-agnostic governance service.

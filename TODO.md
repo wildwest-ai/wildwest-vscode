@@ -1,6 +1,6 @@
 # TODO — wildwest-vscode
 
-> **Last updated:** 2026-04-29 13:43 UTC (09:43 EDT)
+> **Last updated:** 2026-04-29 14:47 UTC (10:47 EDT)
 
 ---
 
@@ -18,6 +18,19 @@ Initialize any repo as a `.wildwest/` governed town via a guided wizard.
 - [ ] **Self-onboard wildwest-vscode** — run `wildwest.initTown` in this repo as the first real test
 
 Out of scope for v1: CLAUDE.md generation, registry.json, any git push.
+
+---
+
+## MCP integration — future
+
+Migrate governance artifacts from local `.wildwest/` files to an MCP server. Governance capabilities become MCP tools callable by any actor regardless of editor or channel.
+
+- [ ] **MCP server** — expose `sendMessage`, `readTelegraph`, `reportHeartbeat`, `listWorktrees`, `getSoloTier` as MCP tools
+- [ ] **wildwest-vscode as MCP host** — bridge VSCode UI + file watching to the MCP transport layer
+- [ ] **`.wildwest/` shrinks to runtime only** — `telegraph/`, `scripts/`, `docs/` move server-side; only `worktrees/` remains locally (fully gitignored)
+- [ ] **Actor-agnostic** — Claude Code, Copilot, Codex all call the same MCP tools; no file-convention assumptions
+
+Out of scope until governance file layer is stable.
 
 ---
 
