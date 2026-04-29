@@ -10,23 +10,13 @@ export async function initTown(outputChannel: vscode.OutputChannel): Promise<voi
     return;
   }
 
-  // ── Folder selection — prefer active editor's folder, fallback to picker ──
-  let cwd: string;
-  const activeUri = vscode.window.activeTextEditor?.document.uri;
-  const activeFolder = activeUri ? vscode.workspace.getWorkspaceFolder(activeUri) : undefined;
-
-  if (folders.length === 1) {
-    cwd = folders[0].uri.fsPath;
-  } else if (activeFolder) {
-    cwd = activeFolder.uri.fsPath;
-  } else {
-    const pick = await vscode.window.showQuickPick(
-      folders.map((f) => ({ label: f.name, description: f.uri.fsPath, folder: f })),
-      { placeHolder: 'Select the repo to initialize as a Wild West town' },
-    );
-    if (!pick) return;
-    cwd = pick.folder.uri.fsPath;
-  }
+  // ── Folder selection — always show picker so user confirms the target ─────
+  const pick = await vscode.window.showQuickPick(
+    folders.map((f) => ({ label: f.name, description: f.uri.fsPath, folder: f })),
+    { placeHolder: 'Initialize which repo as a Wild West town?' },
+  );
+  if (!pick) return;
+  const cwd = pick.folder.uri.fsPath;
 
   // ── Verify git repo ───────────────────────────────────────────────────────
   let repoRoot: string;
@@ -50,7 +40,7 @@ export async function initTown(outputChannel: vscode.OutputChannel): Promise<voi
   // ── Run steps with progress notification ──────────────────────────────────
   let success = false;
   await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: 'Wild West: Initializing town…', cancellable: false },
+    { location: vscode.ProgressLocation.Notification, title: 'Wild West v0.2.4: Initializing town…', cancellable: false },
     async (progress) => {
       try {
         // Step 1 — directory structure
@@ -81,6 +71,9 @@ export async function initTown(outputChannel: vscode.OutputChannel): Promise<voi
         progress.report({ message: 'Adding _heartbeat worktree…' });
         const worktreePath = path.join(wildwestDir, 'worktrees', '_heartbeat');
         fs.mkdirSync(path.join(wildwestDir, 'worktrees'), { recursive: true });
+
+        // prune stale registrations before checking (handles rm -rf .wildwest/ leftovers)
+        try { execSync('git worktree prune', { cwd: repoRoot, encoding: 'utf8' }); } catch { /* ignore */ }
 
         const wtList = execSync('git worktree list --porcelain', { cwd: repoRoot, encoding: 'utf8' });
         if (!wtList.includes(worktreePath)) {
