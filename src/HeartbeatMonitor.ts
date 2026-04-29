@@ -1,4 +1,4 @@
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
@@ -94,21 +94,52 @@ export class HeartbeatMonitor {
     });
   }
 
+  private getGovInfo(): { branch: string; tier: number; worktreeCount: number } {
+    const folders = vscode.workspace.workspaceFolders;
+    const cwd = folders && folders.length > 0 ? folders[0].uri.fsPath : undefined;
+
+    let branch = '?';
+    if (cwd) {
+      try {
+        branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd, encoding: 'utf8' }).trim();
+      } catch {
+        // not a git repo or git unavailable
+      }
+    }
+
+    const worktrees = this.worktreeManager.list();
+    const nonHeartbeat = worktrees.filter((w) => !w.isHeartbeat);
+    const worktreeCount = nonHeartbeat.length;
+
+    let tier = 4;
+    if (this.state !== 'stopped' && cwd) {
+      const hasBranchDoc = fs.existsSync(
+        path.join(cwd, 'docs', 'branches', 'active', branch, 'README.md'),
+      );
+      tier = hasBranchDoc ? 2 : 1;
+    }
+
+    return { branch, tier, worktreeCount };
+  }
+
   private updateStatusBar(): void {
+    const { branch, tier, worktreeCount } = this.getGovInfo();
+    const wtLabel = worktreeCount === 1 ? '1 wt' : `${worktreeCount} wt`;
+
     switch (this.state) {
       case 'alive':
-        this.statusBarItem.text = '● Wild West';
-        this.statusBarItem.tooltip = 'Heartbeat alive — no flags';
+        this.statusBarItem.text = `● Wild West  $(git-branch) ${branch}  T${tier}  ${wtLabel}`;
+        this.statusBarItem.tooltip = `Heartbeat alive — no flags\nBranch: ${branch}  |  Solo Tier ${tier}  |  ${wtLabel}`;
         this.statusBarItem.color = undefined;
         break;
       case 'flagged':
-        this.statusBarItem.text = '⚠ Wild West';
-        this.statusBarItem.tooltip = 'Heartbeat alive — flags present (click to view telegraph)';
+        this.statusBarItem.text = `⚠ Wild West  $(git-branch) ${branch}  T${tier}  ${wtLabel}`;
+        this.statusBarItem.tooltip = `Heartbeat alive — flags present (click to view telegraph)\nBranch: ${branch}  |  Solo Tier ${tier}  |  ${wtLabel}`;
         this.statusBarItem.color = new vscode.ThemeColor('statusBarItem.warningForeground');
         break;
       case 'stopped':
-        this.statusBarItem.text = '○ Wild West';
-        this.statusBarItem.tooltip = 'Heartbeat stopped or stale — no _heartbeat worktree?';
+        this.statusBarItem.text = `○ Wild West  $(git-branch) ${branch}  T4  ${wtLabel}`;
+        this.statusBarItem.tooltip = `Heartbeat stopped or stale — no _heartbeat worktree?\nBranch: ${branch}  |  Solo Tier 4 (no heartbeat)  |  ${wtLabel}`;
         this.statusBarItem.color = new vscode.ThemeColor('statusBarItem.errorForeground');
         break;
     }

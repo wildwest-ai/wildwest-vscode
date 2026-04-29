@@ -6,3 +6,4 @@ dist/*.map
 tsconfig.json
 TODO.md
 README.md
+.wildwest/worktrees/**

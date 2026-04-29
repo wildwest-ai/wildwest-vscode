@@ -21,10 +21,14 @@ export class WorktreeManager {
         encoding: 'utf8',
       }).trim();
       // resolve to main checkout root (worktrees share the same git dir)
-      const mainRoot = execSync('git -C "' + root + '" rev-parse --git-common-dir', {
+      // git-common-dir is absolute in a linked worktree (/path/.git), relative in the main one (.git)
+      const gitCommonDir = execSync('git -C "' + root + '" rev-parse --git-common-dir', {
         encoding: 'utf8',
-      }).trim().replace(/\/\.git$/, '');
-      this.repoRoot = mainRoot !== root ? mainRoot : root;
+      }).trim();
+      const mainRoot = path.isAbsolute(gitCommonDir)
+        ? gitCommonDir.replace(/\/\.git$/, '')
+        : root;
+      this.repoRoot = mainRoot;
       return this.repoRoot;
     } catch {
       return null;
