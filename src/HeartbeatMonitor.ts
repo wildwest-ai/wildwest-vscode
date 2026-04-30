@@ -73,15 +73,29 @@ export class HeartbeatMonitor {
     this.statusBarItem.dispose();
   }
 
-  private sentinelPath(): string | null {
+  /**
+   * Returns the workspace folder that is a governed Wild West town.
+   * Prefers the first folder that has `.wildwest/` initialized; falls back to folders[0].
+   * This handles multi-root workspaces where the governed town is not folders[0].
+   */
+  private getTownRoot(): string | null {
     const folders = vscode.workspace.workspaceFolders;
-    const cwd = folders && folders.length > 0 ? folders[0].uri.fsPath : undefined;
+    if (!folders || folders.length === 0) return null;
+    // A properly initialized town has .wildwest/scripts/ (created by initTown).
+    // wildwest-framework only has .wildwest/telegraph/ — not a full town.
+    const governed = folders.find((f) =>
+      fs.existsSync(path.join(f.uri.fsPath, '.wildwest', 'scripts')),
+    );
+    return (governed ?? folders[0]).uri.fsPath;
+  }
+
+  private sentinelPath(): string | null {
+    const cwd = this.getTownRoot();
     return cwd ? path.join(cwd, '.wildwest', 'telegraph', '.last-beat') : null;
   }
 
   private beat(): void {
-    const folders = vscode.workspace.workspaceFolders;
-    const cwd = folders && folders.length > 0 ? folders[0].uri.fsPath : undefined;
+    const cwd = this.getTownRoot();
     if (!cwd) {
       this.state = 'stopped';
       this.updateStatusBar();
@@ -115,8 +129,7 @@ export class HeartbeatMonitor {
   }
 
   private refreshGovCache(): void {
-    const folders = vscode.workspace.workspaceFolders;
-    const cwd = folders && folders.length > 0 ? folders[0].uri.fsPath : undefined;
+    const cwd = this.getTownRoot();
 
     const updateWorktreeCount = () => {
       const worktrees = this.worktreeManager.list();
@@ -138,8 +151,7 @@ export class HeartbeatMonitor {
 
   private getGovInfo(): { branch: string; tier: number; worktreeCount: number } {
     const { branch, worktreeCount } = this.govCache;
-    const folders = vscode.workspace.workspaceFolders;
-    const cwd = folders && folders.length > 0 ? folders[0].uri.fsPath : undefined;
+    const cwd = this.getTownRoot();
 
     let tier = 4;
     if (this.state !== 'stopped' && cwd) {

@@ -1,4 +1,5 @@
 import { execSync } from 'child_process';
+import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 
@@ -16,9 +17,14 @@ export class WorktreeManager {
     if (this.repoRoot) return this.repoRoot;
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) return null;
+    // In multi-root workspaces, prefer the folder that is a governed town (.wildwest/ initialized)
+    const governed = folders.find((f) =>
+      fs.existsSync(path.join(f.uri.fsPath, '.wildwest', 'scripts')),
+    );
+    const startDir = (governed ?? folders[0]).uri.fsPath;
     try {
       const root = execSync('git rev-parse --show-toplevel', {
-        cwd: folders[0].uri.fsPath,
+        cwd: startDir,
         encoding: 'utf8',
       }).trim();
       // resolve to main checkout root (worktrees share the same git dir)
