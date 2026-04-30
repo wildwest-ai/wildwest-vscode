@@ -782,8 +782,8 @@ export class SessionExporter {
   private getDefaultExportPath(): string {
     const userHome = process.env.HOME || process.env.USERPROFILE || '';
     const username = this.getGitUsername();
-    // Default: ${userHome}/wildwest-vscode/{git-username}/
-    return path.join(userHome, 'wildwest-vscode', username);
+    // Default: ${userHome}/wildwest/sessions/{git-username}/
+    return path.join(userHome, 'wildwest', 'sessions', username);
   }
 
   async start(): Promise<void> {
