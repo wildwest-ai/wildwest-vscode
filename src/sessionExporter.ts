@@ -55,7 +55,7 @@ export class SessionExporter {
     if (configPath) {
       this.exportPath = this.expandPath(configPath, this.userHome);
     } else {
-      // Default: ${userHome}/wildwest-vscode/{git-username}/
+      // Default: ${userHome}/wildwest/sessions/{git-username}/
       this.exportPath = this.getDefaultExportPath();
     }
     

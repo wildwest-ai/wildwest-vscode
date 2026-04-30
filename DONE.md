@@ -65,6 +65,12 @@
 
 ---
 
+## sessionExporter.ts comment fix ✓ shipped v0.5.2
+
+- [x] **Stale inline comment updated** — `sessionExporter.ts` line 58: `// Default: ${userHome}/wildwest-vscode/` → `${userHome}/wildwest/sessions/`
+
+---
+
 ## README export path fix ✓ shipped v0.5.1
 
 - [x] **README.md: stale `~/wildwest-vscode/` paths replaced** — export path description and `wildwest.exportPath` default updated to `~/wildwest/sessions/{git-username}/` to match the v0.4.0 actual behavior
