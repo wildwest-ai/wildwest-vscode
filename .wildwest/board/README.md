@@ -1,6 +1,6 @@
 # Board — wildwest-vscode
 
-> **Last updated:** 2026-04-30 11:28 UTC
+> **Last updated:** 2026-04-30 12:11 UTC
 > **Town:** wildwest-vscode
 > **Repo:** https://github.com/wildwest-ai/wildwest-vscode
 
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.3.2 |
+| Version | 0.3.4 |
 | Branch | main |
 | Heartbeat | ● alive (native Node.js) |
 | Solo Tier | T1 — no active feature branch |
@@ -20,7 +20,7 @@
 
 ## Active Branches
 
-_None. All work is on `main`._
+_None. All work on `main`._
 
 See `board/branches/` for lifecycle docs.
 
@@ -31,8 +31,8 @@ See `board/branches/` for lifecycle docs.
 | ID | Item | Notes |
 |---|---|---|
 | B5 | Command palette split | `package.json` only — no code |
-| B4 | Last beat age in tooltip | Low effort, high signal |
-| B3 | Telegraph unread badge | TelegraphWatcher already in place |
+| B4 | Last beat age in tooltip | Low effort; mtime already read |
+| B3 | Telegraph unread badge | TelegraphWatcher in place |
 | B2 | Branch doc creation command | T1→T2 upgrade path; needs UI |
 | B1 | Heartbeat log | Per-branch daily log in telegraph |
 
@@ -42,11 +42,11 @@ See `board/branches/` for lifecycle docs.
 
 | Version | Commit | What |
 |---|---|---|
-| v0.3.2 | `0800e03` | Exclude main worktree from count; branch doc → `.wildwest/docs/branches/` |
-| v0.3.1 | `c5a55f6` | Heartbeat rewritten as native Node.js; async govCache |
-| v0.3.0 | `5a3882b` | Status bar governance dashboard (branch, tier, worktree count) |
-| v0.2.4 | `462c1b2` | initTown: always show repo picker; prune stale worktrees |
-| v0.2.0 | `5becc98` | wildwest.initTown wizard |
+| v0.3.4 | `25f743c` | board/branches/ 4-state lifecycle; rich branch doc template; generate-branch-index.sh |
+| v0.3.3 | `756f087` | Multi-root workspace town detection — getTownRoot() keys on .wildwest/scripts/ |
+| v0.3.2 | `0800e03` | Exclude main worktree from count; branch doc → .wildwest/ |
+| v0.3.1 | `c5a55f6` | Native Node.js heartbeat; async govCache |
+| v0.3.0 | `5a3882b` | Status bar governance dashboard |
 
 ---
 
