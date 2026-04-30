@@ -7,7 +7,7 @@ Governance framework for AI-assisted development. Tracks devPair activity, expor
 ## Features
 
 ### devPair Log Watcher
-Automatically polls chat session storage every 5 seconds and exports raw sessions to `~/wildwest-vscode/{git-username}/raw/`:
+Automatically polls chat session storage every 5 seconds and exports raw sessions to `~/wildwest/sessions/{git-username}/raw/`:
 
 | Provider | Source | Output folder |
 |---|---|---|
@@ -78,7 +78,7 @@ Settings are available under `Preferences → Settings → Wild West`.
 | Setting | Default | Description |
 |---|---|---|
 | `wildwest.enabled` | `true` | Enable Wild West on startup |
-| `wildwest.exportPath` | `~/wildwest-vscode/{git-username}/` | Export directory. Supports `~` and `${userHome}` |
+| `wildwest.exportPath` | `~/wildwest/sessions/{git-username}/` | Export directory. Supports `~` and `${userHome}` |
 | `wildwest.watchInterval` | `5000` | Poll interval in milliseconds |
 | `wildwest.autoExportOnChange` | `true` | Auto-export when chat data changes |
 | `wildwest.heartbeatInterval` | `300000` | Heartbeat interval in milliseconds (default: 5 min) |

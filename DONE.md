@@ -65,6 +65,12 @@
 
 ---
 
+## README export path fix ✓ shipped v0.5.1
+
+- [x] **README.md: stale `~/wildwest-vscode/` paths replaced** — export path description and `wildwest.exportPath` default updated to `~/wildwest/sessions/{git-username}/` to match the v0.4.0 actual behavior
+
+---
+
 ## v3 cascading scope heartbeat ✓ shipped v0.5.0
 
 - [x] **Multi-scope detection** — `detectScopes()` reads `scope` field from `.wildwest/registry.json`; for each town found, walks ancestor dirs to locate county and world roots; deduplicates by rootPath
