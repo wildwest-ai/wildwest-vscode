@@ -6,6 +6,7 @@ export interface Worktree {
   path: string;
   branch: string;
   isHeartbeat: boolean;
+  isMain: boolean;
 }
 
 export class WorktreeManager {
@@ -69,6 +70,7 @@ export class WorktreeManager {
         path: wtPath,
         branch,
         isHeartbeat: path.basename(wtPath) === '_heartbeat' || branch === '_heartbeat',
+        isMain: worktrees.length === 0, // first entry from git worktree list is always main
       });
     }
     return worktrees;

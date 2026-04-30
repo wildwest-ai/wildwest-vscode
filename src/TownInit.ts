@@ -40,7 +40,7 @@ export async function initTown(outputChannel: vscode.OutputChannel): Promise<voi
   // ── Run steps with progress notification ──────────────────────────────────
   let success = false;
   await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: 'Wild West v0.3.1: Initializing town…', cancellable: false },
+    { location: vscode.ProgressLocation.Notification, title: 'Wild West v0.3.2: Initializing town…', cancellable: false },
     async (progress) => {
       try {
         // Step 1 — directory structure

@@ -120,7 +120,7 @@ export class HeartbeatMonitor {
 
     const updateWorktreeCount = () => {
       const worktrees = this.worktreeManager.list();
-      this.govCache.worktreeCount = worktrees.filter((w) => !w.isHeartbeat).length;
+      this.govCache.worktreeCount = worktrees.filter((w) => !w.isHeartbeat && !w.isMain).length;
       this.updateStatusBar();
     };
 
@@ -144,7 +144,7 @@ export class HeartbeatMonitor {
     let tier = 4;
     if (this.state !== 'stopped' && cwd) {
       const hasBranchDoc = fs.existsSync(
-        path.join(cwd, 'docs', 'branches', 'active', branch, 'README.md'),
+        path.join(cwd, '.wildwest', 'docs', 'branches', 'active', branch, 'README.md'),
       );
       tier = hasBranchDoc ? 2 : 1;
     }
