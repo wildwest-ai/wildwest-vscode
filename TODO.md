@@ -1,23 +1,6 @@
 # TODO — wildwest-vscode
 
-> **Last updated:** 2026-04-29 14:47 UTC (10:47 EDT)
-
----
-
-## Town onboarding — `wildwest.initTown`
-
-Initialize any repo as a `.wildwest/` governed town via a guided wizard.
-
-- [ ] **`wildwest.initTown` command** — entry point; checks if `.wildwest/` already exists; if yes, reports current state; if no, launches wizard
-- [ ] **Wizard steps:**
-  1. Confirm repo is a git repo (bail early if not)
-  2. Create `.wildwest/` directory structure: `telegraph/`, `scripts/`, `docs/`
-  3. Create `_heartbeat` branch + worktree at `.wildwest/worktrees/_heartbeat/`
-  4. Add `.wildwest/worktrees/` to `.gitignore`
-  5. Summary: what was created, what the user should commit and push next
-- [ ] **Self-onboard wildwest-vscode** — run `wildwest.initTown` in this repo as the first real test
-
-Out of scope for v1: CLAUDE.md generation, registry.json, any git push.
+> **Last updated:** 2026-04-29 15:23 UTC (11:23 EDT)
 
 ---
 
@@ -46,12 +29,6 @@ Change is purely in `package.json` `contributes.commands[*].category` — no cod
 ---
 
 ## Status bar — Wild West features
-
-### High value, low effort
-
-- [ ] **Active worktrees count** — add `$(git-branch) N worktrees` next to the heartbeat pill. `WorktreeManager.list()` already exists; count non-heartbeat entries.
-- [ ] **Solo tier for current branch** — add `Tier N` badge to the status bar. `SoloModeController.getTier()` already computes it; just surface it. Most governance-relevant signal — an HG in Tier 4 should not be acting.
-- [ ] **Current branch name** — show `$(git-branch) <branch>` via `git rev-parse --abbrev-ref HEAD`. Lets you verify which worktree VSCode considers active without leaving the editor.
 
 ### Medium value, more effort
 
