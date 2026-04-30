@@ -1,4 +1,4 @@
-import { exec, execSync } from 'child_process';
+import { exec } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
@@ -14,6 +14,7 @@ export class HeartbeatMonitor {
   private state: HeartbeatState = 'stopped';
   private outputChannel: vscode.OutputChannel;
   private worktreeManager: WorktreeManager;
+  private govCache: { branch: string; worktreeCount: number } = { branch: '?', worktreeCount: 0 };
 
   constructor(outputChannel: vscode.OutputChannel, worktreeManager: WorktreeManager) {
     this.outputChannel = outputChannel;
@@ -22,6 +23,7 @@ export class HeartbeatMonitor {
     this.statusBarItem.command = 'wildwest.viewTelegraph';
     this.statusBarItem.show();
     this.updateStatusBar();
+    this.refreshGovCache();
   }
 
   start(): void {
@@ -49,9 +51,8 @@ export class HeartbeatMonitor {
   }
 
   checkLiveness(): HeartbeatState {
-    const hwt = this.worktreeManager.getHeartbeatWorktree();
-    if (!hwt) return 'stopped';
-    const sentinel = path.join(hwt.path, '.wildwest', 'telegraph', '.last-beat');
+    const sentinel = this.sentinelPath();
+    if (!sentinel) return 'stopped';
     try {
       const stat = fs.statSync(sentinel);
       const ageMs = Date.now() - stat.mtimeMs;
@@ -72,44 +73,73 @@ export class HeartbeatMonitor {
     this.statusBarItem.dispose();
   }
 
+  private sentinelPath(): string | null {
+    const folders = vscode.workspace.workspaceFolders;
+    const cwd = folders && folders.length > 0 ? folders[0].uri.fsPath : undefined;
+    return cwd ? path.join(cwd, '.wildwest', 'telegraph', '.last-beat') : null;
+  }
+
   private beat(): void {
-    const hwt = this.worktreeManager.getHeartbeatWorktree();
-    if (!hwt) {
-      this.outputChannel.appendLine('[HeartbeatMonitor] no _heartbeat worktree found — skipping beat');
+    const folders = vscode.workspace.workspaceFolders;
+    const cwd = folders && folders.length > 0 ? folders[0].uri.fsPath : undefined;
+    if (!cwd) {
       this.state = 'stopped';
       this.updateStatusBar();
       return;
     }
-    const scriptPath = path.join(hwt.path, '.wildwest', 'scripts', 'heartbeat.sh');
-    exec(`bash "${scriptPath}"`, { cwd: hwt.path }, (err, stdout, stderr) => {
-      if (stdout) this.outputChannel.appendLine(stdout.trim());
-      if (stderr) this.outputChannel.appendLine(`[stderr] ${stderr.trim()}`);
-      if (err) {
-        this.outputChannel.appendLine(`[HeartbeatMonitor] beat error: ${err.message}`);
-        this.state = 'stopped';
-      } else {
-        this.state = stdout.includes('flag') && !stdout.includes('flags=0') ? 'flagged' : 'alive';
-      }
-      this.updateStatusBar();
-    });
+
+    const telegraphDir = path.join(cwd, '.wildwest', 'telegraph');
+    const sentinelPath = path.join(telegraphDir, '.last-beat');
+
+    try {
+      fs.mkdirSync(telegraphDir, { recursive: true });
+      fs.writeFileSync(sentinelPath, new Date().toISOString() + '\n');
+    } catch (err) {
+      this.outputChannel.appendLine(`[HeartbeatMonitor] beat error: ${err}`);
+      this.state = 'stopped';
+      this.refreshGovCache();
+      return;
+    }
+
+    // Scan telegraph for flag files (skip sentinel and history dir)
+    let flagged = false;
+    try {
+      flagged = fs.readdirSync(telegraphDir).some(
+        (e) => !e.startsWith('.') && e !== 'history' && !e.includes('-heartbeat--'),
+      );
+    } catch { /* no flags */ }
+
+    this.state = flagged ? 'flagged' : 'alive';
+    this.outputChannel.appendLine(`[HeartbeatMonitor] beat — state=${this.state}`);
+    this.refreshGovCache();
   }
 
-  private getGovInfo(): { branch: string; tier: number; worktreeCount: number } {
+  private refreshGovCache(): void {
     const folders = vscode.workspace.workspaceFolders;
     const cwd = folders && folders.length > 0 ? folders[0].uri.fsPath : undefined;
 
-    let branch = '?';
-    if (cwd) {
-      try {
-        branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd, encoding: 'utf8' }).trim();
-      } catch {
-        // not a git repo or git unavailable
-      }
-    }
+    const updateWorktreeCount = () => {
+      const worktrees = this.worktreeManager.list();
+      this.govCache.worktreeCount = worktrees.filter((w) => !w.isHeartbeat).length;
+      this.updateStatusBar();
+    };
 
-    const worktrees = this.worktreeManager.list();
-    const nonHeartbeat = worktrees.filter((w) => !w.isHeartbeat);
-    const worktreeCount = nonHeartbeat.length;
+    if (cwd) {
+      exec('git rev-parse --abbrev-ref HEAD', { cwd, encoding: 'utf8' }, (err, stdout) => {
+        if (!err) {
+          this.govCache.branch = stdout.trim();
+        }
+        updateWorktreeCount();
+      });
+    } else {
+      updateWorktreeCount();
+    }
+  }
+
+  private getGovInfo(): { branch: string; tier: number; worktreeCount: number } {
+    const { branch, worktreeCount } = this.govCache;
+    const folders = vscode.workspace.workspaceFolders;
+    const cwd = folders && folders.length > 0 ? folders[0].uri.fsPath : undefined;
 
     let tier = 4;
     if (this.state !== 'stopped' && cwd) {

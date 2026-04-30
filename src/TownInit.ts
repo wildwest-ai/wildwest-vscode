@@ -40,7 +40,7 @@ export async function initTown(outputChannel: vscode.OutputChannel): Promise<voi
   // ── Run steps with progress notification ──────────────────────────────────
   let success = false;
   await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: 'Wild West v0.3.0: Initializing town…', cancellable: false },
+    { location: vscode.ProgressLocation.Notification, title: 'Wild West v0.3.1: Initializing town…', cancellable: false },
     async (progress) => {
       try {
         // Step 1 — directory structure
@@ -72,7 +72,6 @@ export async function initTown(outputChannel: vscode.OutputChannel): Promise<voi
         const worktreePath = path.join(wildwestDir, 'worktrees', '_heartbeat');
         fs.mkdirSync(path.join(wildwestDir, 'worktrees'), { recursive: true });
 
-        // prune stale registrations before checking (handles rm -rf .wildwest/ leftovers)
         try { execSync('git worktree prune', { cwd: repoRoot, encoding: 'utf8' }); } catch { /* ignore */ }
 
         const wtList = execSync('git worktree list --porcelain', { cwd: repoRoot, encoding: 'utf8' });
