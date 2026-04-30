@@ -156,7 +156,7 @@ export class HeartbeatMonitor {
     let tier = 4;
     if (this.state !== 'stopped' && cwd) {
       const hasBranchDoc = fs.existsSync(
-        path.join(cwd, '.wildwest', 'docs', 'branches', 'active', branch, 'README.md'),
+        path.join(cwd, '.wildwest', 'board', 'branches', 'active', branch, 'README.md'),
       );
       tier = hasBranchDoc ? 2 : 1;
     }
