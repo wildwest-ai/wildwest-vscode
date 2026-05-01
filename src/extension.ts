@@ -6,12 +6,14 @@ import { SoloModeController } from './SoloModeController';
 import { TelegraphWatcher } from './TelegraphWatcher';
 import { WorktreeManager } from './WorktreeManager';
 import { initTown } from './TownInit';
+import { TelegraphInbox } from './TelegraphInbox';
 
 let exporter: SessionExporter;
 let heartbeatMonitor: HeartbeatMonitor;
 let telegraphWatcher: TelegraphWatcher;
 let soloModeController: SoloModeController;
 let worktreeManager: WorktreeManager;
+let telegraphInbox: TelegraphInbox;
 let outputChannel: vscode.OutputChannel;
 
 export function activate(context: vscode.ExtensionContext) {
@@ -24,6 +26,7 @@ export function activate(context: vscode.ExtensionContext) {
   heartbeatMonitor = new HeartbeatMonitor(outputChannel);
   telegraphWatcher = new TelegraphWatcher(outputChannel, worktreeManager, heartbeatMonitor);
   soloModeController = new SoloModeController(outputChannel, worktreeManager, heartbeatMonitor);
+  telegraphInbox = new TelegraphInbox(outputChannel);
 
   // ── Commands — devPair log (existing) ─────────────────────────────────────
   context.subscriptions.push(
@@ -56,6 +59,7 @@ export function activate(context: vscode.ExtensionContext) {
         { label: 'Generate Index',            command: 'wildwest.generateIndex' },
         { label: 'Governance', kind: vscode.QuickPickItemKind.Separator },
         { label: 'Init Town',                 command: 'wildwest.initTown' },
+        { label: 'Process Inbox',             command: 'wildwest.processInbox' },
         { label: 'View Telegraph',            command: 'wildwest.viewTelegraph' },
         { label: 'Solo Mode Report',          command: 'wildwest.soloModeReport' },
       ];
@@ -76,6 +80,11 @@ export function activate(context: vscode.ExtensionContext) {
   // ── Command — town init ───────────────────────────────────────────────────
   context.subscriptions.push(
     vscode.commands.registerCommand('wildwest.initTown', () => initTown(outputChannel)),
+  );
+
+  // ── Command — telegraph inbox (rule 23 enforcement) ───────────────────────
+  context.subscriptions.push(
+    vscode.commands.registerCommand('wildwest.processInbox', () => telegraphInbox.processInbox()),
   );
 
   // ── Commands — heartbeat ──────────────────────────────────────────────────

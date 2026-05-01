@@ -6,6 +6,7 @@ import { WorktreeManager } from './WorktreeManager';
 
 const ATTENTION_PATTERNS = ['--ack-blocked--', '--ack-question--'];
 
+
 export class TelegraphWatcher {
   private watchers: chokidar.FSWatcher[] = [];
   private outputChannel: vscode.OutputChannel;
@@ -54,9 +55,23 @@ export class TelegraphWatcher {
 
   private onFile(filePath: string): void {
     const basename = path.basename(filePath);
-    // ignore sentinel and heartbeat logs
+    // ignore sentinel, heartbeat logs, and ack files
     if (basename === '.last-beat' || basename.includes('-heartbeat--')) return;
 
+    // Incoming memo addressed to an actor → flag + prompt to process inbox
+    if (basename.startsWith('to-') && !basename.includes('--ack-')) {
+      this.heartbeatMonitor.setFlagged(true);
+      const msg = `Wild West: 📬 new memo — ${basename}`;
+      this.outputChannel.appendLine(`[TelegraphWatcher] incoming memo: ${basename}`);
+      vscode.window.showWarningMessage(msg, 'Process Inbox', 'Dismiss').then((choice) => {
+        if (choice === 'Process Inbox') {
+          vscode.commands.executeCommand('wildwest.processInbox');
+        }
+      });
+      return;
+    }
+
+    // Ack-blocked or ack-question still needs the sender's attention
     const needsAttention = ATTENTION_PATTERNS.some((p) => basename.includes(p));
     if (needsAttention) {
       this.heartbeatMonitor.setFlagged(true);
