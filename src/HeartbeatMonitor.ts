@@ -1,8 +1,6 @@
-import { exec } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { WorktreeManager } from './WorktreeManager';
 
 // Absolute hardcoded floor — 5 min.
 // Used when no registry.json and no VS Code setting overrides for a scope.
@@ -203,19 +201,10 @@ function beatWorld(
 export class HeartbeatMonitor {
   private scopes: ScopeRoot[] = [];
   private scopeStates: Map<string, HeartbeatState> = new Map();
-  private statusBarItem: vscode.StatusBarItem;
   private outputChannel: vscode.OutputChannel;
-  private worktreeManager: WorktreeManager;
-  private govCache: { branch: string; worktreeCount: number } = { branch: '?', worktreeCount: 0 };
 
-  constructor(outputChannel: vscode.OutputChannel, worktreeManager: WorktreeManager) {
+  constructor(outputChannel: vscode.OutputChannel) {
     this.outputChannel = outputChannel;
-    this.worktreeManager = worktreeManager;
-    this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-    this.statusBarItem.command = 'wildwest.viewTelegraph';
-    this.statusBarItem.show();
-    this.updateStatusBar();
-    this.refreshGovCache();
   }
 
   start(): void {
@@ -224,7 +213,6 @@ export class HeartbeatMonitor {
     this.scopes = this.detectScopes();
     if (this.scopes.length === 0) {
       this.outputChannel.appendLine('[HeartbeatMonitor] no governed scopes found — not starting');
-      this.updateStatusBar();
       return;
     }
 
@@ -241,7 +229,6 @@ export class HeartbeatMonitor {
       }
       this.scopeStates.set(scope.rootPath, 'stopped');
     }
-    this.updateStatusBar();
     this.outputChannel.appendLine('[HeartbeatMonitor] stopped all scope timers');
   }
 
@@ -271,12 +258,10 @@ export class HeartbeatMonitor {
     const current = this.scopeStates.get(town.rootPath);
     if (current === 'stopped') return;
     this.scopeStates.set(town.rootPath, flagged ? 'flagged' : 'alive');
-    this.updateStatusBar();
   }
 
   dispose(): void {
     this.stop();
-    this.statusBarItem.dispose();
   }
 
   // ---------------------------------------------------------------------------
@@ -360,75 +345,6 @@ export class HeartbeatMonitor {
     }
     this.scopeStates.set(scope.rootPath, state);
     this.outputChannel.appendLine(`[HeartbeatMonitor] beat — scope=${scope.scope} state=${state}`);
-    this.refreshGovCache();
   }
 
-  /** Returns the town root if one is detected — used for branch/worktree display. */
-  private getTownRoot(): string | null {
-    return this.scopes.find((s) => s.scope === 'town')?.rootPath ?? null;
-  }
-
-  private refreshGovCache(): void {
-    const cwd = this.getTownRoot();
-
-    const updateWorktreeCount = () => {
-      const worktrees = this.worktreeManager.list();
-      this.govCache.worktreeCount = worktrees.filter((w) => !w.isHeartbeat && !w.isMain).length;
-      this.updateStatusBar();
-    };
-
-    if (cwd) {
-      exec('git rev-parse --abbrev-ref HEAD', { cwd, encoding: 'utf8' }, (err, stdout) => {
-        if (!err) {
-          this.govCache.branch = stdout.trim();
-        }
-        updateWorktreeCount();
-      });
-    } else {
-      updateWorktreeCount();
-    }
-  }
-
-  private getGovInfo(): { branch: string; tier: number; worktreeCount: number } {
-    const { branch, worktreeCount } = this.govCache;
-    const cwd = this.getTownRoot();
-
-    let tier = 4;
-    if (cwd) {
-      const townState = this.scopeStates.get(cwd);
-      if (townState && townState !== 'stopped') {
-        const hasBranchDoc = fs.existsSync(
-          path.join(cwd, '.wildwest', 'board', 'branches', 'active', branch, 'README.md'),
-        );
-        tier = hasBranchDoc ? 2 : 1;
-      }
-    }
-
-    return { branch, tier, worktreeCount };
-  }
-
-  private updateStatusBar(): void {
-    const { branch, tier, worktreeCount } = this.getGovInfo();
-    const wtLabel = worktreeCount === 1 ? '1 wt' : `${worktreeCount} wt`;
-    // Overall state for status bar = town state (primary) or worst-scope state if no town
-    const displayState = this.checkLiveness();
-
-    switch (displayState) {
-      case 'alive':
-        this.statusBarItem.text = `● Wild West  $(git-branch) ${branch}  T${tier}  ${wtLabel}`;
-        this.statusBarItem.tooltip = `Heartbeat alive — no flags\nBranch: ${branch}  |  Solo Tier ${tier}  |  ${wtLabel}`;
-        this.statusBarItem.color = undefined;
-        break;
-      case 'flagged':
-        this.statusBarItem.text = `⚠ Wild West  $(git-branch) ${branch}  T${tier}  ${wtLabel}`;
-        this.statusBarItem.tooltip = `Heartbeat alive — flags present (click to view telegraph)\nBranch: ${branch}  |  Solo Tier ${tier}  |  ${wtLabel}`;
-        this.statusBarItem.color = new vscode.ThemeColor('statusBarItem.warningForeground');
-        break;
-      case 'stopped':
-        this.statusBarItem.text = `○ Wild West  $(git-branch) ${branch}  T4  ${wtLabel}`;
-        this.statusBarItem.tooltip = `Heartbeat stopped or stale — no governed scope detected?\nBranch: ${branch}  |  Solo Tier 4 (no heartbeat)  |  ${wtLabel}`;
-        this.statusBarItem.color = new vscode.ThemeColor('statusBarItem.errorForeground');
-        break;
-    }
-  }
 }

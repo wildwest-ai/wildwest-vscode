@@ -1344,11 +1344,11 @@ export class SessionExporter {
 
   private updateStatusBar(): void {
     if (this.isWatching) {
-      this.statusBar.text = '$(eye) Wild West: Watching';
+      this.statusBar.text = '$(eye) Wild West';
       this.statusBar.tooltip = this.createTooltip();
       this.statusBar.show();
     } else {
-      this.statusBar.text = '$(eye-closed) Wild West: Stopped';
+      this.statusBar.text = '$(eye-closed) Wild West';
       this.statusBar.tooltip = this.createTooltip();
       this.statusBar.show();
     }

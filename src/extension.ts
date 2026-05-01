@@ -21,7 +21,7 @@ export function activate(context: vscode.ExtensionContext) {
   // ── Core components ───────────────────────────────────────────────────────
   worktreeManager = new WorktreeManager();
   exporter = new SessionExporter(context, outputChannel);
-  heartbeatMonitor = new HeartbeatMonitor(outputChannel, worktreeManager);
+  heartbeatMonitor = new HeartbeatMonitor(outputChannel);
   telegraphWatcher = new TelegraphWatcher(outputChannel, worktreeManager, heartbeatMonitor);
   soloModeController = new SoloModeController(outputChannel, worktreeManager, heartbeatMonitor);
 
