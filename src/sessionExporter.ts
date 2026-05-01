@@ -822,6 +822,9 @@ export class SessionExporter {
         this.log(`${this.getTimestamp()} Initial scan complete. State initialized.`);
       }
 
+      // Auto-convert raw/ → staged/ on every startup (staged/ is interim MCP proxy)
+      await this.batchConvertSessions(true);
+
       // Start polling after any initial scan
       this.isWatching = true;
       this.updateStatusBar();
@@ -1469,33 +1472,35 @@ export class SessionExporter {
     return this.exportPath;
   }
 
-  async batchConvertSessions(): Promise<void> {
+  async batchConvertSessions(silent = false): Promise<void> {
     try {
       this.log(`${this.getTimestamp()} Starting batch conversion...`);
 
       if (!fs.existsSync(this.exportPath)) {
-        vscode.window.showErrorMessage(`Export directory not found: ${this.exportPath}`);
+        if (!silent) vscode.window.showErrorMessage(`Export directory not found: ${this.exportPath}`);
         return;
       }
 
-      vscode.window.showInformationMessage('Batch converting chat sessions...');
+      if (!silent) vscode.window.showInformationMessage('Batch converting chat sessions...');
 
       const converter = new BatchChatConverter(this.exportPath, false);
       await converter.run();
 
       const stagedDir = path.join(this.exportPath, 'staged');
       this.log(`${this.getTimestamp()} Batch conversion completed`);
-      vscode.window.showInformationMessage(
-        `✅ Batch conversion complete! Files saved to: ${stagedDir}`,
-        'Open Folder'
-      ).then((action) => {
-        if (action === 'Open Folder') {
-          vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(stagedDir));
-        }
-      });
+      if (!silent) {
+        vscode.window.showInformationMessage(
+          `✅ Batch conversion complete! Files saved to: ${stagedDir}`,
+          'Open Folder'
+        ).then((action) => {
+          if (action === 'Open Folder') {
+            vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(stagedDir));
+          }
+        });
+      }
     } catch (error) {
       this.log(`${this.getTimestamp('error')} Batch conversion failed: ${error}`);
-      vscode.window.showErrorMessage(`Batch conversion failed: ${error}`);
+      if (!silent) vscode.window.showErrorMessage(`Batch conversion failed: ${error}`);
     }
   }
 

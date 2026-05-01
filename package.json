@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
   },
-  "version": "0.5.4",
+  "version": "0.5.5",
   "publisher": "wildwest-ai",
   "engines": {
     "vscode": "^1.84.0"
@@ -50,7 +50,6 @@
         "title": "Generate Index",
         "category": "Wild West"
       },
-
       {
         "command": "wildwest.viewTelegraph",
         "title": "View Telegraph",
