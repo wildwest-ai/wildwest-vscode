@@ -1,6 +1,26 @@
 # TODO — wildwest-vscode
 
-> **Last updated:** 2026-04-30 14:45 UTC (10:45 EDT)
+> **Last updated:** 2026-05-01 16:30 UTC (12:30 EDT)
+
+---
+
+## staged/ — continuous incremental sync (fixed v0.7.1)
+
+`staged/` is the interim MCP proxy. The v0.6.0 auto-sync ran once at startup only — active
+sessions updated after startup were never re-converted. Spotted when reading TM session 54f60505:
+raw/ had the latest content (12:36) but staged/ was stale (synced at 11:56).
+
+**Fix (v0.7.1):** fire `batchConvertSessions(true)` at the end of each `checkAllChatSessions()`
+poll cycle when activity is detected. `BatchChatConverter.isAlreadyConverted()` already uses mtime
+checks — only changed files are re-converted. staged/ now lags raw/ by at most one 5s poll cycle.
+
+---
+
+## vsix — output to build/ only (fixed v0.7.1)
+
+Root vsix files (0.5.5, 0.6.0, 0.7.0) were left in repo root — `.gitignore` correctly ignores
+root `*.vsix` and tracks only `build/*.vsix`. Root strays moved to `build/` in v0.7.1.
+`npm run package` uses `--out build/` — always use it, never bare `vsce package`.
 
 ---
 

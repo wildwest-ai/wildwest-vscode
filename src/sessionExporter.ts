@@ -894,6 +894,9 @@ export class SessionExporter {
       this.saveState();
       if (activity) {
         this.log(`${this.getTimestamp()} State file saved: ${path.join(this.exportPath, '.wildwest-state.json')}`);
+        // Incremental staged/ sync: re-convert only raw files changed this cycle
+        // (BatchChatConverter.isAlreadyConverted uses mtime — unchanged files are skipped)
+        this.batchConvertSessions(true).catch(() => { /* silent */ });
       } else {
         // Only log heartbeat dot, do not log state file saves for idle cycles
         // (No state file log at all for idle cycles)
