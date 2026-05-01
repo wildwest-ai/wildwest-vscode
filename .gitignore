@@ -5,3 +5,5 @@ out/
 !build/*.vsix
 .DS_Store
 .wildwest/worktrees/
+
+.wildwest/telegraph/.last-beat
