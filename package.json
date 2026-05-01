@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
   },
-  "version": "0.5.2",
+  "version": "0.5.3",
   "publisher": "wildwest-ai",
   "engines": {
     "vscode": "^1.84.0"
@@ -50,16 +50,7 @@
         "title": "Generate Index",
         "category": "Wild West"
       },
-      {
-        "command": "wildwest.startHeartbeat",
-        "title": "Start Heartbeat",
-        "category": "Wild West"
-      },
-      {
-        "command": "wildwest.stopHeartbeat",
-        "title": "Stop Heartbeat",
-        "category": "Wild West"
-      },
+
       {
         "command": "wildwest.viewTelegraph",
         "title": "View Telegraph",
@@ -106,33 +97,33 @@
         },
         "wildwest.heartbeat.town.intervalMs": {
           "type": "number",
-          "default": 86400000,
-          "description": "Town heartbeat idle interval in ms (default: 86400000 = 24hr). Overridden by registry.json heartbeat.interval_ms."
+          "default": 300000,
+          "description": "Town heartbeat idle interval in ms (default: 300000 = 5 min). Overridden by registry.json heartbeat.interval_ms."
         },
         "wildwest.heartbeat.town.intervalActiveMs": {
           "type": "number",
-          "default": 86400000,
-          "description": "Town heartbeat active interval in ms when active_branches > 0 (default: 86400000 = 24hr). Overridden by registry.json heartbeat.interval_active_ms."
+          "default": 120000,
+          "description": "Town heartbeat active interval in ms when active_branches > 0 (default: 120000 = 2 min). Overridden by registry.json heartbeat.interval_active_ms."
         },
         "wildwest.heartbeat.county.intervalMs": {
           "type": "number",
-          "default": 86400000,
-          "description": "County heartbeat idle interval in ms (default: 86400000 = 24hr). Overridden by registry.json heartbeat.interval_ms."
+          "default": 1800000,
+          "description": "County heartbeat idle interval in ms (default: 1800000 = 30 min). Overridden by registry.json heartbeat.interval_ms."
         },
         "wildwest.heartbeat.county.intervalActiveMs": {
           "type": "number",
-          "default": 86400000,
-          "description": "County heartbeat active interval in ms when active_branches > 0 (default: 86400000 = 24hr). Overridden by registry.json heartbeat.interval_active_ms."
+          "default": 900000,
+          "description": "County heartbeat active interval in ms when active_branches > 0 (default: 900000 = 15 min). Overridden by registry.json heartbeat.interval_active_ms."
         },
         "wildwest.heartbeat.world.intervalMs": {
           "type": "number",
-          "default": 86400000,
-          "description": "World heartbeat idle interval in ms (default: 86400000 = 24hr). Overridden by registry.json heartbeat.interval_ms."
+          "default": 3600000,
+          "description": "World heartbeat idle interval in ms (default: 3600000 = 1 hr). Overridden by registry.json heartbeat.interval_ms."
         },
         "wildwest.heartbeat.world.intervalActiveMs": {
           "type": "number",
-          "default": 86400000,
-          "description": "World heartbeat active interval in ms when active_branches > 0 (default: 86400000 = 24hr). Overridden by registry.json heartbeat.interval_active_ms."
+          "default": 1800000,
+          "description": "World heartbeat active interval in ms when active_branches > 0 (default: 1800000 = 30 min). Overridden by registry.json heartbeat.interval_active_ms."
         }
       }
     }

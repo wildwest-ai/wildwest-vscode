@@ -1,6 +1,6 @@
 # DONE — wildwest-vscode
 
-> **Last updated:** 2026-04-30 14:45 UTC (10:45 EDT)
+> **Last updated:** 2026-05-01 UTC
 
 ---
 
@@ -62,6 +62,15 @@
 
 - [x] **`getDefaultExportPath()` updated** — default export path changed from `~/wildwest-vscode/{username}` to `~/wildwest/sessions/{username}`; session exports now live at framework level, not scoped to the tool name
 - [x] **`~/wildwest/` as single world trunk** — marks the boundary of the `~/wildwest/` world migration; sessions belong alongside counties, not inside the vscode extension folder
+
+---
+
+## Always-on heartbeat + sane intervals ✓ shipped v0.5.3
+
+- [x] **Heartbeat auto-starts on extension activate** — no manual `Start Heartbeat` needed; governed scopes detected and timers started immediately
+- [x] **`FLOOR_MS` reduced from 24hr to 5 min** — absolute floor now meaningful; status bar reflects live devPair presence
+- [x] **Default intervals corrected** — town idle: 5 min, town active: 2 min, county idle: 30 min, county active: 15 min, world idle: 1 hr, world active: 30 min
+- [x] **`Stop Heartbeat` removed from command palette and menu** — heartbeat is always-on; stop is still available via `wildwest.enabled = false` setting
 
 ---
 

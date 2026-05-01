@@ -4,9 +4,9 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { WorktreeManager } from './WorktreeManager';
 
-// Absolute hardcoded floor — 24hr UTC daily.
+// Absolute hardcoded floor — 5 min.
 // Used when no registry.json and no VS Code setting overrides for a scope.
-const FLOOR_MS = 86_400_000;
+const FLOOR_MS = 300_000;
 
 // Staleness threshold for .last-beat sentinel: 2× the scope's idle interval.
 // Computed per scope at runtime.

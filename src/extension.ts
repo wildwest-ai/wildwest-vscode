@@ -56,8 +56,6 @@ export function activate(context: vscode.ExtensionContext) {
         { label: 'Generate Index',            command: 'wildwest.generateIndex' },
         { label: 'Governance', kind: vscode.QuickPickItemKind.Separator },
         { label: 'Init Town',                 command: 'wildwest.initTown' },
-        { label: 'Start Heartbeat',           command: 'wildwest.startHeartbeat' },
-        { label: 'Stop Heartbeat',            command: 'wildwest.stopHeartbeat' },
         { label: 'View Telegraph',            command: 'wildwest.viewTelegraph' },
         { label: 'Solo Mode Report',          command: 'wildwest.soloModeReport' },
       ];
