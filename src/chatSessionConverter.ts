@@ -50,6 +50,7 @@ interface ChatReplayFormat {
     prompt: string;
     timestamp?: number;
     response?: string;
+    thinking?: string;
     hasSeen: boolean;
     logCount: number;
     logs: Array<{
@@ -105,6 +106,7 @@ class ChatSessionConverter {
 
   /**
    * Extract text content from response objects
+   * Uses same strategy: prefer 'text' kind, fallback to 'thinking' if empty
    */
   private extractResponseText(): string {
     if (!this.session.requests.length) return '';
@@ -113,9 +115,21 @@ class ChatSessionConverter {
     let responseText = '';
 
     const responseItems = Array.isArray(request.response) ? request.response : [];
+    
+    // First pass: look for 'text' kind
     for (const item of responseItems) {
       if (item.kind === 'text' || item.kind === 'value') {
         responseText += typeof (item as { value?: string }).value === 'string' ? (item as { value?: string }).value : '';
+      }
+    }
+
+    // Fallback: if empty, use 'thinking' field
+    if (!responseText) {
+      for (const item of responseItems) {
+        if (item.kind === 'thinking' && item.value) {
+          responseText = `[thinking] ${item.value}`;
+          break;
+        }
       }
     }
 
@@ -209,12 +223,13 @@ class ChatSessionConverter {
     const timezoneOffset = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
 
     const prompts = this.session.requests.map((request) => {
-      const responseText = this.extractResponseTextFromRequest(request);
+      const { responseText, thinkingText } = this.extractResponseAndThinking(request);
       const timestamp = request.timestamp || Date.now();
       return {
         prompt: request && request.message && typeof request.message.text === 'string' ? request.message.text : '',
         timestamp: timestamp,
         response: responseText,
+        thinking: thinkingText || undefined,
         hasSeen: false,
         logCount: 1,
         logs: [
@@ -248,16 +263,44 @@ class ChatSessionConverter {
   }
 
   /**
-   * Extract response text from a request
+   * Extract response text and thinking from a request
+   * 
+   * GitHub Copilot stores response in interleaved parts:
+   * - kind=None (or undefined): ACTUAL RESPONSE TEXT fragments (concatenate all)
+   * - kind='thinking': Internal chain-of-thought (concatenate, excluding sentinel entries)
    */
-  private extractResponseTextFromRequest(request: SessionRequest): string {
+  private extractResponseAndThinking(request: SessionRequest): { responseText: string; thinkingText: string } {
     let responseText = '';
+    let thinkingText = '';
     const responseItems = Array.isArray(request.response) ? request.response : [];
+    
     for (const item of responseItems) {
-      if (item.kind === 'text' || item.kind === 'value') {
-        responseText += typeof (item as { value?: string }).value === 'string' ? (item as { value?: string }).value : '';
+      const value = typeof (item as { value?: string }).value === 'string' ? (item as { value?: string }).value : '';
+      const kind = (item as { kind?: string | null }).kind;
+      
+      // Actual response: kind is null/undefined (no kind field)
+      if ((kind === null || kind === undefined) && value) {
+        responseText += value;
+      }
+      
+      // Thinking: kind is 'thinking', skip sentinel entries (vscodeReasoningDone)
+      if (kind === 'thinking' && value) {
+        try {
+          const parsed = JSON.parse(value);
+          if (!parsed.vscodeReasoningDone) {
+            thinkingText += (thinkingText ? '\n' : '') + value;
+          }
+        } catch {
+          thinkingText += (thinkingText ? '\n' : '') + value;
+        }
       }
     }
+    
+    return { responseText, thinkingText };
+  }
+  
+  private extractResponseTextFromRequest(request: SessionRequest): string {
+    const { responseText } = this.extractResponseAndThinking(request);
     return responseText;
   }
 

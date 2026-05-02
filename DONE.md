@@ -1,6 +1,25 @@
 # DONE — wildwest-vscode
 
-> **Last updated:** 2026-05-01 UTC
+> **Last updated:** 2026-05-02 UTC
+
+---
+
+## Copilot response extraction fix ✓ shipped v0.9.0
+
+- [x] **Actual response text extraction** — Copilot stores response in parts with `kind=undefined` (no kind field); updated `extractResponseAndThinking()` to concatenate these instead of using thinking as fallback
+- [x] **Thinking preserved as separate field** — `thinking` field now extracted alongside `response` and stored in staged JSON; thinking excludes sentinel entries (`vscodeReasoningDone` markers)
+- [x] **Schema updated** — `ChatReplayFormat.prompts` now includes optional `thinking` field; both response and thinking available for session review
+- [x] **Verified structure** — Confirmed interleaved response sequence: `mcpServersStarting` → `thinking` → `kind=None` → `toolInvocationSerialized` → `thinking` → `kind=None`
+
+---
+
+## Registry identity + copilot response fallback ✓ shipped v0.8.0
+
+- [x] **Registry creation in initTown** — Step 2 now writes `.wildwest/registry.json` with identity block: `scope`, `wwuid`, `alias`, `remote`, `mcp: null`, `createdAt`; towns now self-register on init
+- [x] **Town root detection fix** — `WorktreeManager` and `HeartbeatMonitor` now key on `.wildwest/registry.json` instead of `.wildwest/scripts/`; single marker simplifies scope detection; `.scripts/` fallback removed
+- [x] **Empty session filtering** — `batchConverter.ts` now skips sessions with `requests.length === 0` (Copilot), `prompts.length === 0` (Claude), or `totalPrompts === 0` (Codex); VSCode session stubs no longer written to `staged/`
+- [x] **Copilot response capture: thinking field fallback** — `chatSessionConverter.ts` now implements two-tier extraction: try 'text' kind first, fallback to 'thinking' field if empty; marked as `[thinking]` for clarity; improves response signal when rendered text unavailable at source
+- [x] **Known limitations doc** — README.md updated to document both the thinking field mitigation and empty session filtering
 
 ---
 

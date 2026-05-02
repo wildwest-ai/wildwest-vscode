@@ -104,6 +104,23 @@ Then reload the VSCode window (`Cmd+Shift+P` → **Developer: Reload Window**).
 
 ---
 
+## Known Limitations
+
+### Copilot Response Text: Now Fully Captured + Thinking Preserved
+
+GitHub Copilot chat storage now **fully captures** both response text and thinking in staged JSON:
+
+- **Response text:** Extracted from parts where `kind` is undefined or null (the actual response shown to user)
+- **Thinking:** Extracted from `kind='thinking'` parts (model's internal chain-of-thought); sentinels excluded
+
+Both fields are preserved separately in the staged output, allowing full session review and model assessment.
+
+### Empty Session Artifacts
+
+VSCode creates session JSON stubs (480 bytes) when the chat panel opens, even if no messages are sent. These sessions have `requests: []` and `totalPrompts: 0`. The batch converter filters these automatically and does not write them to `staged/`.
+
+---
+
 ## Roadmap
 
 ### MCP integration

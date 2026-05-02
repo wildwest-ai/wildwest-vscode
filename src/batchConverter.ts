@@ -277,6 +277,18 @@ class BatchChatConverter {
         })();
         const totalPrompts = prompts.length;
         const totalLogEntries = prompts.length * 2;
+
+        // Skip empty sessions (no prompts/requests)
+        if (totalPrompts === 0) {
+          console.log(`[DEBUG] Skipping empty Codex session (no prompts): ${filename}`);
+          return {
+            file: filename,
+            success: true,
+            skipped: true,
+            skipReason: 'Empty session (totalPrompts === 0)',
+          };
+        }
+
         const lastPromptObj = prompts.length > 0 ? prompts[prompts.length - 1] : undefined;
         const lastUpdated = lastPromptObj && typeof lastPromptObj.timestamp === 'number' ? lastPromptObj.timestamp : Date.now();
         const sessionId = (meta && meta.id) || sourceSessionId;
@@ -393,6 +405,17 @@ class BatchChatConverter {
           });
         }
 
+        // Skip empty sessions (no prompts/requests)
+        if (prompts.length === 0) {
+          console.log(`[DEBUG] Skipping empty Claude session (no prompts): ${filename}`);
+          return {
+            file: filename,
+            success: true,
+            skipped: true,
+            skipReason: 'Empty session (prompts.length === 0)',
+          };
+        }
+
         const claudeSessionId = (rawSession.sessionId as string) || sourceSessionId;
         const claudeCreationDate = (rawSession.creationDate as number) || Date.now();
         const claudeLastMessageDate = (rawSession.lastMessageDate as number) || claudeCreationDate;
@@ -459,6 +482,17 @@ class BatchChatConverter {
       // Default: Copilot session JSON
       const converter = new ChatSessionConverter(sessionPath, gitUsername);
       const metadata = converter.getMetadata();
+
+      // Skip empty sessions (VSCode creates session stubs on chat panel open with no messages)
+      if (metadata.totalPrompts === 0) {
+        console.log(`[DEBUG] Skipping empty session (no requests): ${filename}`);
+        return {
+          file: filename,
+          success: true,
+          skipped: true,
+          skipReason: 'Empty session (totalPrompts === 0); VSCode artifact from chat panel open',
+        };
+      }
 
       // Ensure output directory exists
       if (!fs.existsSync(this.outputDir)) {

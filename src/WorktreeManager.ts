@@ -17,9 +17,9 @@ export class WorktreeManager {
     if (this.repoRoot) return this.repoRoot;
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) return null;
-    // In multi-root workspaces, prefer the folder that is a governed town (.wildwest/ initialized)
+    // In multi-root workspaces, prefer the folder that is a governed town (.wildwest/registry.json exists)
     const governed = folders.find((f) =>
-      fs.existsSync(path.join(f.uri.fsPath, '.wildwest', 'scripts')),
+      fs.existsSync(path.join(f.uri.fsPath, '.wildwest', 'registry.json')),
     );
     const startDir = (governed ?? folders[0]).uri.fsPath;
     try {
