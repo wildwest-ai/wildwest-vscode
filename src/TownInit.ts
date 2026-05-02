@@ -51,7 +51,28 @@ export async function initTown(outputChannel: vscode.OutputChannel): Promise<voi
         }
         log('created .wildwest/ directory structure');
 
-        // Step 2 — _heartbeat branch
+        // Step 2 — registry.json identity block
+        progress.report({ message: 'Creating registry.json…' });
+        const wwuid = `town-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+        let remote = '';
+        try {
+          remote = execSync('git config --get remote.origin.url', { cwd: repoRoot, encoding: 'utf8' }).trim();
+        } catch { /* no remote set */ }
+
+        const registry = {
+          scope: 'town',
+          wwuid,
+          alias: repoName,
+          remote: remote || null,
+          mcp: null,
+          createdAt: new Date().toISOString(),
+        };
+
+        const registryPath = path.join(wildwestDir, 'registry.json');
+        fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2) + '\n');
+        log('created registry.json with identity block');
+
+        // Step 3 — _heartbeat branch
         progress.report({ message: 'Setting up _heartbeat branch…' });
         let heartbeatBranchExists = false;
         try {
@@ -67,7 +88,7 @@ export async function initTown(outputChannel: vscode.OutputChannel): Promise<voi
           log('_heartbeat branch already exists — skipped');
         }
 
-        // Step 3 — _heartbeat worktree
+        // Step 4 — _heartbeat worktree
         progress.report({ message: 'Adding _heartbeat worktree…' });
         const worktreePath = path.join(wildwestDir, 'worktrees', '_heartbeat');
         fs.mkdirSync(path.join(wildwestDir, 'worktrees'), { recursive: true });
@@ -82,7 +103,7 @@ export async function initTown(outputChannel: vscode.OutputChannel): Promise<voi
           log('_heartbeat worktree already exists — skipped');
         }
 
-        // Step 4 — .gitignore
+        // Step 5 — .gitignore
         progress.report({ message: 'Updating .gitignore…' });
         const gitignorePath = path.join(repoRoot, '.gitignore');
         const ignoreEntry = '.wildwest/worktrees/';

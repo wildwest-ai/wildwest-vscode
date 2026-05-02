@@ -289,8 +289,8 @@ export class HeartbeatMonitor {
       const s = scopeOf(fp);
       if (s) {
         add(fp, s);
-      } else if (fs.existsSync(path.join(fp, '.wildwest', 'scripts'))) {
-        // pre-spec backward compat: treat as town
+      } else if (fs.existsSync(path.join(fp, '.wildwest', 'registry.json'))) {
+        // fallback: registry.json exists but scopeOf() returned null (malformed registry)
         add(fp, 'town');
       }
     }
