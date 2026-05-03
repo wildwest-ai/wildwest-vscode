@@ -7,6 +7,7 @@ import { TelegraphWatcher } from './TelegraphWatcher';
 import { WorktreeManager } from './WorktreeManager';
 import { initTown } from './TownInit';
 import { TelegraphInbox } from './TelegraphInbox';
+import { TelegraphCommands } from './TelegraphCommands';
 
 // ── Configuration types & helpers ──────────────────────────────────────────
 
@@ -30,6 +31,7 @@ let heartbeatMonitor: HeartbeatMonitor;
 let telegraphWatcher: TelegraphWatcher;
 let soloModeController: SoloModeController;
 let worktreeManager: WorktreeManager;
+let telegraphCommands: TelegraphCommands;
 let telegraphInbox: TelegraphInbox;
 let outputChannel: vscode.OutputChannel;
 
@@ -47,6 +49,8 @@ export function activate(context: vscode.ExtensionContext) {
   telegraphWatcher = new TelegraphWatcher(outputChannel, worktreeManager, heartbeatMonitor);
   soloModeController = new SoloModeController(outputChannel, worktreeManager, heartbeatMonitor);
   telegraphInbox = new TelegraphInbox(outputChannel);
+  telegraphCommands = new TelegraphCommands(outputChannel);
+  telegraphCommands.register(context);
 
   // ── Commands — devPair log (existing) ─────────────────────────────────────
   context.subscriptions.push(

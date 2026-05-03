@@ -74,6 +74,16 @@
         "command": "wildwest.menu",
         "title": "Menu",
         "category": "Wild West"
+      },
+      {
+        "command": "wildwest.telegraphAck",
+        "title": "Ack Telegraph Memo",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.telegraphSend",
+        "title": "Send Telegraph Memo",
+        "category": "Wild West"
       }
     ],
     "configuration": {
