@@ -8,6 +8,23 @@ import { WorktreeManager } from './WorktreeManager';
 import { initTown } from './TownInit';
 import { TelegraphInbox } from './TelegraphInbox';
 
+// ── Configuration types & helpers ──────────────────────────────────────────
+
+interface WildwestConfig {
+  worldRoot: string;
+  countiesDir: string;
+  sessionsDir: string;
+}
+
+function getWildwestConfig(): WildwestConfig {
+  const cfg = vscode.workspace.getConfiguration('wildwest');
+  const home = process.env['HOME'] ?? '~';
+  const worldRoot = (cfg.get<string>('worldRoot') ?? '~/wildwest').replace(/^~/, home);
+  const countiesDir = cfg.get<string>('countiesDir') ?? 'counties';
+  const sessionsDir = cfg.get<string>('sessionsDir') ?? 'sessions';
+  return { worldRoot, countiesDir, sessionsDir };
+}
+
 let exporter: SessionExporter;
 let heartbeatMonitor: HeartbeatMonitor;
 let telegraphWatcher: TelegraphWatcher;
@@ -20,10 +37,13 @@ export function activate(context: vscode.ExtensionContext) {
   outputChannel = vscode.window.createOutputChannel('Wild West');
   outputChannel.appendLine('Wild West extension activated');
 
+  // Get Wild West config
+  const wwConfig = getWildwestConfig();
+
   // ── Core components ───────────────────────────────────────────────────────
   worktreeManager = new WorktreeManager();
   exporter = new SessionExporter(context, outputChannel);
-  heartbeatMonitor = new HeartbeatMonitor(outputChannel);
+  heartbeatMonitor = new HeartbeatMonitor(outputChannel, wwConfig.worldRoot, wwConfig.countiesDir);
   telegraphWatcher = new TelegraphWatcher(outputChannel, worktreeManager, heartbeatMonitor);
   soloModeController = new SoloModeController(outputChannel, worktreeManager, heartbeatMonitor);
   telegraphInbox = new TelegraphInbox(outputChannel);

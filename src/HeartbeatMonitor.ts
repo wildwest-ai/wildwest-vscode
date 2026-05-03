@@ -147,6 +147,8 @@ function beatTown(
 function beatCounty(
   rootPath: string,
   outputChannel: vscode.OutputChannel,
+  worldRoot: string,
+  countiesDir: string,
 ): HeartbeatState {
   const sentinel = sentinelPath(rootPath, 'county');
   writeSentinel(sentinel, outputChannel);
@@ -155,13 +157,17 @@ function beatCounty(
   const reg = readRegistry(rootPath);
   let ok = true;
   if (reg) {
-    const towns = reg['towns'] as Array<{ path?: string }> | undefined;
-    if (Array.isArray(towns)) {
+    const countyAlias = reg['alias'] as string | undefined;
+    const towns = reg['towns'] as Array<{ alias?: string }> | undefined;
+    if (Array.isArray(towns) && countyAlias) {
       for (const t of towns) {
-        const tp = t.path ? t.path.replace(/^~/, process.env['HOME'] ?? '~') : null;
-        if (tp && !fs.existsSync(path.join(tp, '.wildwest', 'registry.json'))) {
-          outputChannel.appendLine(`[HeartbeatMonitor] county: town missing on disk: ${tp}`);
-          ok = false;
+        const townAlias = t.alias;
+        if (townAlias) {
+          const tp = path.join(worldRoot, countiesDir, countyAlias, townAlias);
+          if (!fs.existsSync(path.join(tp, '.wildwest', 'registry.json'))) {
+            outputChannel.appendLine(`[HeartbeatMonitor] county: town missing on disk: ${tp}`);
+            ok = false;
+          }
         }
       }
     }
@@ -172,6 +178,8 @@ function beatCounty(
 function beatWorld(
   rootPath: string,
   outputChannel: vscode.OutputChannel,
+  worldRoot: string,
+  countiesDir: string,
 ): HeartbeatState {
   const sentinel = sentinelPath(rootPath, 'world');
   writeSentinel(sentinel, outputChannel);
@@ -180,13 +188,16 @@ function beatWorld(
   const reg = readRegistry(rootPath);
   let ok = true;
   if (reg) {
-    const counties = reg['counties'] as Array<{ path?: string }> | undefined;
+    const counties = reg['counties'] as Array<{ alias?: string }> | undefined;
     if (Array.isArray(counties)) {
       for (const c of counties) {
-        const cp = c.path ? c.path.replace(/^~/, process.env['HOME'] ?? '~') : null;
-        if (cp && !fs.existsSync(path.join(cp, '.wildwest', 'registry.json'))) {
-          outputChannel.appendLine(`[HeartbeatMonitor] world: county missing on disk: ${cp}`);
-          ok = false;
+        const countyAlias = c.alias;
+        if (countyAlias) {
+          const cp = path.join(worldRoot, countiesDir, countyAlias);
+          if (!fs.existsSync(path.join(cp, '.wildwest', 'registry.json'))) {
+            outputChannel.appendLine(`[HeartbeatMonitor] world: county missing on disk: ${cp}`);
+            ok = false;
+          }
         }
       }
     }
@@ -202,9 +213,13 @@ export class HeartbeatMonitor {
   private scopes: ScopeRoot[] = [];
   private scopeStates: Map<string, HeartbeatState> = new Map();
   private outputChannel: vscode.OutputChannel;
+  private worldRoot: string;
+  private countiesDir: string;
 
-  constructor(outputChannel: vscode.OutputChannel) {
+  constructor(outputChannel: vscode.OutputChannel, worldRoot: string, countiesDir: string) {
     this.outputChannel = outputChannel;
+    this.worldRoot = worldRoot;
+    this.countiesDir = countiesDir;
   }
 
   start(): void {
@@ -333,10 +348,10 @@ export class HeartbeatMonitor {
           state = beatTown(scope.rootPath, this.outputChannel);
           break;
         case 'county':
-          state = beatCounty(scope.rootPath, this.outputChannel);
+          state = beatCounty(scope.rootPath, this.outputChannel, this.worldRoot, this.countiesDir);
           break;
         case 'world':
-          state = beatWorld(scope.rootPath, this.outputChannel);
+          state = beatWorld(scope.rootPath, this.outputChannel, this.worldRoot, this.countiesDir);
           break;
       }
     } catch (err) {
