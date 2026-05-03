@@ -1,5 +1,5 @@
 #!/bin/bash
-# Release workflow: docs update → version bump → build → install → commit
+# Release workflow: docs update → version bump → build → package → [install] → commit
 
 set -e
 
@@ -37,7 +37,13 @@ npm install
 
 # Step 5: Compile & test
 echo "🧪 Compiling TypeScript..."
-npm run compile (optional, requires --install flag)
+npm run compile
+
+# Step 6: Package extension
+echo "📦 Packaging extension (.vsix)..."
+npm run package -- --no-dependencies --out build/
+
+# Step 7: Install extension to VSCode (optional, requires --install flag)
 if [ "$INSTALL_EXTENSION" = true ]; then
   echo "🔌 Installing extension to VSCode..."
   NEW_VERSION=$(jq -r '.version' package.json)
@@ -54,8 +60,9 @@ fi
 
 # Step 8: Commit
 echo "💾 Committing changes..."
+NEW_VERSION=$(jq -r '.version' package.json)
 git add -A
-git commit -m "Release v$NEW_VERSION: registry path removal + world root config (P1)"
+git commit -m "Release v$NEW_VERSION: telegraph scripts, schema_version guard, registry v2 migration"
 
 echo "✅ Release v$NEW_VERSION complete!"
 echo ""
@@ -63,11 +70,6 @@ echo "⚠️  AUTHORIZATION REQUIRED:"
 echo "   Ready to push to remote? Send explicit approval:"
 echo "   'git push origin main && git tag v$NEW_VERSION && git push origin v$NEW_VERSION'"
 echo ""
-echo "📝 Usage: bash scripts/release.sh [--install]"
-echo "   --install: Install the packaged .vsix to VSCode after building
-
-echo "✅ Release v$NEW_VERSION complete!"
-echo ""
-echo "⚠️  AUTHORIZATION REQUIRED:"
-echo "   Ready to push to remote? Send explicit approval:"
-echo "   'git push origin main && git tag v$NEW_VERSION && git push origin v$NEW_VERSION'"
+echo "📝 Usage:"
+echo "   bash scripts/release.sh          (build and package only)"
+echo "   bash scripts/release.sh --install (build, package, and install to VSCode)"
