@@ -33,11 +33,28 @@ npm install
 echo "🧪 Compiling TypeScript..."
 npm run compile
 
-# Step 6: Commit
-echo "💾 Committing changes..."
+# Step 6: Package extension
+echo "📦 Packaging extension (.vsix)..."
+npm run package -- --no-dependencies --out build/
+
+# Step 7: Install extension to VSCode
+echo "🔌 Installing extension to VSCode..."
 NEW_VERSION=$(jq -r '.version' package.json)
+VSIX_FILE="$ROOT_DIR/build/wildwest-vscode-$NEW_VERSION.vsix"
+if [ -f "$VSIX_FILE" ]; then
+  code --install-extension "$VSIX_FILE"
+  echo "  ✓ Extension installed: $VSIX_FILE"
+else
+  echo "  ⚠️  VSIX file not found: $VSIX_FILE"
+fi
+
+# Step 8: Commit
+echo "💾 Committing changes..."
 git add -A
 git commit -m "Release v$NEW_VERSION: registry path removal + world root config (P1)"
 
 echo "✅ Release v$NEW_VERSION complete!"
-echo "Next: Push to remote with 'git push origin' and tag with 'git tag v$NEW_VERSION && git push origin v$NEW_VERSION'"
+echo ""
+echo "⚠️  AUTHORIZATION REQUIRED:"
+echo "   Ready to push to remote? Send explicit approval:"
+echo "   'git push origin main && git tag v$NEW_VERSION && git push origin v$NEW_VERSION'"
