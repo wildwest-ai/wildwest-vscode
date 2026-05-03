@@ -150,7 +150,7 @@
   "scripts": {
     "vscode:prepublish": "npm run esbuild-base -- --minify",
     "package": "npx vsce package --no-dependencies --out build/",
-    "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --target=node18",
+    "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --external:fsevents --format=cjs --platform=node --target=node18",
     "esbuild": "npm run esbuild-base -- --sourcemap",
     "esbuild-watch": "npm run esbuild-base -- --sourcemap --watch",
     "compile": "tsc -p ./",
