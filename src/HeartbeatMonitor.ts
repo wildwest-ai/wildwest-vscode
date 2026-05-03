@@ -153,8 +153,20 @@ function beatCounty(
   const sentinel = sentinelPath(rootPath, 'county');
   writeSentinel(sentinel, outputChannel);
 
-  // Check all towns listed in registry are present on disk
+  // Check schema version
   const reg = readRegistry(rootPath);
+  const registryPath = path.join(rootPath, '.wildwest', 'registry.json');
+  if (reg) {
+    const schemaVersion = reg['schema_version'] as string | undefined;
+    if (!schemaVersion || schemaVersion === '1') {
+      outputChannel.appendLine(
+        `[wildwest] WARNING: Registry at ${registryPath} is schema v1 (has 'path' fields). ` +
+        `Update to schema v2: remove 'path' fields, add "schema_version": "2", rename 'name' → 'alias' in county entries.`
+      );
+    }
+  }
+
+  // Check all towns listed in registry are present on disk
   let ok = true;
   if (reg) {
     const countyAlias = reg['alias'] as string | undefined;
@@ -184,8 +196,20 @@ function beatWorld(
   const sentinel = sentinelPath(rootPath, 'world');
   writeSentinel(sentinel, outputChannel);
 
-  // Check all counties listed in registry are present on disk
+  // Check schema version
   const reg = readRegistry(rootPath);
+  const registryPath = path.join(rootPath, '.wildwest', 'registry.json');
+  if (reg) {
+    const schemaVersion = reg['schema_version'] as string | undefined;
+    if (!schemaVersion || schemaVersion === '1') {
+      outputChannel.appendLine(
+        `[wildwest] WARNING: Registry at ${registryPath} is schema v1 (has 'path' fields). ` +
+        `Update to schema v2: remove 'path' fields, add "schema_version": "2", use 'alias' instead of 'name' in county entries.`
+      );
+    }
+  }
+
+  // Check all counties listed in registry are present on disk
   let ok = true;
   if (reg) {
     const counties = reg['counties'] as Array<{ alias?: string }> | undefined;
