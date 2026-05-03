@@ -6,6 +6,12 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
+# Parse arguments
+INSTALL_EXTENSION=false
+if [[ "$1" == "--install" ]]; then
+  INSTALL_EXTENSION=true
+fi
+
 echo "🚀 Starting release workflow in $ROOT_DIR"
 
 # Step 1: Update docs (README.md / CHANGELOG placeholder)
@@ -31,27 +37,34 @@ npm install
 
 # Step 5: Compile & test
 echo "🧪 Compiling TypeScript..."
-npm run compile
-
-# Step 6: Package extension
-echo "📦 Packaging extension (.vsix)..."
-npm run package -- --no-dependencies --out build/
-
-# Step 7: Install extension to VSCode
-echo "🔌 Installing extension to VSCode..."
-NEW_VERSION=$(jq -r '.version' package.json)
-VSIX_FILE="$ROOT_DIR/build/wildwest-vscode-$NEW_VERSION.vsix"
-if [ -f "$VSIX_FILE" ]; then
-  code --install-extension "$VSIX_FILE"
-  echo "  ✓ Extension installed: $VSIX_FILE"
+npm run compile (optional, requires --install flag)
+if [ "$INSTALL_EXTENSION" = true ]; then
+  echo "🔌 Installing extension to VSCode..."
+  NEW_VERSION=$(jq -r '.version' package.json)
+  VSIX_FILE="$ROOT_DIR/build/wildwest-vscode-$NEW_VERSION.vsix"
+  if [ -f "$VSIX_FILE" ]; then
+    code --install-extension "$VSIX_FILE"
+    echo "  ✓ Extension installed: $VSIX_FILE"
+  else
+    echo "  ⚠️  VSIX file not found: $VSIX_FILE"
+  fi
 else
-  echo "  ⚠️  VSIX file not found: $VSIX_FILE"
+  echo "⏭️  Skipping extension install (use --install flag to enable)"
 fi
 
 # Step 8: Commit
 echo "💾 Committing changes..."
 git add -A
 git commit -m "Release v$NEW_VERSION: registry path removal + world root config (P1)"
+
+echo "✅ Release v$NEW_VERSION complete!"
+echo ""
+echo "⚠️  AUTHORIZATION REQUIRED:"
+echo "   Ready to push to remote? Send explicit approval:"
+echo "   'git push origin main && git tag v$NEW_VERSION && git push origin v$NEW_VERSION'"
+echo ""
+echo "📝 Usage: bash scripts/release.sh [--install]"
+echo "   --install: Install the packaged .vsix to VSCode after building
 
 echo "✅ Release v$NEW_VERSION complete!"
 echo ""
