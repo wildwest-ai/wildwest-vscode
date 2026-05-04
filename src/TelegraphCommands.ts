@@ -224,12 +224,12 @@ original_memo: ${originalFileName}
     if (!subject) return;
 
     // Open untitled editor for memo body
-    const untitled = await vscode.workspace.openUntitledTextDocument({
+    const untitled = await vscode.workspace.openTextDocument({
       language: 'markdown',
       content: `# Memo: ${subject}\n\n(Write memo body here)`,
     });
 
-    const editor = await vscode.window.showTextDocument(untitled);
+    await vscode.window.showTextDocument(untitled);
 
     // Wait for save
     const saveWatcher = vscode.workspace.onDidSaveTextDocument((doc) => {

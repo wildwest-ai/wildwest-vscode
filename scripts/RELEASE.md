@@ -1,11 +1,12 @@
 # Release Workflow
 
-This script automates the full release process for wildwest-vscode.
+This script automates the build process for wildwest-vscode but **requires manual push authorization**.
 
 ## Usage
 
 ```bash
-npm run release
+bash scripts/release.sh              # Build and package only
+bash scripts/release.sh --install    # Build, package, and install to VSCode
 ```
 
 ## What It Does
@@ -16,20 +17,26 @@ npm run release
 4. **Install** — Runs `npm install` (ensures dependencies are current)
 5. **Compile** — Runs `npm run compile` (validates TypeScript)
 6. **Commit** — Git commits all changes with version number in message
+7. **STOPS** — Does NOT run `git push`. Requires explicit authorization before push.
 
-## Manual Steps After Release
+## Push Requires Explicit Authorization
 
-The script will output:
+After the script completes, it prints:
 ```
-Next: Push to remote with 'git push origin' and tag with 'git tag v<VERSION> && git push origin v<VERSION>'
+Release v0.X.Y complete!
+
+⚠️  AUTHORIZATION REQUIRED:
+   Ready to push to remote? Send explicit approval:
+   'git push origin main && git tag vX.Y.Z && git push origin vX.Y.Z'
 ```
 
-Do NOT forget these steps:
+The push must be performed manually by the devPair lead (S(R)) with explicit authorization:
 ```bash
-git push origin                    # Push commit
-git tag v0.10.0                    # Create local tag
-git push origin v0.10.0            # Push tag to remote
+git push origin main               # Push commit
+git push origin v0.X.Y             # Push tag to remote
 ```
+
+**Push is NOT automated.** No flag or setting will auto-push.
 
 ## If Something Goes Wrong
 

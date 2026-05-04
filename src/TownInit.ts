@@ -107,7 +107,7 @@ export async function initTown(outputChannel: vscode.OutputChannel): Promise<voi
         progress.report({ message: 'Updating .gitignore…' });
         const gitignorePath = path.join(repoRoot, '.gitignore');
         const ignoreEntry = '.wildwest/worktrees/';
-        let gitignoreContent = fs.existsSync(gitignorePath)
+        const gitignoreContent = fs.existsSync(gitignorePath)
           ? fs.readFileSync(gitignorePath, 'utf8')
           : '';
         if (!gitignoreContent.includes(ignoreEntry)) {

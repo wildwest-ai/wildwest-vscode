@@ -7,13 +7,6 @@ import { convertJsonFileToMarkdown } from './jsonToMarkdown';
 import { generateIndex } from './generateIndex';
 import { execSync } from 'child_process';
 
-interface ChatSession {
-  id: string;
-  timestamp: number;
-  title?: string;
-  messages?: unknown[];
-}
-
 export class SessionExporter {
   private watcher: chokidar.FSWatcher | null = null;
   private vscodeStoragePath: string;
