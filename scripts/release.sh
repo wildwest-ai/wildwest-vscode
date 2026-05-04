@@ -8,9 +8,27 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Parse arguments
 INSTALL_EXTENSION=false
-if [[ "$1" == "--install" ]]; then
-  INSTALL_EXTENSION=true
-fi
+BUMP_TYPE="minor"  # default to minor
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --install)
+      INSTALL_EXTENSION=true
+      shift
+      ;;
+    --patch)
+      BUMP_TYPE="patch"
+      shift
+      ;;
+    --minor)
+      BUMP_TYPE="minor"
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
 
 echo "🚀 Starting release workflow in $ROOT_DIR"
 
@@ -22,10 +40,10 @@ else
   echo "  ⚠️  No CHANGELOG.md found — skipping doc update"
 fi
 
-# Step 2: Bump minor version
-echo "📦 Bumping minor version..."
+# Step 2: Bump version
+echo "📦 Bumping $BUMP_TYPE version..."
 cd "$ROOT_DIR"
-npm version minor --no-git-tag-v
+npm version "$BUMP_TYPE" --no-git-tag-v
 
 # Step 3: Build
 echo "🏗️  Building extension..."
@@ -71,5 +89,8 @@ echo "   Ready to push to remote? Send explicit approval:"
 echo "   'git push origin main && git tag v$NEW_VERSION && git push origin v$NEW_VERSION'"
 echo ""
 echo "📝 Usage:"
-echo "   bash scripts/release.sh          (build and package only)"
-echo "   bash scripts/release.sh --install (build, package, and install to VSCode)"
+echo "   bash scripts/release.sh                    (minor bump, build and package only)"
+echo "   bash scripts/release.sh --patch            (patch bump, build and package only)"
+echo "   bash scripts/release.sh --minor            (minor bump, build and package only)"
+echo "   bash scripts/release.sh --patch --install  (patch bump, build, package, and install)"
+echo "   bash scripts/release.sh --install          (minor bump, build, package, and install)"
