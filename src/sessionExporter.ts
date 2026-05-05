@@ -6,6 +6,7 @@ import { BatchChatConverter } from './batchConverter';
 import { convertJsonFileToMarkdown } from './jsonToMarkdown';
 import { generateIndex } from './generateIndex';
 import { execSync } from 'child_process';
+import { PipelineAdapter } from './sessionPipeline';
 
 export class SessionExporter {
   private watcher: chokidar.FSWatcher | null = null;
@@ -22,6 +23,7 @@ export class SessionExporter {
   private state: { version: number; initialized: boolean; lastDbStats: Record<string, { mtime: number; size: number }> } = { version: 1, initialized: false, lastDbStats: {} };
   private isScanning: boolean = false;
   private _lastLogMessage: string | null = null;
+  private pipelineAdapter: PipelineAdapter | null = null;
 
   constructor(context: vscode.ExtensionContext, outputChannel: vscode.OutputChannel) {
     this.outputChannel = outputChannel;
@@ -57,6 +59,18 @@ export class SessionExporter {
     
     // Load state file
     this.state = this.loadState();
+
+    // Initialize pipeline adapter
+    try {
+      const gitUsername = this.getGitUsername();
+      this.pipelineAdapter = new PipelineAdapter({
+        sessionsDir: path.join(this.userHome, 'wildwest', 'sessions', gitUsername),
+        actor: gitUsername,
+        projectPath: vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath,
+      });
+    } catch (error) {
+      this.log(`${this.getTimestamp('warn')} Failed to initialize pipeline adapter: ${error}`);
+    }
   }
 
   private log(message: string, appendDot: boolean = false): void {
@@ -178,6 +192,16 @@ export class SessionExporter {
 
   private getClaudeProjectsPath(userHome: string): string {
     return path.join(userHome, '.claude', 'projects');
+  }
+
+  private getGitUsername(): string {
+    try {
+      const username = execSync('git config --global user.name', { encoding: 'utf8' }).trim();
+      if (username) return username;
+    } catch {
+      // Fallback to system user
+    }
+    return process.env.USER || process.env.USERNAME || 'unknown';
   }
 
   private isClaudeSidechain(content: string): boolean {
@@ -887,6 +911,14 @@ export class SessionExporter {
       this.saveState();
       if (activity) {
         this.log(`${this.getTimestamp()} State file saved: ${path.join(this.exportPath, '.wildwest-state.json')}`);
+        
+        // Process new sessions through pipeline (emit packets)
+        if (this.pipelineAdapter) {
+          this.pipelineAdapter.processRawSessions().catch((err) => {
+            this.log(`${this.getTimestamp('warn')} Pipeline processing error: ${err}`);
+          });
+        }
+        
         // Incremental staged/ sync: re-convert only raw files changed this cycle
         // (BatchChatConverter.isAlreadyConverted uses mtime — unchanged files are skipped)
         this.batchConvertSessions(true).catch(() => { /* silent */ });
@@ -1577,10 +1609,31 @@ export class SessionExporter {
   }
 
   dispose(): void {
+    // Close all open sessions before shutting down
+    if (this.pipelineAdapter) {
+      this.closeAllOpenSessions().catch((err) => {
+        this.log(`${this.getTimestamp('warn')} Error closing sessions on dispose: ${err}`);
+      });
+    }
     this.saveState();
     this.statusBar.dispose();
     if (this.watcher) {
       this.watcher.close();
+    }
+  }
+
+  private async closeAllOpenSessions(): Promise<void> {
+    if (!this.pipelineAdapter) return;
+    
+    const sessions = await this.pipelineAdapter.getStoredSessions();
+    for (const session of sessions) {
+      if (!session.closed_at) {
+        // Session is still open, close it
+        await this.pipelineAdapter.closeSession(
+          session.tool as 'cld' | 'cpt' | 'ccx',
+          session.tool_sid
+        );
+      }
     }
   }
 }

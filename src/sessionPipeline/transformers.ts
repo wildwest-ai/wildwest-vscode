@@ -1,0 +1,365 @@
+/**
+ * Session Export Pipeline — Tool Transformers
+ * 
+ * Normalize raw tool session formats into common NormalizedTurn schema.
+ * Each tool (cpt, cld, ccx) has its own raw format and cursor tracking.
+ */
+
+import { NormalizedTurn, Cursor, TurnMeta, ContentPart } from './types';
+
+/**
+ * Tool-agnostic interface for session transformation
+ * 
+ * Implementations handle tool-specific raw format parsing and
+ * turn normalization.
+ */
+export interface ISessionTransformer {
+  /**
+   * Tool identifier
+   */
+  readonly tool: 'cld' | 'cpt' | 'ccx';
+
+  /**
+   * Parse raw tool session data
+   * 
+   * Returns the raw session object after JSON parsing.
+   * Tool-specific format.
+   */
+  parseRaw(rawContent: string): unknown;
+
+  /**
+   * Extract current cursor position from raw session
+   * 
+   * Used to determine which turns are already stored and which are new.
+   * Different tools track position differently (message_id, request_id, line_offset).
+   */
+  getCurrentCursor(rawSession: unknown): Cursor;
+
+  /**
+   * Transform raw session to normalized turns
+   * 
+   * Returns all turns present in the raw session, normalized to common schema.
+   * Includes turn_index assignments (zero-based, monotonic).
+   * 
+   * Multi-part responses (e.g., thinking + text) may result in multiple
+   * turns with consecutive indexes.
+   */
+  transformTurns(rawSession: unknown): NormalizedTurn[];
+
+  /**
+   * Get metadata about the session
+   * 
+   * Used to populate SessionRecord fields like project_path.
+   */
+  getSessionMetadata(rawSession: unknown): {
+    project_path: string;
+    session_type: 'chat' | 'edit';
+  };
+}
+
+/**
+ * GitHub Copilot (cpt) transformer
+ * 
+ * Raw format: Copilot's native JSON session structure
+ * Cursor: requestId (incrementing integer per turn)
+ */
+export class CopilotTransformer implements ISessionTransformer {
+  readonly tool = 'cpt' as const;
+
+  parseRaw(rawContent: string): unknown {
+    return JSON.parse(rawContent);
+  }
+
+  getCurrentCursor(rawSession: unknown): Cursor {
+    const session = rawSession as any;
+    // Most recent request_id is the current cursor
+    // (Copilot stores requests in order; last one is the cursor)
+    const requests = session.requests || [];
+    if (requests.length === 0) {
+      return { type: 'request_id', value: -1 };
+    }
+    const lastRequest = requests[requests.length - 1];
+    return { type: 'request_id', value: lastRequest.requestId ?? requests.length - 1 };
+  }
+
+  transformTurns(rawSession: unknown): NormalizedTurn[] {
+    const session = rawSession as any;
+    const requests = session.requests || [];
+    const turns: NormalizedTurn[] = [];
+    let turn_index = 0;
+
+    for (const request of requests) {
+      // User message
+      if (request.message) {
+        turns.push({
+          turn_index: turn_index++,
+          role: 'user',
+          content: this.extractTextContent(request.message),
+          parts: this.extractParts(request.message),
+          meta: {
+            tool_cursor_value: request.requestId ?? requests.indexOf(request),
+            ...request.meta,
+          },
+          timestamp: request.timestamp || new Date().toISOString(),
+        });
+      }
+
+      // Assistant response (may have multiple parts: thinking + text)
+      if (request.response) {
+        const responseParts = this.extractParts(request.response);
+
+        // If response has multiple parts, split them into separate turns
+        // (following the spec: multi-part turns become separate indexed turns)
+        if (responseParts.length > 1) {
+          for (const part of responseParts) {
+            turns.push({
+              turn_index: turn_index++,
+              role: 'assistant',
+              content: part.kind === 'text' ? part.content : '',
+              parts: [part],
+              meta: {
+                tool_cursor_value: request.requestId ?? requests.indexOf(request),
+                ...request.meta,
+              },
+              timestamp: request.responseTimestamp || new Date().toISOString(),
+            });
+          }
+        } else {
+          // Single-part response
+          turns.push({
+            turn_index: turn_index++,
+            role: 'assistant',
+            content: this.extractTextContent(request.response),
+            parts: responseParts,
+            meta: {
+              tool_cursor_value: request.requestId ?? requests.indexOf(request),
+              ...request.meta,
+            },
+            timestamp: request.responseTimestamp || new Date().toISOString(),
+          });
+        }
+      }
+    }
+
+    return turns;
+  }
+
+  getSessionMetadata(rawSession: unknown) {
+    const session = rawSession as any;
+    return {
+      project_path: session.workspaceFolder || '',
+      session_type: 'chat' as const,
+    };
+  }
+
+  private extractParts(content: string | any): ContentPart[] {
+    if (typeof content === 'string') {
+      return [{ kind: 'text' as const, content }];
+    }
+
+    // If content has structured parts (thinking + text)
+    if (content.parts && Array.isArray(content.parts)) {
+      return content.parts.map((part: any) => ({
+        kind: part.kind || 'text',
+        content: part.content || '',
+        thinking_id: part.thinking_id,
+      }));
+    }
+
+    return [{ kind: 'text' as const, content: JSON.stringify(content) }];
+  }
+
+  private extractTextContent(content: string | any): string {
+    if (typeof content === 'string') return content;
+    if (content.parts && Array.isArray(content.parts)) {
+      return content.parts
+        .filter((p: any) => p.kind === 'text' || !p.kind)
+        .map((p: any) => p.content || '')
+        .join('');
+    }
+    return '';
+  }
+}
+
+/**
+ * Claude Code (cld) transformer
+ * 
+ * Raw format: Claude Code's native session structure (JSONL)
+ * Cursor: message.id (UUID)
+ */
+export class ClaudeCodeTransformer implements ISessionTransformer {
+  readonly tool = 'cld' as const;
+
+  parseRaw(rawContent: string): unknown {
+    const lines = rawContent.split('\n').filter((l) => l.trim());
+    const messages = lines.map((line) => JSON.parse(line));
+    return { messages };
+  }
+
+  getCurrentCursor(rawSession: unknown): Cursor {
+    const session = rawSession as any;
+    const messages = session.messages || [];
+    if (messages.length === 0) {
+      return { type: 'message_id', value: '' };
+    }
+    const lastMessage = messages[messages.length - 1];
+    return { type: 'message_id', value: lastMessage.id || '' };
+  }
+
+  transformTurns(rawSession: unknown): NormalizedTurn[] {
+    const session = rawSession as any;
+    const messages = session.messages || [];
+    const turns: NormalizedTurn[] = [];
+
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+      const role = msg.role || 'user';
+
+      turns.push({
+        turn_index: i,
+        role: role as 'user' | 'assistant',
+        content: this.extractTextContent(msg.content),
+        parts: this.extractParts(msg.content),
+        meta: {
+          tool_cursor_value: msg.id || '',
+          ...msg.meta,
+        },
+        timestamp: msg.timestamp || new Date().toISOString(),
+      });
+    }
+
+    return turns;
+  }
+
+  getSessionMetadata(rawSession: unknown) {
+    const session = rawSession as any;
+    return {
+      project_path: session.projectPath || '',
+      session_type: 'chat' as const,
+    };
+  }
+
+  private extractParts(content: any): ContentPart[] {
+    if (typeof content === 'string') {
+      return [{ kind: 'text' as const, content }];
+    }
+
+    if (Array.isArray(content)) {
+      return content.map((part) => ({
+        kind: part.kind || 'text',
+        content: part.text || part.content || '',
+        thinking_id: part.thinking_id,
+      }));
+    }
+
+    return [{ kind: 'text' as const, content: JSON.stringify(content) }];
+  }
+
+  private extractTextContent(content: any): string {
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) {
+      return content
+        .filter((p) => p.kind === 'text' || !p.kind)
+        .map((p) => p.text || p.content || '')
+        .join('');
+    }
+    return '';
+  }
+}
+
+/**
+ * ChatGPT Codex (ccx) transformer
+ * 
+ * Raw format: ChatGPT's JSONL export format
+ * Cursor: line_offset (JSONL line number)
+ */
+export class CodexTransformer implements ISessionTransformer {
+  readonly tool = 'ccx' as const;
+
+  parseRaw(rawContent: string): unknown {
+    const lines = rawContent.split('\n').filter((l) => l.trim());
+    const messages = lines.map((line) => JSON.parse(line));
+    return { messages, line_count: lines.length };
+  }
+
+  getCurrentCursor(rawSession: unknown): Cursor {
+    const session = rawSession as any;
+    return { type: 'line_offset', value: session.line_count || 0 };
+  }
+
+  transformTurns(rawSession: unknown): NormalizedTurn[] {
+    const session = rawSession as any;
+    const messages = session.messages || [];
+    const turns: NormalizedTurn[] = [];
+
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+      const role = msg.role || 'user';
+
+      turns.push({
+        turn_index: i,
+        role: role as 'user' | 'assistant',
+        content: this.extractTextContent(msg.content),
+        parts: this.extractParts(msg.content),
+        meta: {
+          tool_cursor_value: i, // Line offset in JSONL
+          ...msg.meta,
+        },
+        timestamp: msg.create_time
+          ? new Date(msg.create_time * 1000).toISOString()
+          : new Date().toISOString(),
+      });
+    }
+
+    return turns;
+  }
+
+  getSessionMetadata(rawSession: unknown) {
+    return {
+      project_path: '',
+      session_type: 'chat' as const,
+    };
+  }
+
+  private extractParts(content: any): ContentPart[] {
+    if (typeof content === 'string') {
+      return [{ kind: 'text' as const, content }];
+    }
+
+    if (Array.isArray(content)) {
+      return content.map((part) => ({
+        kind: part.type || 'text',
+        content: part.content || '',
+      }));
+    }
+
+    return [{ kind: 'text' as const, content: JSON.stringify(content) }];
+  }
+
+  private extractTextContent(content: any): string {
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) {
+      return content.map((p) => p.content || '').join('');
+    }
+    return '';
+  }
+}
+
+/**
+ * Get transformer for a given tool
+ * 
+ * @param tool Tool code ('cpt', 'cld', 'ccx')
+ * @returns Transformer instance
+ */
+export function getTransformer(tool: string): ISessionTransformer {
+  switch (tool) {
+    case 'cpt':
+      return new CopilotTransformer();
+    case 'cld':
+      return new ClaudeCodeTransformer();
+    case 'ccx':
+      return new CodexTransformer();
+    default:
+      throw new Error(`Unknown tool: ${tool}`);
+  }
+}
