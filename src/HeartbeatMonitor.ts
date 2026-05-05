@@ -11,7 +11,7 @@ const FLOOR_MS = 300_000;
 const STALE_MULTIPLIER = 2;
 
 export type HeartbeatState = 'alive' | 'flagged' | 'stopped';
-export type WildWestScope = 'town' | 'county' | 'world';
+export type WildWestScope = 'town' | 'county' | 'territory';
 
 interface HeartbeatConfig {
   intervalMs: number;
@@ -42,7 +42,7 @@ function scopeOf(rootPath: string): WildWestScope | null {
   const reg = readRegistry(rootPath);
   if (!reg) return null;
   const s = reg['scope'];
-  if (s === 'town' || s === 'county' || s === 'world') return s;
+  if (s === 'town' || s === 'county' || s === 'territory') return s;
   return null;
 }
 
@@ -187,13 +187,13 @@ function beatCounty(
   return ok ? 'alive' : 'flagged';
 }
 
-function beatWorld(
+function beatTerritory(
   rootPath: string,
   outputChannel: vscode.OutputChannel,
   worldRoot: string,
   countiesDir: string,
 ): HeartbeatState {
-  const sentinel = sentinelPath(rootPath, 'world');
+  const sentinel = sentinelPath(rootPath, 'territory');
   writeSentinel(sentinel, outputChannel);
 
   // Check schema version
@@ -339,8 +339,8 @@ export class HeartbeatMonitor {
       if (sr.scope !== 'town') continue;
       const countyPath = walkUpForScope(sr.rootPath, 'county');
       if (countyPath) add(countyPath, 'county');
-      const worldPath = walkUpForScope(sr.rootPath, 'world');
-      if (worldPath) add(worldPath, 'world');
+      const worldPath = walkUpForScope(sr.rootPath, 'territory');
+      if (worldPath) add(worldPath, 'territory');
     }
 
     return result;
@@ -374,8 +374,8 @@ export class HeartbeatMonitor {
         case 'county':
           state = beatCounty(scope.rootPath, this.outputChannel, this.worldRoot, this.countiesDir);
           break;
-        case 'world':
-          state = beatWorld(scope.rootPath, this.outputChannel, this.worldRoot, this.countiesDir);
+        case 'territory':
+          state = beatTerritory(scope.rootPath, this.outputChannel, this.worldRoot, this.countiesDir);
           break;
       }
     } catch (err) {

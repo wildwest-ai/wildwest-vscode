@@ -39,7 +39,7 @@ export class SoloModeController {
   }
 
   hasBranchDoc(worktreePath: string, branch: string): boolean {
-    const docPath = path.join(worktreePath, 'docs', 'branches', 'active', branch, 'README.md');
+    const docPath = path.join(worktreePath, '.wildwest', 'board', 'branches', 'active', branch, 'README.md');
     return fs.existsSync(docPath);
   }
 
