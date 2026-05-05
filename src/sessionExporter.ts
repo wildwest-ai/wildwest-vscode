@@ -911,6 +911,14 @@ export class SessionExporter {
       this.saveState();
       if (activity) {
         this.log(`${this.getTimestamp()} State file saved: ${path.join(this.exportPath, '.wildwest-state.json')}`);
+        
+        // Process new sessions through pipeline (emit packets)
+        if (this.pipelineAdapter) {
+          this.pipelineAdapter.processRawSessions().catch((err) => {
+            this.log(`${this.getTimestamp('warn')} Pipeline processing error: ${err}`);
+          });
+        }
+        
         // Incremental staged/ sync: re-convert only raw files changed this cycle
         // (BatchChatConverter.isAlreadyConverted uses mtime — unchanged files are skipped)
         this.batchConvertSessions(true).catch(() => { /* silent */ });
