@@ -1609,10 +1609,31 @@ export class SessionExporter {
   }
 
   dispose(): void {
+    // Close all open sessions before shutting down
+    if (this.pipelineAdapter) {
+      this.closeAllOpenSessions().catch((err) => {
+        this.log(`${this.getTimestamp('warn')} Error closing sessions on dispose: ${err}`);
+      });
+    }
     this.saveState();
     this.statusBar.dispose();
     if (this.watcher) {
       this.watcher.close();
+    }
+  }
+
+  private async closeAllOpenSessions(): Promise<void> {
+    if (!this.pipelineAdapter) return;
+    
+    const sessions = await this.pipelineAdapter.getStoredSessions();
+    for (const session of sessions) {
+      if (!session.closed_at) {
+        // Session is still open, close it
+        await this.pipelineAdapter.closeSession(
+          session.tool as 'cld' | 'cpt' | 'ccx',
+          session.tool_sid
+        );
+      }
     }
   }
 }
