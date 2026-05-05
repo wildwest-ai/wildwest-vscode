@@ -54,3 +54,9 @@ Change is purely in `package.json` `contributes.commands[*].category` — no cod
 
 - [ ] **Telegraph unread count** — `$(mail) N` badge when non-system files exist in `.wildwest/telegraph/`. `TelegraphWatcher` already watches the dir; count and badge.
 - [ ] **Last beat age** — show `N min ago` in the heartbeat tooltip (or inline). `.last-beat` mtime is already read in `checkLiveness()`; format the age as a human string. Catches stale-but-not-yet-expired heartbeats early.
+
+---
+
+## Backlog — v0.15.x
+
+- [ ] **`wildwest.telegraphStatus` command (P4)** — Query and display current telegraph status (inbox count, unresolved memos, compliance state). Deferred pending session-open/close protocol maturation. Adopted in 0254Z decisions memo 2026-05-05.

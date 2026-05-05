@@ -3,7 +3,7 @@
 **Town:** wildwest-vscode  
 **County:** wildwest-ai  
 **Scope:** town  
-**Version:** 0.11.0  
+**Version:** 0.13.2  
 
 ---
 
@@ -38,10 +38,11 @@ Every new Copilot window in this town must follow this sequence:
 
 1. **Read this file** — You're reading it now ✓
 2. **Read county law** — `~/wildwest/counties/wildwest-ai/CLAUDE.md` (contains P1 decisions, shared patterns)
-3. **Process telegraph inbox** — `.wildwest/telegraph/` — resolve unprocessed memos (Rule 23)
-4. **Check git status** — `git status` and `git log --oneline -5`
-5. **Know active branches** — `.wildwest/board/branches/` — track 5-state lifecycle
-6. **Review TODO.md** — Open work and blockers for this town
+3. **Send session-open memo** — `.wildwest/telegraph/` — memo with inbox count, assignments detected, compliance intent (P1 protocol)
+4. **Process telegraph inbox** — `.wildwest/telegraph/` — resolve unprocessed memos (Rule 23)
+5. **Check git status** — `git status` and `git log --oneline -5`
+6. **Know active branches** — `.wildwest/board/branches/` — track 5-state lifecycle
+7. **Review TODO.md** — Open work and blockers for this town
 
 ---
 
@@ -78,6 +79,49 @@ Every new Copilot window in this town must follow this sequence:
 - **Inbound:** `YYYYMMDD-HHMMz-to-TM(RHk)-from-CD(RSn)--subject.md`
 - **Outbound (response):** `YYYYMMDD-HHMMz-to-CD(RSn)-from-TM(RHk)--subject-resolved.md`
 - **Acknowledgment:** `YYYYMMDD-HHMMz-ack--subject.md` (if decision is clear, no action needed)
+
+### Session-Open Memo Template (P1 Protocol)
+
+```markdown
+# Telegraph Memo
+
+**To:** CD(RSn)  
+**From:** TM(RHk).Cpt  
+**Date:** YYYYMMDD-HHMMz  
+**Re:** Session open — inbox status + assignments
+
+---
+
+Inbox: N memos (M unresolved)  
+Assignments detected: [list or "none"]  
+Compliance intent: [describe focus]
+
+**Ready for telegraph.**
+
+TM(RHk).Cpt
+```
+
+### Session-Close Memo Template (P3 Protocol)
+
+```markdown
+# Telegraph Memo
+
+**To:** CD(RSn)  
+**From:** TM(RHk).Cpt  
+**Date:** YYYYMMDD-HHMMz  
+**Re:** Session close — summary + unresolved
+
+---
+
+Session length: X hrs Y mins  
+Commits: N  
+Memos processed: M  
+Unresolved: [list or "none"]  
+
+Work archived per Rule 23.
+
+TM(RHk).Cpt
+```
 
 ---
 
