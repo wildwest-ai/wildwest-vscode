@@ -646,28 +646,6 @@ export class SessionExporter {
       .replace('~', userHome);
   }
 
-  private getGitUsername(): string {
-    try {
-      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-      if (!workspaceFolder) {
-        this.log(`${this.getTimestamp('warn')} No workspace folder open`);
-        return 'unknown';
-      }
-      const cwd = workspaceFolder.uri.fsPath;
-      this.log(`${this.getTimestamp()} Getting git username from: ${cwd}`);
-      const username = execSync('git config user.name', { 
-        encoding: 'utf8',
-        cwd: cwd
-      }).trim();
-      this.log(`${this.getTimestamp()} Git username found: ${username}`);
-      return username || 'unknown';
-    } catch (error) {
-      this.log(`${this.getTimestamp('error')} Error getting git username: ${error}`);
-      console.warn('Could not get git username:', error);
-      return 'unknown';
-    }
-  }
-
   private getTimestamp(level: string = 'info'): string {
     const now = new Date();
     const year = now.getFullYear();
@@ -1625,15 +1603,7 @@ export class SessionExporter {
   private async closeAllOpenSessions(): Promise<void> {
     if (!this.pipelineAdapter) return;
     
-    const sessions = await this.pipelineAdapter.getStoredSessions();
-    for (const session of sessions) {
-      if (!session.closed_at) {
-        // Session is still open, close it
-        await this.pipelineAdapter.closeSession(
-          session.tool as 'cld' | 'cpt' | 'ccx',
-          session.tool_sid
-        );
-      }
-    }
+    // TODO: Implement session close detection when getStoredSessions() is available
+    // For now, closeAllOpenSessions is a stub for future expansion
   }
 }

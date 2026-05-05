@@ -158,7 +158,7 @@ export class SessionExportPipeline {
 
     const record = JSON.parse(fs.readFileSync(recordPath, 'utf8'));
     const existingIndexes = new Set((record.turns || []).map((t: any) => t.turn_index));
-    const maxExisting = Math.max(...Array.from(existingIndexes), -1);
+    const maxExisting = Math.max(...(Array.from(existingIndexes) as number[]), -1);
 
     // Return turns after max existing
     return allTurns.filter((t) => t.turn_index > maxExisting);
