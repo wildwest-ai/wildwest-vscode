@@ -219,7 +219,7 @@ function beatTerritory(
         if (countyAlias) {
           const cp = path.join(worldRoot, countiesDir, countyAlias);
           if (!fs.existsSync(path.join(cp, '.wildwest', 'registry.json'))) {
-            outputChannel.appendLine(`[HeartbeatMonitor] world: county missing on disk: ${cp}`);
+            outputChannel.appendLine(`[HeartbeatMonitor] territory: county missing on disk: ${cp}`);
             ok = false;
           }
         }
