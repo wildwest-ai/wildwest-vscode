@@ -1,12 +1,15 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { HeartbeatMonitor } from './HeartbeatMonitor';
 
 export class TelegraphCommands {
   private outputChannel: vscode.OutputChannel;
+  private heartbeatMonitor: HeartbeatMonitor;
 
-  constructor(outputChannel: vscode.OutputChannel) {
+  constructor(outputChannel: vscode.OutputChannel, heartbeatMonitor?: HeartbeatMonitor) {
     this.outputChannel = outputChannel;
+    this.heartbeatMonitor = heartbeatMonitor || ({} as HeartbeatMonitor);
   }
 
   /**
@@ -38,6 +41,19 @@ export class TelegraphCommands {
     }
 
     return telegraphDir;
+  }
+
+  /**
+   * Check if command is allowed in current scope.
+   * Telegraph commands are town-scoped only.
+   */
+  private requireTownScope(): boolean {
+    const scope = this.heartbeatMonitor?.detectScope?.();
+    if (scope !== 'town') {
+      vscode.window.showWarningMessage(`Telegraph commands are only available in town scope. Current scope: ${scope || 'unknown'}`);
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -87,6 +103,9 @@ export class TelegraphCommands {
    * Command: Ack a telegraph memo
    */
   private async ackMemo(): Promise<void> {
+    // Enforce town scope for telegraph commands
+    if (!this.requireTownScope()) return;
+
     const telegraphDir = await this.getTelegraphDir();
     if (!telegraphDir) return;
 
@@ -196,6 +215,9 @@ original_memo: ${originalFileName}
    * Command: Send a telegraph memo
    */
   private async sendMemo(): Promise<void> {
+    // Enforce town scope for telegraph commands
+    if (!this.requireTownScope()) return;
+
     const telegraphDir = await this.getTelegraphDir();
     if (!telegraphDir) return;
 

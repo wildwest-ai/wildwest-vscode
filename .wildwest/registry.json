@@ -1,6 +1,8 @@
 {
   "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
   "alias": "wildwest-vscode",
+  "scope": "town",
   "remote": "https://github.com/wildwest-ai/wildwest-vscode",
-  "mcp": null
+  "mcp": null,
+  "actors": []
 }

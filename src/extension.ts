@@ -2,6 +2,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { SessionExporter } from './sessionExporter';
 import { HeartbeatMonitor } from './HeartbeatMonitor';
+import { StatusBarManager } from './StatusBarManager';
 import { SoloModeController } from './SoloModeController';
 import { TelegraphWatcher } from './TelegraphWatcher';
 import { WorktreeManager } from './WorktreeManager';
@@ -28,6 +29,7 @@ function getWildwestConfig(): WildwestConfig {
 
 let exporter: SessionExporter;
 let heartbeatMonitor: HeartbeatMonitor;
+let statusBarManager: StatusBarManager;
 let telegraphWatcher: TelegraphWatcher;
 let soloModeController: SoloModeController;
 let worktreeManager: WorktreeManager;
@@ -46,10 +48,11 @@ export function activate(context: vscode.ExtensionContext) {
   worktreeManager = new WorktreeManager();
   exporter = new SessionExporter(context, outputChannel);
   heartbeatMonitor = new HeartbeatMonitor(outputChannel, wwConfig.worldRoot, wwConfig.countiesDir);
+  statusBarManager = new StatusBarManager(heartbeatMonitor);
   telegraphWatcher = new TelegraphWatcher(outputChannel, worktreeManager, heartbeatMonitor);
   soloModeController = new SoloModeController(outputChannel, worktreeManager, heartbeatMonitor);
   telegraphInbox = new TelegraphInbox(outputChannel);
-  telegraphCommands = new TelegraphCommands(outputChannel);
+  telegraphCommands = new TelegraphCommands(outputChannel, heartbeatMonitor);
   telegraphCommands.register(context);
 
   // ── Commands — devPair log (existing) ─────────────────────────────────────
@@ -136,12 +139,19 @@ export function activate(context: vscode.ExtensionContext) {
       soloModeController.report();
       outputChannel.show();
     }),
+    vscode.commands.registerCommand('wildwest.showStatus', () => {
+      const scope = heartbeatMonitor.detectScope();
+      const actor = vscode.workspace.getConfiguration('wildwest').get<string>('actor', '');
+      const info = scope ? `Scope: ${scope}\nActor: ${actor || '(not declared)'}` : 'No Wild West scope detected';
+      vscode.window.showInformationMessage(`Wild West Status\n${info}`);
+    }),
   );
 
   // ── Auto-start ────────────────────────────────────────────────────────────
   const config = vscode.workspace.getConfiguration('wildwest');
   if (config.get<boolean>('enabled') !== false) {
     exporter.start();
+    statusBarManager.startListening();
     heartbeatMonitor.start();
     telegraphWatcher.start();
   }
@@ -160,11 +170,12 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
 
-  context.subscriptions.push(heartbeatMonitor, telegraphWatcher, soloModeController);
+  context.subscriptions.push(heartbeatMonitor, telegraphWatcher, soloModeController, statusBarManager);
 }
 
 export function deactivate() {
   exporter?.dispose();
   heartbeatMonitor?.dispose();
   telegraphWatcher?.dispose();
+  statusBarManager?.dispose();
 }

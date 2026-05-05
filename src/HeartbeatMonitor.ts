@@ -13,6 +13,13 @@ const STALE_MULTIPLIER = 2;
 export type HeartbeatState = 'alive' | 'flagged' | 'stopped';
 export type WildWestScope = 'town' | 'county' | 'territory';
 
+// Approved scope → roles mapping per CD decision
+const SCOPE_ROLES: Record<WildWestScope, string[]> = {
+  'territory': ['G', 'RA'],
+  'county': ['S', 'CD', 'TM'],
+  'town': ['Mayor', 'TM', 'HG'],
+};
+
 interface HeartbeatConfig {
   intervalMs: number;
   intervalActiveMs: number;
@@ -44,6 +51,15 @@ function scopeOf(rootPath: string): WildWestScope | null {
   const s = reg['scope'];
   if (s === 'town' || s === 'county' || s === 'territory') return s;
   return null;
+}
+
+/**
+ * Validate if an actor role is valid for a given scope.
+ * Returns true if role is in SCOPE_ROLES mapping for that scope.
+ */
+function isValidRoleForScope(role: string, scope: WildWestScope): boolean {
+  const validRoles = SCOPE_ROLES[scope] || [];
+  return validRoles.includes(role);
 }
 
 /**
@@ -209,6 +225,22 @@ function beatTown(
     outputChannel.appendLine(
       `[heartbeat] telegraph cleanup: ${cleanupResult.archived} archived, ${cleanupResult.open} open`,
     );
+  }
+
+  // Validate declared actor role against scope
+  const scope = scopeOf(rootPath);
+  if (scope === 'town') {
+    const actorSetting = vscode.workspace.getConfiguration('wildwest').get<string>('actor', '');
+    if (actorSetting) {
+      // Extract just the role part (before any parentheses, e.g. "TM" from "TM(RHk)")
+      const roleMatch = actorSetting.match(/^([A-Za-z]+)/);
+      if (roleMatch) {
+        const role = roleMatch[1];
+        if (!isValidRoleForScope(role, 'town')) {
+          outputChannel.appendLine(`[HeartbeatMonitor] WARNING: Actor role "${role}" is not valid for scope "town". Valid roles: ${SCOPE_ROLES['town'].join(', ')}`);
+        }
+      }
+    }
   }
 
   // Scan telegraph for non-heartbeat, non-sentinel, non-history files = flags
@@ -379,6 +411,30 @@ export class HeartbeatMonitor {
 
   dispose(): void {
     this.stop();
+  }
+
+  /**
+   * Detect the scope of the current workspace (primary folder).
+   * Returns the scope from registry.json or null if not found.
+   */
+  detectScope(): WildWestScope | null {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) return null;
+    const primaryFolder = folders[0].uri.fsPath;
+    return scopeOf(primaryFolder);
+  }
+
+  /**
+   * Validate that the declared actor role is valid for the given scope.
+   * Extracts role from actor setting (e.g. "TM" from "TM(RHk)").
+   * Returns true if valid or no actor declared; false if invalid role for scope.
+   */
+  validateActorForScope(actor: string, scope: WildWestScope): boolean {
+    if (!actor) return true; // Empty actor is valid (no declaration)
+    const roleMatch = actor.match(/^([A-Za-z]+)/);
+    if (!roleMatch) return false; // Malformed actor
+    const role = roleMatch[1];
+    return isValidRoleForScope(role, scope);
   }
 
   // ---------------------------------------------------------------------------

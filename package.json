@@ -153,6 +153,11 @@
           "type": "string",
           "default": "sessions",
           "description": "Directory name for session exports, relative to worldRoot. Default: sessions."
+        },
+        "wildwest.actor": {
+          "type": "string",
+          "default": "",
+          "description": "Declare this window's actor role (e.g., RA(RSn), TM(RHk), CD(RSn)). Scope determines valid roles. Leave empty for no actor."
         }
       }
     }
