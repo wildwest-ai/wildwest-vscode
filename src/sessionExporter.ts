@@ -6,6 +6,7 @@ import { BatchChatConverter } from './batchConverter';
 import { convertJsonFileToMarkdown } from './jsonToMarkdown';
 import { generateIndex } from './generateIndex';
 import { execSync } from 'child_process';
+import { PipelineAdapter } from './sessionPipeline';
 
 export class SessionExporter {
   private watcher: chokidar.FSWatcher | null = null;
@@ -22,6 +23,7 @@ export class SessionExporter {
   private state: { version: number; initialized: boolean; lastDbStats: Record<string, { mtime: number; size: number }> } = { version: 1, initialized: false, lastDbStats: {} };
   private isScanning: boolean = false;
   private _lastLogMessage: string | null = null;
+  private pipelineAdapter: PipelineAdapter | null = null;
 
   constructor(context: vscode.ExtensionContext, outputChannel: vscode.OutputChannel) {
     this.outputChannel = outputChannel;
@@ -57,6 +59,18 @@ export class SessionExporter {
     
     // Load state file
     this.state = this.loadState();
+
+    // Initialize pipeline adapter
+    try {
+      const gitUsername = this.getGitUsername();
+      this.pipelineAdapter = new PipelineAdapter({
+        sessionsDir: path.join(this.userHome, 'wildwest', 'sessions', gitUsername),
+        actor: gitUsername,
+        projectPath: vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath,
+      });
+    } catch (error) {
+      this.log(`${this.getTimestamp('warn')} Failed to initialize pipeline adapter: ${error}`);
+    }
   }
 
   private log(message: string, appendDot: boolean = false): void {
@@ -178,6 +192,16 @@ export class SessionExporter {
 
   private getClaudeProjectsPath(userHome: string): string {
     return path.join(userHome, '.claude', 'projects');
+  }
+
+  private getGitUsername(): string {
+    try {
+      const username = execSync('git config --global user.name', { encoding: 'utf8' }).trim();
+      if (username) return username;
+    } catch {
+      // Fallback to system user
+    }
+    return process.env.USER || process.env.USERNAME || 'unknown';
   }
 
   private isClaudeSidechain(content: string): boolean {
