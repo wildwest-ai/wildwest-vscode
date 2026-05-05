@@ -96,7 +96,10 @@ export class CopilotTransformer implements ISessionTransformer {
           role: 'user',
           content: this.extractTextContent(request.message),
           parts: this.extractParts(request.message),
-          meta: {},
+          meta: {
+            tool_cursor_value: request.requestId ?? requests.indexOf(request),
+            ...request.meta,
+          },
           timestamp: request.timestamp || new Date().toISOString(),
         });
       }
@@ -114,7 +117,10 @@ export class CopilotTransformer implements ISessionTransformer {
               role: 'assistant',
               content: part.kind === 'text' ? part.content : '',
               parts: [part],
-              meta: request.meta || {},
+              meta: {
+                tool_cursor_value: request.requestId ?? requests.indexOf(request),
+                ...request.meta,
+              },
               timestamp: request.responseTimestamp || new Date().toISOString(),
             });
           }
@@ -125,7 +131,10 @@ export class CopilotTransformer implements ISessionTransformer {
             role: 'assistant',
             content: this.extractTextContent(request.response),
             parts: responseParts,
-            meta: request.meta || {},
+            meta: {
+              tool_cursor_value: request.requestId ?? requests.indexOf(request),
+              ...request.meta,
+            },
             timestamp: request.responseTimestamp || new Date().toISOString(),
           });
         }
@@ -211,7 +220,10 @@ export class ClaudeCodeTransformer implements ISessionTransformer {
         role: role as 'user' | 'assistant',
         content: this.extractTextContent(msg.content),
         parts: this.extractParts(msg.content),
-        meta: msg.meta || {},
+        meta: {
+          tool_cursor_value: msg.id || '',
+          ...msg.meta,
+        },
         timestamp: msg.timestamp || new Date().toISOString(),
       });
     }
@@ -289,7 +301,10 @@ export class CodexTransformer implements ISessionTransformer {
         role: role as 'user' | 'assistant',
         content: this.extractTextContent(msg.content),
         parts: this.extractParts(msg.content),
-        meta: msg.meta || {},
+        meta: {
+          tool_cursor_value: i, // Line offset in JSONL
+          ...msg.meta,
+        },
         timestamp: msg.create_time
           ? new Date(msg.create_time * 1000).toISOString()
           : new Date().toISOString(),

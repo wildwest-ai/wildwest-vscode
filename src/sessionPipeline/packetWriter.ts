@@ -175,7 +175,8 @@ export class PacketWriter {
   async applyPacketToStorage(
     packet: SessionPacket,
     projectPath: string,
-    sessionType: 'chat' | 'edit'
+    sessionType: 'chat' | 'edit',
+    toolCursor?: any
   ): Promise<void> {
     const sessionRecordPath = path.join(
       this.stagedDir,
@@ -225,7 +226,7 @@ export class PacketWriter {
       // Update metadata
       record.last_turn_at = packet.created_at;
       record.turn_count = record.turns.length;
-      record.cursor = {
+      record.cursor = toolCursor || {
         type: this.getCursorType(packet.tool),
         value: this.extractCursorValue(record.turns[record.turns.length - 1]),
       };
@@ -299,8 +300,11 @@ export class PacketWriter {
   }
 
   private extractCursorValue(turn: NormalizedTurn): string | number {
-    // For now, use turn_index as cursor value
-    // Tool-specific cursors should be added to turn metadata if available
+    // Use tool-native cursor value if available in turn meta
+    if (turn.meta?.tool_cursor_value !== undefined) {
+      return turn.meta.tool_cursor_value;
+    }
+    // Fallback: use turn_index
     return turn.turn_index;
   }
 }

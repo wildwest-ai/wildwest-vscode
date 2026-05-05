@@ -24,6 +24,7 @@ export interface TurnMeta {
   model?: string; // e.g., 'claude-sonnet-4-6', 'gpt-5.2-codex'
   elapsed_ms?: number;
   completion_tokens?: number;
+  tool_cursor_value?: string | number; // Tool-native cursor for this turn (requestId, message_id, line offset, etc.)
   [key: string]: unknown;
 }
 

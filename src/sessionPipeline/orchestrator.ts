@@ -9,9 +9,10 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 import { getTransformer } from './transformers';
 import { PacketWriter } from './packetWriter';
-import { SessionPacket, NormalizedTurn } from './types';
+import { SessionPacket, NormalizedTurn, Cursor } from './types';
 import { generateWwsid, generateDeviceId, getCursorType } from './utils';
 
 export interface PipelineOptions {
@@ -110,7 +111,7 @@ export class SessionExportPipeline {
     try {
       const packet: SessionPacket = {
         schema_version: '1',
-        packet_id: require('uuid').v4(),
+        packet_id: uuidv4(),
         wwsid,
         tool,
         tool_sid,
@@ -125,7 +126,11 @@ export class SessionExportPipeline {
       await this.packetWriter.applyPacketToStorage(
         packet,
         metadata.project_path || this.projectPath,
-        metadata.session_type
+        metadata.session_type,
+        {
+          type: getCursorType(tool),
+          value: turnsForPacket[turnsForPacket.length - 1].meta?.tool_cursor_value || turnsForPacket[turnsForPacket.length - 1].turn_index,
+        }
       );
     } catch (error) {
       throw new Error(`Storage update failed: ${error}`);
