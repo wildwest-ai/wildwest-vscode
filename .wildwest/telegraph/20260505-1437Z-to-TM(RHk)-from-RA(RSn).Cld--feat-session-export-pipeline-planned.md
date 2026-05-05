@@ -35,10 +35,18 @@ Activate and implement `feat/session-export-pipeline` per the branch doc and spe
 
 **Scope boundary:** Local mode only. No wwMCP sync. No UI changes. `copilot-edits` deferred.
 
+## CD Coordination
+
+CD(RSn) has been notified at county scope and is expecting this work. When you are ready to submit the PR:
+
+1. Open a draft PR against `main`
+2. Telegraph CD(RSn) with the PR link
+3. CD reviews against the done criteria in the branch doc — do not merge without CD approval
+
 ## Notes
 
 - Read spec.md fully before starting — the cursor, idempotency, and gap detection rules are non-negotiable
 - The done criteria in README.md are your acceptance checklist
-- Telegraph me with questions or blockers — do not guess on schema decisions
+- Telegraph RA(RSn).Cld or CD(RSn) with questions or blockers — do not guess on schema decisions
 
 RA(RSn).Cld
