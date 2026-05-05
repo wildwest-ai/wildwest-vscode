@@ -45,13 +45,53 @@ function readRegistry(rootPath: string): Record<string, unknown> | null {
   }
 }
 
+/**
+ * Migrate a registry that lacks schema_version to v2.
+ * Adds schema_version, scope, and alias if inferrable from legacy fields.
+ * Writes the updated registry back to disk.
+ * Returns the migrated registry object.
+ */
+function migrateRegistry(rootPath: string, reg: Record<string, unknown>): Record<string, unknown> {
+  const p = path.join(rootPath, '.wildwest', 'registry.json');
+  const updated = { ...reg };
+
+  // Infer scope from legacy fields
+  if (!updated['scope']) {
+    if (updated['county']) {
+      updated['scope'] = 'county';
+    } else if (updated['wwuid'] && !updated['county']) {
+      // Town registries have wwuid; if no county key, treat as town
+      updated['scope'] = 'town';
+    }
+  }
+
+  // Promote 'county' key to 'alias' if missing
+  if (!updated['alias'] && updated['county']) {
+    updated['alias'] = updated['county'];
+  }
+
+  updated['schema_version'] = '2';
+
+  try {
+    fs.writeFileSync(p, JSON.stringify(updated, null, 2) + '\n', 'utf8');
+  } catch {
+    // Migration write failed — proceed with in-memory result
+  }
+
+  return updated;
+}
+
 function scopeOf(rootPath: string): WildWestScope | null {
-  const reg = readRegistry(rootPath);
+  let reg = readRegistry(rootPath);
   if (!reg) return null;
+
+  // Auto-migrate if schema_version is missing
+  if (!reg['schema_version']) {
+    reg = migrateRegistry(rootPath, reg);
+  }
+
   const s = reg['scope'];
   if (s === 'town' || s === 'county' || s === 'territory') return s;
-  // Legacy schema fallback: no 'scope' field but has 'county' key → county scope
-  if (reg['county'] && !s) return 'county';
   return null;
 }
 
