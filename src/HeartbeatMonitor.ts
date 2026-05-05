@@ -309,7 +309,7 @@ export class HeartbeatMonitor {
 
   /**
    * Detect all governed scope roots from workspace folders.
-   * For each town found, walk upward to find its county and world roots.
+   * For each town found, walk upward to find its county and territory roots.
    * Deduplicates by rootPath.
    */
   private detectScopes(): ScopeRoot[] {
@@ -334,7 +334,7 @@ export class HeartbeatMonitor {
       }
     }
 
-    // For each town, walk up to find county + world
+    // For each town, walk up to find county + territory
     for (const sr of [...result]) {
       if (sr.scope !== 'town') continue;
       const countyPath = walkUpForScope(sr.rootPath, 'county');
