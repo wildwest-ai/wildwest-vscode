@@ -58,6 +58,11 @@ export class StatusBarManager {
       this.updateDisplay();
     });
 
+    // Periodic refresh (every 5 seconds) to catch scope changes
+    setInterval(() => {
+      this.updateDisplay();
+    }, 5000);
+
     // Initial display
     this.updateDisplay();
   }
