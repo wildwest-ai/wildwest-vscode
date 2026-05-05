@@ -124,6 +124,76 @@ function writeSentinel(sentinelFile: string, outputChannel: vscode.OutputChannel
 // Per-scope beat logic
 // ---------------------------------------------------------------------------
 
+/**
+ * Scan telegraphDir for resolved memo pairs (ack-done/ack-deferred + original).
+ * Move pairs to history/ (create if needed). Leave ack-blocked/ack-question in place.
+ * Returns { archived, open }.
+ */
+function cleanupTelegraph(
+  telegraphDir: string,
+  outputChannel: vscode.OutputChannel,
+): { archived: number; open: number } {
+  let archived = 0;
+  let open = 0;
+
+  try {
+    if (!fs.existsSync(telegraphDir)) return { archived, open };
+
+    const entries = fs.readdirSync(telegraphDir);
+    const ackFiles = entries.filter(
+      (e) => e.includes('ack-done--') || e.includes('ack-deferred--'),
+    );
+
+    for (const ackFile of ackFiles) {
+      try {
+        // Extract subject from ack file: match pattern like "20260505-1824Z-ack-done--subject.md"
+        let subject: string | null = null;
+        if (ackFile.includes('ack-done--')) {
+          subject = ackFile.split('ack-done--')[1]?.replace('.md', '');
+        } else if (ackFile.includes('ack-deferred--')) {
+          subject = ackFile.split('ack-deferred--')[1]?.replace('.md', '');
+        }
+        if (!subject) continue;
+        // Try to find the paired memo (scan for anything with same subject)
+        const paired = entries.find(
+          (e) => e !== ackFile && e.includes(`--${subject}.md`),
+        );
+
+        const ackPath = path.join(telegraphDir, ackFile);
+        const historyDir = path.join(telegraphDir, 'history');
+
+        // Ensure history/ exists
+        if (!fs.existsSync(historyDir)) {
+          fs.mkdirSync(historyDir, { recursive: true });
+        }
+
+        // Move ack file
+        fs.renameSync(ackPath, path.join(historyDir, ackFile));
+        archived++;
+
+        // Move paired memo if found
+        if (paired) {
+          const pairedPath = path.join(telegraphDir, paired);
+          fs.renameSync(pairedPath, path.join(historyDir, paired));
+          archived++;
+        }
+      } catch (err) {
+        outputChannel.appendLine(`[HeartbeatMonitor] cleanup error for ${ackFile}: ${err}`);
+      }
+    }
+
+    // Count open items
+    const openFiles = entries.filter(
+      (e) => e.includes('ack-blocked--') || e.includes('ack-question--'),
+    );
+    open = openFiles.length;
+  } catch (err) {
+    outputChannel.appendLine(`[HeartbeatMonitor] telegraph cleanup scan error: ${err}`);
+  }
+
+  return { archived, open };
+}
+
 function beatTown(
   rootPath: string,
   outputChannel: vscode.OutputChannel,
@@ -132,6 +202,14 @@ function beatTown(
   const sentinel = sentinelPath(rootPath, 'town');
 
   writeSentinel(sentinel, outputChannel);
+
+  // Run telegraph cleanup
+  const cleanupResult = cleanupTelegraph(telegraphDir, outputChannel);
+  if (cleanupResult.archived > 0 || cleanupResult.open > 0) {
+    outputChannel.appendLine(
+      `[heartbeat] telegraph cleanup: ${cleanupResult.archived} archived, ${cleanupResult.open} open`,
+    );
+  }
 
   // Scan telegraph for non-heartbeat, non-sentinel, non-history files = flags
   let flagged = false;
