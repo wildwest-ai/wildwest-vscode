@@ -415,13 +415,28 @@ export class HeartbeatMonitor {
 
   /**
    * Detect the scope of the current workspace (primary folder).
+   * Checks the primary folder first, then walks up to find any Wild West scope.
    * Returns the scope from registry.json or null if not found.
    */
   detectScope(): WildWestScope | null {
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) return null;
     const primaryFolder = folders[0].uri.fsPath;
-    return scopeOf(primaryFolder);
+    
+    // Check primary folder first
+    const primaryScope = scopeOf(primaryFolder);
+    if (primaryScope) return primaryScope;
+    
+    // Walk up to find any Wild West scope (town, county, or territory)
+    let current = primaryFolder;
+    const root = path.parse(current).root;
+    while (current !== root) {
+      current = path.dirname(current);
+      const s = scopeOf(current);
+      if (s) return s; // Return any scope found
+    }
+    
+    return null;
   }
 
   /**
