@@ -50,6 +50,8 @@ function scopeOf(rootPath: string): WildWestScope | null {
   if (!reg) return null;
   const s = reg['scope'];
   if (s === 'town' || s === 'county' || s === 'territory') return s;
+  // Legacy schema fallback: no 'scope' field but has 'county' key → county scope
+  if (reg['county'] && !s) return 'county';
   return null;
 }
 
