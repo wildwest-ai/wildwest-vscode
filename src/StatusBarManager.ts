@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { HeartbeatMonitor, WildWestScope } from './HeartbeatMonitor';
+import { HeartbeatMonitor } from './HeartbeatMonitor';
 
 /**
  * StatusBarManager handles the Wild West status bar display.

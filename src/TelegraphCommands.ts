@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { HeartbeatMonitor, WildWestScope } from './HeartbeatMonitor';
+import { HeartbeatMonitor } from './HeartbeatMonitor';
 
 export class TelegraphCommands {
   private outputChannel: vscode.OutputChannel;
