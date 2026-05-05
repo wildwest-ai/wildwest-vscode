@@ -142,7 +142,7 @@
         "wildwest.worldRoot": {
           "type": "string",
           "default": "~/wildwest",
-          "description": "Absolute path to the wwWorld root directory. Default: ~/wildwest."
+          "description": "Absolute path to the wwTerritory root directory. Default: ~/wildwest."
         },
         "wildwest.countiesDir": {
           "type": "string",
