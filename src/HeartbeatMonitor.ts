@@ -381,6 +381,17 @@ export class HeartbeatMonitor {
     this.stop();
   }
 
+  /**
+   * Detect the scope of the current workspace (primary folder).
+   * Returns the scope from registry.json or null if not found.
+   */
+  detectScope(): WildWestScope | null {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) return null;
+    const primaryFolder = folders[0].uri.fsPath;
+    return scopeOf(primaryFolder);
+  }
+
   // ---------------------------------------------------------------------------
   // Private
   // ---------------------------------------------------------------------------
