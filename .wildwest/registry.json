@@ -3,5 +3,6 @@
   "alias": "wildwest-vscode",
   "scope": "town",
   "remote": "https://github.com/wildwest-ai/wildwest-vscode",
-  "mcp": null
+  "mcp": null,
+  "actors": []
 }
