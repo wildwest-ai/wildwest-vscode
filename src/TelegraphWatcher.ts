@@ -1,4 +1,5 @@
 import * as chokidar from 'chokidar';
+import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { HeartbeatMonitor } from './HeartbeatMonitor';
@@ -29,6 +30,15 @@ export class TelegraphWatcher {
     for (const wt of worktrees) {
       const telegraphDir = path.join(wt.path, '.wildwest', 'telegraph');
       const inboxDir = path.join(telegraphDir, 'inbox');
+      
+      // Ensure inbox/ exists (may not exist on first run after upgrade)
+      if (!fs.existsSync(inboxDir)) {
+        try {
+          fs.mkdirSync(inboxDir, { recursive: true });
+        } catch (err) {
+          this.outputChannel.appendLine(`[TelegraphWatcher] failed to create inbox: ${err}`);
+        }
+      }
       
       // Primary watcher: inbox/ directory (new outbox/inbox model)
       const inboxWatcher = chokidar.watch(inboxDir, {
