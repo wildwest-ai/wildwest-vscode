@@ -252,14 +252,259 @@ function cleanupTelegraph(
   return { archived, open };
 }
 
+/**
+ * Parse YAML frontmatter from a memo file.
+ * Returns { to: string | null, ... other fields }.
+ */
+function parseMemoFrontmatter(
+  memoPath: string,
+): Record<string, unknown> {
+  try {
+    const content = fs.readFileSync(memoPath, 'utf8');
+    // Extract frontmatter between --- and ---
+    const match = content.match(/^---\n([\s\S]*?)\n---/);
+    if (!match) return {};
+    const frontmatter = match[1];
+    const result: Record<string, unknown> = {};
+    const lines = frontmatter.split('\n');
+    for (const line of lines) {
+      const [key, ...valueParts] = line.split(':');
+      if (key && valueParts.length > 0) {
+        const value = valueParts.join(':').trim();
+        result[key.trim()] = value;
+      }
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Extract role abbreviation from a to/from field.
+ * E.g., "CD(RSn).Cpt" → "CD"
+ */
+function extractRole(actorField: string): string | null {
+  const match = actorField.match(/^([A-Za-z]+)/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Resolve a role to its scope tier.
+ * Based on SCOPE_ROLES mapping defined at top of file.
+ */
+function resolveRoleToScope(role: string): WildWestScope | null {
+  for (const [scope, roles] of Object.entries(SCOPE_ROLES)) {
+    if (roles.includes(role)) {
+      return scope as WildWestScope;
+    }
+  }
+  return null;
+}
+
+/**
+ * Resolve a destination scope to its filesystem path.
+ * Given current scope (town) and destination scope (county/territory),
+ * constructs the path using worldRoot and countiesDir configuration.
+ *
+ * Examples:
+ * - From town ~/wildwest/counties/wildwest-ai/wildwest-vscode/ → county ~/wildwest/counties/wildwest-ai/
+ * - From town/county → territory ~/wildwest/
+ */
+function resolveScopePath(
+  currentScope: WildWestScope,
+  currentPath: string,
+  destScope: WildWestScope,
+  worldRoot: string,
+  countiesDir: string,
+): string | null {
+  // If destination is same scope, no delivery needed (local operation)
+  if (currentScope === destScope) {
+    return null;
+  }
+
+  // Hierarchy: territory > county > town
+  if (destScope === 'territory') {
+    // Always go to worldRoot
+    return worldRoot;
+  }
+
+  if (destScope === 'county') {
+    if (currentScope === 'town') {
+      // Go up to parent county: ~/wildwest/counties/wildwest-ai/
+      const countyPath = path.join(worldRoot, countiesDir, '*'); // Will be replaced with actual alias
+      // For now, we infer by walking up the path
+      // From /wildwest/counties/wildwest-ai/wildwest-vscode/ → /wildwest/counties/wildwest-ai/
+      const parts = currentPath.split(path.sep);
+      // Find the index of 'counties' and extract up to that + next level
+      const countiesIdx = parts.indexOf(countiesDir);
+      if (countiesIdx >= 0 && countiesIdx + 1 < parts.length) {
+        return parts.slice(0, countiesIdx + 2).join(path.sep);
+      }
+    }
+    // If already at county or territory, can't resolve to county
+    return null;
+  }
+
+  if (destScope === 'town') {
+    // Can't resolve to another town without explicit routing
+    return null;
+  }
+
+  return null;
+}
+
+/**
+ * Deliver pending memos from outbox/ to remote inboxes.
+ * Called on every heartbeat tick.
+ * 
+ * Algorithm:
+ * 1. Scan outbox/ for memos
+ * 2. For each memo: parse 'to:' field
+ * 3. Resolve destination scope (role → scope → path)
+ * 4. Write delivered copy to destination inbox/
+ * 5. Stamp delivered_at in original
+ * 6. Archive original to outbox/history/
+ */
+function deliverPendingOutbox(
+  rootPath: string,
+  scope: WildWestScope,
+  outputChannel: vscode.OutputChannel,
+  worldRoot: string,
+  countiesDir: string,
+): { delivered: number; failed: number } {
+  let delivered = 0;
+  let failed = 0;
+
+  try {
+    const outboxDir = path.join(rootPath, '.wildwest', 'telegraph', 'outbox');
+    if (!fs.existsSync(outboxDir)) {
+      return { delivered, failed };
+    }
+
+    const entries = fs.readdirSync(outboxDir);
+    // Process only .md files, exclude history/
+    const memoFiles = entries.filter(
+      (e) => e.endsWith('.md') && !e.startsWith('.'),
+    );
+
+    for (const memoFile of memoFiles) {
+      try {
+        const memoPath = path.join(outboxDir, memoFile);
+        const frontmatter = parseMemoFrontmatter(memoPath);
+        const toField = frontmatter['to'] as string | undefined;
+        if (!toField) {
+          outputChannel.appendLine(
+            `[HeartbeatMonitor] delivery: ${memoFile} has no 'to:' field — skipping`,
+          );
+          failed++;
+          continue;
+        }
+
+        // Scope resolution: parse role → determine destination scope → resolve path
+        const role = extractRole(toField);
+        if (!role) {
+          outputChannel.appendLine(
+            `[HeartbeatMonitor] delivery: ${memoFile} → ${toField} — invalid role format`,
+          );
+          failed++;
+          continue;
+        }
+
+        const destScope = resolveRoleToScope(role);
+        if (!destScope) {
+          outputChannel.appendLine(
+            `[HeartbeatMonitor] delivery: ${memoFile} → ${role} — unknown role`,
+          );
+          failed++;
+          continue;
+        }
+
+        const destPath = resolveScopePath(scope, rootPath, destScope, worldRoot, countiesDir);
+
+        if (!destPath) {
+          // Local memo (same scope) — just archive, no remote delivery
+          outputChannel.appendLine(
+            `[HeartbeatMonitor] delivery: ${memoFile} → ${toField} (local, no remote delivery)`,
+          );
+        } else {
+          // Remote memo — deliver to destination inbox/
+          const destInboxDir = path.join(destPath, '.wildwest', 'telegraph', 'inbox');
+          if (!fs.existsSync(destInboxDir)) {
+            fs.mkdirSync(destInboxDir, { recursive: true });
+          }
+          const destMemoPath = path.join(destInboxDir, memoFile);
+
+          // Copy original (without delivered_at) to destination
+          const originalContent = fs.readFileSync(memoPath, 'utf8');
+          fs.writeFileSync(destMemoPath, originalContent, 'utf8');
+
+          outputChannel.appendLine(
+            `[HeartbeatMonitor] delivery: ${memoFile} → ${destPath}/.wildwest/telegraph/inbox/`,
+          );
+        }
+
+        // Stamp delivered_at in our copy
+        let content = fs.readFileSync(memoPath, 'utf8');
+        const now = new Date().toISOString();
+        const deliveredLine = `delivered_at: ${now}\n`;
+        // Insert delivered_at after the opening ---
+        const frontmatterMatch = content.match(/^(---\n)/);
+        if (frontmatterMatch) {
+          content =
+            frontmatterMatch[1] +
+            deliveredLine +
+            content.substring(frontmatterMatch[1].length);
+        }
+
+        // Move to outbox/history/
+        const historyDir = path.join(outboxDir, 'history');
+        if (!fs.existsSync(historyDir)) {
+          fs.mkdirSync(historyDir, { recursive: true });
+        }
+        const historyPath = path.join(historyDir, memoFile);
+        fs.writeFileSync(historyPath, content, 'utf8');
+        fs.unlinkSync(memoPath);
+
+        delivered++;
+      } catch (err) {
+        outputChannel.appendLine(
+          `[HeartbeatMonitor] delivery error for ${memoFile}: ${err}`,
+        );
+        failed++;
+      }
+    }
+  } catch (err) {
+    outputChannel.appendLine(
+      `[HeartbeatMonitor] outbox scan error: ${err}`,
+    );
+  }
+
+  if (delivered > 0 || failed > 0) {
+    outputChannel.appendLine(
+      `[HeartbeatMonitor] outbox delivery: ${delivered} delivered, ${failed} failed`,
+    );
+  }
+
+  return { delivered, failed };
+}
+
 function beatTown(
   rootPath: string,
   outputChannel: vscode.OutputChannel,
+  worldRoot: string,
+  countiesDir: string,
 ): HeartbeatState {
   const telegraphDir = path.join(rootPath, '.wildwest', 'telegraph');
   const sentinel = sentinelPath(rootPath, 'town');
 
   writeSentinel(sentinel, outputChannel);
+
+  // Run telegraph delivery operator
+  const scope = scopeOf(rootPath);
+  if (scope === 'town') {
+    deliverPendingOutbox(rootPath, scope, outputChannel, worldRoot, countiesDir);
+  }
 
   // Run telegraph cleanup
   const cleanupResult = cleanupTelegraph(telegraphDir, outputChannel);
@@ -270,8 +515,8 @@ function beatTown(
   }
 
   // Validate declared actor role against scope
-  const scope = scopeOf(rootPath);
-  if (scope === 'town') {
+  const scopeCheck = scopeOf(rootPath);
+  if (scopeCheck === 'town') {
     const actorSetting = vscode.workspace.getConfiguration('wildwest').get<string>('actor', '');
     if (actorSetting) {
       // Extract just the role part (before any parentheses, e.g. "TM" from "TM(RHk)")
@@ -560,7 +805,7 @@ export class HeartbeatMonitor {
     try {
       switch (scope.scope) {
         case 'town':
-          state = beatTown(scope.rootPath, this.outputChannel);
+          state = beatTown(scope.rootPath, this.outputChannel, this.worldRoot, this.countiesDir);
           break;
         case 'county':
           state = beatCounty(scope.rootPath, this.outputChannel, this.worldRoot, this.countiesDir);

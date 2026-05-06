@@ -109,16 +109,22 @@ export class TelegraphCommands {
     const telegraphDir = await this.getTelegraphDir();
     if (!telegraphDir) return;
 
-    // Scan for unacked inbound memos
-    const files = fs.readdirSync(telegraphDir);
+    // Scan inbox/ for unacked inbound memos
+    const inboxDir = path.join(telegraphDir, 'inbox');
+    if (!fs.existsSync(inboxDir)) {
+      vscode.window.showInformationMessage('No inbox directory found');
+      return;
+    }
+
+    const files = fs.readdirSync(inboxDir);
     const inboundMemos = files.filter((f) => {
-      if (f.startsWith('.') || f === 'history' || f.includes('ack-')) return false;
-      // Match to-TM* or to-CD* patterns (addressed to current actor)
-      return f.includes('-to-TM(') || f.includes('-to-CD(');
+      if (f.startsWith('.') || f.includes('ack-')) return false;
+      // Match memo pattern: YYYYMMDD-HHMMz-to-* 
+      return f.includes('-to-');
     });
 
     if (inboundMemos.length === 0) {
-      vscode.window.showInformationMessage('No unacked memos found');
+      vscode.window.showInformationMessage('No unacked memos found in inbox');
       return;
     }
 
@@ -134,7 +140,7 @@ export class TelegraphCommands {
     if (!selection) return;
 
     const originalFileName = selection.label;
-    const originalPath = path.join(telegraphDir, originalFileName);
+    const originalPath = path.join(inboxDir, originalFileName);
 
     // Parse frontmatter
     const fm = this.parseFrontmatter(originalPath);
@@ -286,7 +292,13 @@ original_memo: ${originalFileName}
     // Build filename: YYYYMMDD-HHMMZ-to-<ToActor>-from-<FromActor>--<subject>.md
     const timestamp = this.getTimestamp();
     const fileName = `${timestamp}-to-${toActor}-from-${fromActor}--${subject}.md`;
-    const filePath = path.join(telegraphDir, fileName);
+    
+    // Write to outbox/
+    const outboxDir = path.join(telegraphDir, 'outbox');
+    if (!fs.existsSync(outboxDir)) {
+      fs.mkdirSync(outboxDir, { recursive: true });
+    }
+    const filePath = path.join(outboxDir, fileName);
 
     // Build YAML frontmatter
     const isoTimestamp = this.getISO8601Timestamp();
@@ -310,7 +322,7 @@ subject: ${subject}
     const content = `${frontmatter}\n\n${cleanBody}\n`;
     fs.writeFileSync(filePath, content, 'utf8');
 
-    this.outputChannel.appendLine(`[TelegraphCommands] Memo created: ${fileName}`);
-    vscode.window.showInformationMessage(`Memo created: ${fileName}`);
+    this.outputChannel.appendLine(`[TelegraphCommands] Memo created in outbox: ${fileName}`);
+    vscode.window.showInformationMessage(`Memo created in outbox: ${fileName}`);
   }
 }
