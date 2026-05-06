@@ -381,7 +381,7 @@ function beatTown(
   // Run telegraph delivery operator
   const scope = scopeOf(rootPath);
   if (scope === 'town') {
-    const deliveryResult = deliverPendingOutbox(rootPath, scope, outputChannel);
+    deliverPendingOutbox(rootPath, scope, outputChannel);
   }
 
   // Run telegraph cleanup

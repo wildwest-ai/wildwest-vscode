@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 import { HeartbeatMonitor } from './HeartbeatMonitor';
 import { WorktreeManager } from './WorktreeManager';
 
-const ATTENTION_PATTERNS = ['--ack-blocked--', '--ack-question--'];
+// Note: ATTENTION_PATTERNS kept for future use when handling ack-blocked/ack-question in inbox
 
 
 export class TelegraphWatcher {
