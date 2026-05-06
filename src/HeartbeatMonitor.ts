@@ -252,6 +252,123 @@ function cleanupTelegraph(
   return { archived, open };
 }
 
+/**
+ * Parse YAML frontmatter from a memo file.
+ * Returns { to: string | null, ... other fields }.
+ */
+function parseMemoFrontmatter(
+  memoPath: string,
+): Record<string, unknown> {
+  try {
+    const content = fs.readFileSync(memoPath, 'utf8');
+    // Extract frontmatter between --- and ---
+    const match = content.match(/^---\n([\s\S]*?)\n---/);
+    if (!match) return {};
+    const frontmatter = match[1];
+    const result: Record<string, unknown> = {};
+    const lines = frontmatter.split('\n');
+    for (const line of lines) {
+      const [key, ...valueParts] = line.split(':');
+      if (key && valueParts.length > 0) {
+        const value = valueParts.join(':').trim();
+        result[key.trim()] = value;
+      }
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Deliver pending memos from outbox/ to remote inboxes.
+ * Called on every heartbeat tick.
+ * Returns { delivered: number; failed: number }.
+ */
+function deliverPendingOutbox(
+  rootPath: string,
+  scope: WildWestScope,
+  outputChannel: vscode.OutputChannel,
+): { delivered: number; failed: number } {
+  let delivered = 0;
+  let failed = 0;
+
+  try {
+    const outboxDir = path.join(rootPath, '.wildwest', 'telegraph', 'outbox');
+    if (!fs.existsSync(outboxDir)) {
+      return { delivered, failed };
+    }
+
+    const entries = fs.readdirSync(outboxDir);
+    // Process only .md files, exclude history/
+    const memoFiles = entries.filter(
+      (e) => e.endsWith('.md') && !e.startsWith('.'),
+    );
+
+    for (const memoFile of memoFiles) {
+      try {
+        const memoPath = path.join(outboxDir, memoFile);
+        const frontmatter = parseMemoFrontmatter(memoPath);
+        const toField = frontmatter['to'] as string | undefined;
+        if (!toField) {
+          outputChannel.appendLine(
+            `[HeartbeatMonitor] delivery: ${memoFile} has no 'to:' field — skipping`,
+          );
+          failed++;
+          continue;
+        }
+
+        // For now, skip remote delivery (scope resolution not yet implemented)
+        // This is a placeholder for the scope resolution logic
+        outputChannel.appendLine(
+          `[HeartbeatMonitor] delivery: ${memoFile} → ${toField} (scope resolution pending)`,
+        );
+
+        // Stamp delivered_at in frontmatter
+        let content = fs.readFileSync(memoPath, 'utf8');
+        const now = new Date().toISOString();
+        const deliveredLine = `delivered_at: ${now}\n`;
+        // Insert delivered_at after the opening ---
+        const frontmatterMatch = content.match(/^(---\n)/);
+        if (frontmatterMatch) {
+          content =
+            frontmatterMatch[1] +
+            deliveredLine +
+            content.substring(frontmatterMatch[1].length);
+        }
+
+        // Move to outbox/history/
+        const historyDir = path.join(outboxDir, 'history');
+        if (!fs.existsSync(historyDir)) {
+          fs.mkdirSync(historyDir, { recursive: true });
+        }
+        const historyPath = path.join(historyDir, memoFile);
+        fs.writeFileSync(historyPath, content, 'utf8');
+        fs.unlinkSync(memoPath);
+
+        delivered++;
+      } catch (err) {
+        outputChannel.appendLine(
+          `[HeartbeatMonitor] delivery error for ${memoFile}: ${err}`,
+        );
+        failed++;
+      }
+    }
+  } catch (err) {
+    outputChannel.appendLine(
+      `[HeartbeatMonitor] outbox scan error: ${err}`,
+    );
+  }
+
+  if (delivered > 0 || failed > 0) {
+    outputChannel.appendLine(
+      `[HeartbeatMonitor] outbox delivery: ${delivered} delivered, ${failed} failed`,
+    );
+  }
+
+  return { delivered, failed };
+}
+
 function beatTown(
   rootPath: string,
   outputChannel: vscode.OutputChannel,
@@ -260,6 +377,12 @@ function beatTown(
   const sentinel = sentinelPath(rootPath, 'town');
 
   writeSentinel(sentinel, outputChannel);
+
+  // Run telegraph delivery operator
+  const scope = scopeOf(rootPath);
+  if (scope === 'town') {
+    const deliveryResult = deliverPendingOutbox(rootPath, scope, outputChannel);
+  }
 
   // Run telegraph cleanup
   const cleanupResult = cleanupTelegraph(telegraphDir, outputChannel);
@@ -270,8 +393,8 @@ function beatTown(
   }
 
   // Validate declared actor role against scope
-  const scope = scopeOf(rootPath);
-  if (scope === 'town') {
+  const scopeCheck = scopeOf(rootPath);
+  if (scopeCheck === 'town') {
     const actorSetting = vscode.workspace.getConfiguration('wildwest').get<string>('actor', '');
     if (actorSetting) {
       // Extract just the role part (before any parentheses, e.g. "TM" from "TM(RHk)")

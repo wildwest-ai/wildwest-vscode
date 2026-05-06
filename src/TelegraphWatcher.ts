@@ -28,17 +28,33 @@ export class TelegraphWatcher {
     const worktrees = this.worktreeManager.list();
     for (const wt of worktrees) {
       const telegraphDir = path.join(wt.path, '.wildwest', 'telegraph');
-      const watcher = chokidar.watch(telegraphDir, {
+      const inboxDir = path.join(telegraphDir, 'inbox');
+      
+      // Primary watcher: inbox/ directory (new outbox/inbox model)
+      const inboxWatcher = chokidar.watch(inboxDir, {
         ignoreInitial: false,
         depth: 0,
         persistent: true,
       });
-      watcher.on('add', (filePath) => this.onFile(filePath));
-      watcher.on('error', (err) => {
-        this.outputChannel.appendLine(`[TelegraphWatcher] error watching ${telegraphDir}: ${err}`);
+      inboxWatcher.on('add', (filePath) => this.onInboxFile(filePath));
+      inboxWatcher.on('error', (err) => {
+        this.outputChannel.appendLine(`[TelegraphWatcher] error watching ${inboxDir}: ${err}`);
       });
-      this.watchers.push(watcher);
-      this.outputChannel.appendLine(`[TelegraphWatcher] watching ${telegraphDir}`);
+      this.watchers.push(inboxWatcher);
+      this.outputChannel.appendLine(`[TelegraphWatcher] watching inbox: ${inboxDir}`);
+      
+      // Legacy watcher: telegraph root (migration period)
+      // Watches for flat memos not in outbox/, inbox/, or history/
+      const legacyWatcher = chokidar.watch(telegraphDir, {
+        ignoreInitial: false,
+        depth: 0,
+        persistent: true,
+      });
+      legacyWatcher.on('add', (filePath) => this.onLegacyFile(filePath, telegraphDir));
+      legacyWatcher.on('error', (err) => {
+        this.outputChannel.appendLine(`[TelegraphWatcher] error watching legacy ${telegraphDir}: ${err}`);
+      });
+      this.watchers.push(legacyWatcher);
     }
   }
 
@@ -53,35 +69,51 @@ export class TelegraphWatcher {
     this.stop();
   }
 
-  private onFile(filePath: string): void {
+  private onInboxFile(filePath: string): void {
     const basename = path.basename(filePath);
-    // ignore sentinel, heartbeat logs, and ack files
-    if (basename === '.last-beat' || basename.includes('-heartbeat--')) return;
-
-    // Incoming memo addressed to an actor → flag + prompt to process inbox
-    if (basename.startsWith('to-') && !basename.includes('--ack-')) {
-      this.heartbeatMonitor.setFlagged(true);
-      const msg = `Wild West: 📬 new memo — ${basename}`;
-      this.outputChannel.appendLine(`[TelegraphWatcher] incoming memo: ${basename}`);
-      vscode.window.showWarningMessage(msg, 'Process Inbox', 'Dismiss').then((choice) => {
-        if (choice === 'Process Inbox') {
-          vscode.commands.executeCommand('wildwest.processInbox');
-        }
-      });
+    
+    // Ignore sentinel, heartbeat logs, and meta files
+    if (
+      basename === '.last-beat' ||
+      basename === '.gitkeep' ||
+      basename.includes('-heartbeat--')
+    ) {
       return;
     }
 
-    // Ack-blocked or ack-question still needs the sender's attention
-    const needsAttention = ATTENTION_PATTERNS.some((p) => basename.includes(p));
-    if (needsAttention) {
-      this.heartbeatMonitor.setFlagged(true);
-      const msg = `Wild West: attention needed — ${basename}`;
-      this.outputChannel.appendLine(`[TelegraphWatcher] ${msg}`);
-      vscode.window.showWarningMessage(msg, 'View Telegraph').then((choice) => {
-        if (choice === 'View Telegraph') {
-          vscode.commands.executeCommand('wildwest.viewTelegraph');
-        }
-      });
+    // New memo in inbox = alert actor to process
+    this.heartbeatMonitor.setFlagged(true);
+    const msg = `Wild West: 📬 new memo in inbox — ${basename}`;
+    this.outputChannel.appendLine(`[TelegraphWatcher] new inbox memo: ${basename}`);
+    vscode.window.showWarningMessage(msg, 'Process Inbox', 'Dismiss').then((choice) => {
+      if (choice === 'Process Inbox') {
+        vscode.commands.executeCommand('wildwest.processInbox');
+      }
+    });
+  }
+
+  private onLegacyFile(filePath: string, telegraphDir: string): void {
+    const basename = path.basename(filePath);
+    const relDir = path.dirname(filePath).replace(telegraphDir, '').split(path.sep).filter(Boolean)[0];
+    
+    // Ignore files in outbox/, inbox/, history/, sentinel, and meta files
+    if (
+      relDir === 'outbox' ||
+      relDir === 'inbox' ||
+      relDir === 'history' ||
+      basename === '.last-beat' ||
+      basename === '.gitkeep' ||
+      basename.includes('-heartbeat--')
+    ) {
+      return;
     }
+
+    // Flat memo detected (legacy model) — flag for migration
+    this.outputChannel.appendLine(
+      `[TelegraphWatcher] MIGRATION: flat memo detected in telegraph root: ${basename}`,
+    );
+    this.outputChannel.appendLine(
+      `[TelegraphWatcher] Run migration to move this to inbox/ or outbox/ as appropriate.`,
+    );
   }
 }
