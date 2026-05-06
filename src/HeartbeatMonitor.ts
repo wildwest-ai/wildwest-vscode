@@ -281,14 +281,97 @@ function parseMemoFrontmatter(
 }
 
 /**
+ * Extract role abbreviation from a to/from field.
+ * E.g., "CD(RSn).Cpt" → "CD"
+ */
+function extractRole(actorField: string): string | null {
+  const match = actorField.match(/^([A-Za-z]+)/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Resolve a role to its scope tier.
+ * Based on SCOPE_ROLES mapping defined at top of file.
+ */
+function resolveRoleToScope(role: string): WildWestScope | null {
+  for (const [scope, roles] of Object.entries(SCOPE_ROLES)) {
+    if (roles.includes(role)) {
+      return scope as WildWestScope;
+    }
+  }
+  return null;
+}
+
+/**
+ * Resolve a destination scope to its filesystem path.
+ * Given current scope (town) and destination scope (county/territory),
+ * constructs the path using worldRoot and countiesDir configuration.
+ *
+ * Examples:
+ * - From town ~/wildwest/counties/wildwest-ai/wildwest-vscode/ → county ~/wildwest/counties/wildwest-ai/
+ * - From town/county → territory ~/wildwest/
+ */
+function resolveScopePath(
+  currentScope: WildWestScope,
+  currentPath: string,
+  destScope: WildWestScope,
+  worldRoot: string,
+  countiesDir: string,
+): string | null {
+  // If destination is same scope, no delivery needed (local operation)
+  if (currentScope === destScope) {
+    return null;
+  }
+
+  // Hierarchy: territory > county > town
+  if (destScope === 'territory') {
+    // Always go to worldRoot
+    return worldRoot;
+  }
+
+  if (destScope === 'county') {
+    if (currentScope === 'town') {
+      // Go up to parent county: ~/wildwest/counties/wildwest-ai/
+      const countyPath = path.join(worldRoot, countiesDir, '*'); // Will be replaced with actual alias
+      // For now, we infer by walking up the path
+      // From /wildwest/counties/wildwest-ai/wildwest-vscode/ → /wildwest/counties/wildwest-ai/
+      const parts = currentPath.split(path.sep);
+      // Find the index of 'counties' and extract up to that + next level
+      const countiesIdx = parts.indexOf(countiesDir);
+      if (countiesIdx >= 0 && countiesIdx + 1 < parts.length) {
+        return parts.slice(0, countiesIdx + 2).join(path.sep);
+      }
+    }
+    // If already at county or territory, can't resolve to county
+    return null;
+  }
+
+  if (destScope === 'town') {
+    // Can't resolve to another town without explicit routing
+    return null;
+  }
+
+  return null;
+}
+
+/**
  * Deliver pending memos from outbox/ to remote inboxes.
  * Called on every heartbeat tick.
- * Returns { delivered: number; failed: number }.
+ * 
+ * Algorithm:
+ * 1. Scan outbox/ for memos
+ * 2. For each memo: parse 'to:' field
+ * 3. Resolve destination scope (role → scope → path)
+ * 4. Write delivered copy to destination inbox/
+ * 5. Stamp delivered_at in original
+ * 6. Archive original to outbox/history/
  */
 function deliverPendingOutbox(
   rootPath: string,
   scope: WildWestScope,
   outputChannel: vscode.OutputChannel,
+  worldRoot: string,
+  countiesDir: string,
 ): { delivered: number; failed: number } {
   let delivered = 0;
   let failed = 0;
@@ -318,13 +401,50 @@ function deliverPendingOutbox(
           continue;
         }
 
-        // For now, skip remote delivery (scope resolution not yet implemented)
-        // This is a placeholder for the scope resolution logic
-        outputChannel.appendLine(
-          `[HeartbeatMonitor] delivery: ${memoFile} → ${toField} (scope resolution pending)`,
-        );
+        // Scope resolution: parse role → determine destination scope → resolve path
+        const role = extractRole(toField);
+        if (!role) {
+          outputChannel.appendLine(
+            `[HeartbeatMonitor] delivery: ${memoFile} → ${toField} — invalid role format`,
+          );
+          failed++;
+          continue;
+        }
 
-        // Stamp delivered_at in frontmatter
+        const destScope = resolveRoleToScope(role);
+        if (!destScope) {
+          outputChannel.appendLine(
+            `[HeartbeatMonitor] delivery: ${memoFile} → ${role} — unknown role`,
+          );
+          failed++;
+          continue;
+        }
+
+        const destPath = resolveScopePath(scope, rootPath, destScope, worldRoot, countiesDir);
+
+        if (!destPath) {
+          // Local memo (same scope) — just archive, no remote delivery
+          outputChannel.appendLine(
+            `[HeartbeatMonitor] delivery: ${memoFile} → ${toField} (local, no remote delivery)`,
+          );
+        } else {
+          // Remote memo — deliver to destination inbox/
+          const destInboxDir = path.join(destPath, '.wildwest', 'telegraph', 'inbox');
+          if (!fs.existsSync(destInboxDir)) {
+            fs.mkdirSync(destInboxDir, { recursive: true });
+          }
+          const destMemoPath = path.join(destInboxDir, memoFile);
+
+          // Copy original (without delivered_at) to destination
+          const originalContent = fs.readFileSync(memoPath, 'utf8');
+          fs.writeFileSync(destMemoPath, originalContent, 'utf8');
+
+          outputChannel.appendLine(
+            `[HeartbeatMonitor] delivery: ${memoFile} → ${destPath}/.wildwest/telegraph/inbox/`,
+          );
+        }
+
+        // Stamp delivered_at in our copy
         let content = fs.readFileSync(memoPath, 'utf8');
         const now = new Date().toISOString();
         const deliveredLine = `delivered_at: ${now}\n`;
@@ -372,6 +492,8 @@ function deliverPendingOutbox(
 function beatTown(
   rootPath: string,
   outputChannel: vscode.OutputChannel,
+  worldRoot: string,
+  countiesDir: string,
 ): HeartbeatState {
   const telegraphDir = path.join(rootPath, '.wildwest', 'telegraph');
   const sentinel = sentinelPath(rootPath, 'town');
@@ -381,7 +503,7 @@ function beatTown(
   // Run telegraph delivery operator
   const scope = scopeOf(rootPath);
   if (scope === 'town') {
-    deliverPendingOutbox(rootPath, scope, outputChannel);
+    deliverPendingOutbox(rootPath, scope, outputChannel, worldRoot, countiesDir);
   }
 
   // Run telegraph cleanup
@@ -683,7 +805,7 @@ export class HeartbeatMonitor {
     try {
       switch (scope.scope) {
         case 'town':
-          state = beatTown(scope.rootPath, this.outputChannel);
+          state = beatTown(scope.rootPath, this.outputChannel, this.worldRoot, this.countiesDir);
           break;
         case 'county':
           state = beatCounty(scope.rootPath, this.outputChannel, this.worldRoot, this.countiesDir);
