@@ -6,5 +6,9 @@
   "alias": "wildwest-vscode",
   "remote": "https://github.com/wildwest-ai/wildwest-vscode",
   "mcp": null,
-  "actors": []
+  "actors": [],
+  "active_branches": {
+    "feat-actor-scope-display": "merged/feat/actor-scope-display",
+    "feat-telegraph-delivery": "feat/telegraph-delivery"
+  }
 }
