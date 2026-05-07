@@ -798,6 +798,18 @@ export class HeartbeatMonitor {
     this.scopeStates.set(town.rootPath, flagged ? 'flagged' : 'alive');
   }
 
+  /**
+   * Trigger immediate outbox delivery for the town scope.
+   * Called by TelegraphWatcher when a new outbox memo is detected,
+   * so delivery happens immediately rather than waiting for the next beat.
+   */
+  deliverOutboxNow(): void {
+    const town = this.scopes.find((s) => s.scope === 'town');
+    if (!town) return;
+    this.outputChannel.appendLine('[HeartbeatMonitor] outbox delivery triggered by new memo');
+    deliverPendingOutbox(town.rootPath, town.scope, this.outputChannel, this.worldRoot, this.countiesDir);
+  }
+
   dispose(): void {
     this.stop();
   }
