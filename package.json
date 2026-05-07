@@ -6,10 +6,10 @@
     "type": "git",
     "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
   },
-  "version": "0.19.1",
+  "version": "0.20.0",
   "publisher": "wildwest-ai",
   "engines": {
-    "vscode": "^1.84.0"
+    "vscode": "^1.90.0"
   },
   "categories": [
     "Other"
@@ -84,6 +84,15 @@
         "command": "wildwest.telegraphSend",
         "title": "Send Telegraph Memo",
         "category": "Wild West"
+      }
+    ],
+    "chatParticipants": [
+      {
+        "id": "wildwest.participant",
+        "name": "wildwest",
+        "fullName": "Wild West",
+        "description": "Query Wild West governance state — telegraph inbox, board branches, town status",
+        "isSticky": false
       }
     ],
     "configuration": {

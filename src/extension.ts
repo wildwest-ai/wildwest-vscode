@@ -11,6 +11,7 @@ import { TelegraphInbox } from './TelegraphInbox';
 import { TelegraphCommands } from './TelegraphCommands';
 import { AIToolBridge } from './AIToolBridge';
 import { ClaudeCodeAdapter } from './aiToolAdapters/ClaudeCodeAdapter';
+import { registerChatParticipant } from './WildwestParticipant';
 
 // ── Configuration types & helpers ──────────────────────────────────────────
 
@@ -68,6 +69,9 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
   aiToolBridge.start();
+
+  // ── @wildwest Copilot Chat participant (P3) ───────────────────────────────
+  registerChatParticipant(context, outputChannel);
 
   // ── Commands — devPair log (existing) ─────────────────────────────────────
   context.subscriptions.push(
