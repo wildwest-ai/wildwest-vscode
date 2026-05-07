@@ -105,6 +105,14 @@ export class TelegraphWatcher {
     if (!basename.endsWith('.md') || basename.startsWith('.') || basename.startsWith('!')) {
       return;
     }
+    // Guard: file must exist and have content — prevents double-fire when delivery
+    // moves the file before a second chokidar event fires against the same path.
+    try {
+      const stat = fs.statSync(filePath);
+      if (stat.size === 0) { return; }
+    } catch {
+      return; // File already gone — delivery already handled it
+    }
     this.outputChannel.appendLine(`[TelegraphWatcher] new outbox memo: ${basename} — triggering immediate delivery`);
     this.heartbeatMonitor.deliverOutboxNow();
   }
