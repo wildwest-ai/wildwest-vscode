@@ -493,19 +493,23 @@ function deliverPendingOutbox(
           continue;
         }
 
-        // Check for old format and warn
-        const isOldFormat = /\([A-Za-z]\)\./.test(toField); // Matches "CD(RSn).Cpt"
+        // Detect and normalize old format: "CD(RSn).Cpt" or "CD(RSn)" → "CD"
+        // Old format: parenthetical suffix that does NOT start with * (actor suffix, not town pattern)
+        const isOldFormat = /\([^*][^)]*\)/.test(toField);
+        const normalizedToField = isOldFormat
+          ? toField.replace(/\([^*][^)]*\)(\.\w+)?/g, '').trim()
+          : toField;
         if (isOldFormat) {
           outputChannel.appendLine(
-            `[HeartbeatMonitor] delivery: ${memoFile} — old format '${toField}' (deprecated in v0.18.0, will break in v0.19.0). Use role-only format.`,
+            `[HeartbeatMonitor] delivery: ${memoFile} — old format '${toField}' normalized to '${normalizedToField}' (deprecated in v0.18.0, will break in v0.19.0). Use role-only format.`,
           );
         }
 
         // Extract role and optional town pattern
-        const rolePattern = extractTownPattern(toField);
+        const rolePattern = extractTownPattern(normalizedToField);
         if (!rolePattern) {
           outputChannel.appendLine(
-            `[HeartbeatMonitor] delivery: ${memoFile} → ${toField} — invalid addressing format`,
+            `[HeartbeatMonitor] delivery: ${memoFile} → ${normalizedToField} — invalid addressing format`,
           );
           failed++;
           continue;
