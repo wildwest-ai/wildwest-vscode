@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.25.3
+**Current version:** 0.25.4
 
 ---
 
 ## What's New
+
+**v0.25.4** — Test isolation: `batchConverter`, `chatSessionConverter`, and `jsonToMarkdown` test suites now use `os.tmpdir()` temp directories per test instead of a shared `__tests__/testdata/` path, eliminating intermittent failures from Jest parallel-runner conflicts.
 
 **v0.25.3** — Lint cleanup: eliminated all 29 ESLint warnings. Removed unused imports (`getTransformer`, `Cursor`, `SessionIndex`, `parsePacketFilename`, `padSequence`, `TurnMeta`). Typed all `any` usages in pipeline code (`Record<string, unknown>`, `PartKind`, `TurnMeta`, `Cursor` casts). Added `argsIgnorePattern: ^_` to ESLint config so `_`-prefixed params are allowed.
 
