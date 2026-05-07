@@ -102,7 +102,7 @@ export class TelegraphWatcher {
 
   private onOutboxFile(filePath: string): void {
     const basename = path.basename(filePath);
-    if (!basename.endsWith('.md') || basename.startsWith('.')) {
+    if (!basename.endsWith('.md') || basename.startsWith('.') || basename.startsWith('!')) {
       return;
     }
     this.outputChannel.appendLine(`[TelegraphWatcher] new outbox memo: ${basename} — triggering immediate delivery`);

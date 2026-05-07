@@ -311,16 +311,18 @@ function resolveRoleToScope(role: string): WildWestScope | null {
 }
 
 /**
- * Extract town pattern from 'to:' field formats.
- * E.g., "TM(*vscode)" → { role: "TM", pattern: "*vscode" }
- * E.g., "CD" → { role: "CD", pattern: null }
+ * Extract role and optional pattern from 'to:' field.
+ * Handles:
+ *   "CD"            → { role: "CD", pattern: null }
+ *   "TM(*vscode)"   → { role: "TM", pattern: "*vscode" }  (glob)
+ *   "CD(wildwest-ai)" → { role: "CD", pattern: "wildwest-ai" } (exact)
  */
-function extractTownPattern(toField: string): { role: string; pattern: string | null } | null {
-  // Match: word, optionally followed by (*pattern)
-  const match = toField.match(/^([A-Za-z]+)(?:\(\*([^)]+)\))?$/);
+function extractRolePattern(toField: string): { role: string; pattern: string | null } | null {
+  // Match: word, optionally followed by (*pattern) or (pattern)
+  const match = toField.match(/^([A-Za-z]+)(?:\((\*?[^)]+)\))?$/);
   if (!match) return null;
   const role = match[1];
-  const pattern = match[2] ? `*${match[2]}` : null;
+  const pattern = match[2] ?? null;
   return { role, pattern };
 }
 
@@ -360,21 +362,54 @@ function listTownsInCounty(countyPath: string): Array<{ name: string; path: stri
  * E.g., pattern "*vscode" matches town "wildwest-vscode"
  * Supports glob patterns: *, **, ?, [abc]
  */
-function resolveTownByPattern(pattern: string, towns: Array<{ name: string; path: string; alias: string | null }>): string | null {
-  if (!pattern || !towns.length) return null;
-  // Convert glob pattern to regex (simple implementation)
-  const regexPattern = pattern
-    .replace(/\./g, '\\.')
-    .replace(/\*/g, '.*')
-    .replace(/\?/g, '.');
-  const regex = new RegExp(`^${regexPattern}$`);
-  // Try to match against alias first, then name
-  for (const town of towns) {
-    if (regex.test(town.alias!) || regex.test(town.name)) {
-      return town.path;
+/**
+ * Resolve a name-or-path pattern against a list of { name, path, alias } entries.
+ * If pattern starts with *, treat as glob. Otherwise, exact match against alias or name.
+ */
+function resolveByPattern(pattern: string, entries: Array<{ name: string; path: string; alias: string | null }>): string | null {
+  if (!pattern || !entries.length) return null;
+  let regex: RegExp;
+  if (pattern.startsWith('*')) {
+    const regexPattern = pattern
+      .replace(/\./g, '\\.')
+      .replace(/\*/g, '.*')
+      .replace(/\?/g, '.');
+    regex = new RegExp(`^${regexPattern}$`);
+  } else {
+    // Exact match
+    regex = new RegExp(`^${pattern.replace(/\./g, '\\.')}$`);
+  }
+  for (const entry of entries) {
+    if ((entry.alias && regex.test(entry.alias)) || regex.test(entry.name)) {
+      return entry.path;
     }
   }
   return null;
+}
+
+/**
+ * List counties in a territory (worldRoot/countiesDir/).
+ */
+function listCountiesInTerritory(worldRoot: string, countiesDir: string): Array<{ name: string; path: string; alias: string | null }> {
+  const counties: Array<{ name: string; path: string; alias: string | null }> = [];
+  try {
+    const countiesRoot = path.join(worldRoot, countiesDir);
+    if (!fs.existsSync(countiesRoot)) return counties;
+    for (const entry of fs.readdirSync(countiesRoot)) {
+      const entryPath = path.join(countiesRoot, entry);
+      if (!fs.statSync(entryPath).isDirectory() || entry.startsWith('.')) continue;
+      const regPath = path.join(entryPath, '.wildwest', 'registry.json');
+      if (fs.existsSync(regPath)) {
+        try {
+          const reg = JSON.parse(fs.readFileSync(regPath, 'utf8')) as Record<string, unknown>;
+          counties.push({ name: entry, path: entryPath, alias: (reg['alias'] as string) || null });
+        } catch {
+          counties.push({ name: entry, path: entryPath, alias: null });
+        }
+      }
+    }
+  } catch { /* ignore */ }
+  return counties;
 }
 
 /**
@@ -393,61 +428,85 @@ function resolveScopePath(
   destScope: WildWestScope,
   worldRoot: string,
   countiesDir: string,
-  townPattern?: string | null,
+  pattern?: string | null,
 ): string | null | 'AMBIGUOUS' {
-  // If destination is same scope, no delivery needed (local operation)
+  // Same scope = local, no remote delivery
   if (currentScope === destScope) {
     return null;
   }
 
-  // Hierarchy: territory > county > town
   if (destScope === 'territory') {
-    // Always go to worldRoot
     return worldRoot;
   }
 
   if (destScope === 'county') {
     if (currentScope === 'town') {
-      // Go up to parent county: ~/wildwest/counties/wildwest-ai/
-      // From /wildwest/counties/wildwest-ai/wildwest-vscode/ → /wildwest/counties/wildwest-ai/
+      // Town → parent county (no pattern needed — one parent)
       const parts = currentPath.split(path.sep);
-      // Find the index of 'counties' and extract up to that + next level
       const countiesIdx = parts.indexOf(countiesDir);
       if (countiesIdx >= 0 && countiesIdx + 1 < parts.length) {
         return parts.slice(0, countiesIdx + 2).join(path.sep);
       }
+      return null;
     }
-    // If already at county or territory, can't resolve to county
+    if (currentScope === 'territory') {
+      // Territory → county: requires county pattern (multiple counties exist)
+      if (!pattern) return 'AMBIGUOUS';
+      const counties = listCountiesInTerritory(worldRoot, countiesDir);
+      return resolveByPattern(pattern, counties);
+    }
     return null;
   }
 
   if (destScope === 'town') {
-    if (!townPattern) {
-      // TM (and other town roles) require a pattern when sent from county or territory
-      // — there are multiple towns; "to: TM" is ambiguous without (*pattern).
-      // From a town, no pattern = local (same scope), handled above.
-      return 'AMBIGUOUS';
-    }
-    // Resolve county path depending on current scope
+    // Town roles (Mayor, TM, HG) require a pattern — multiple towns exist
+    if (!pattern) return 'AMBIGUOUS';
     let countyPath: string | null = null;
     const parts = currentPath.split(path.sep);
     const countiesIdx = parts.indexOf(countiesDir);
     if (currentScope === 'town') {
-      // Parent county: strip town segment
       if (countiesIdx >= 0 && countiesIdx + 1 < parts.length) {
         countyPath = parts.slice(0, countiesIdx + 2).join(path.sep);
       }
     } else if (currentScope === 'county') {
-      // Already at county
       countyPath = currentPath;
     }
-    // territory→town not supported (would need county disambiguation too)
+    // territory→town not supported (county must be specified first)
     if (!countyPath) return null;
     const towns = listTownsInCounty(countyPath);
-    return resolveTownByPattern(townPattern, towns);
+    return resolveByPattern(pattern, towns);
   }
 
   return null;
+}
+
+/**
+ * Mark a memo as permanently failed by:
+ * 1. Injecting (!) into the 'to:' field so the problem is self-documenting
+ * 2. Renaming the file with a '!' prefix so it's skipped on future beats
+ */
+function markMemoFailed(
+  outboxDir: string,
+  memoFile: string,
+  memoPath: string,
+  reason: string,
+  outputChannel: vscode.OutputChannel,
+): void {
+  try {
+    let content = fs.readFileSync(memoPath, 'utf8');
+    // Inject (!) into YAML to: field
+    content = content.replace(/^(to:\s*)(\S[^\n]*)$/m, '$1$2(!)');
+    // Inject (!) into Markdown **To:** field (if no YAML)
+    content = content.replace(/^(\*\*To:\*\*\s*)(\S[^\n]*)$/m, '$1$2(!)');
+    const failedPath = path.join(outboxDir, `!${memoFile}`);
+    fs.writeFileSync(failedPath, content, 'utf8');
+    fs.unlinkSync(memoPath);
+    outputChannel.appendLine(
+      `[HeartbeatMonitor] delivery FAILED: ${memoFile} → renamed to !${memoFile} (${reason})`,
+    );
+  } catch (err) {
+    outputChannel.appendLine(`[HeartbeatMonitor] markMemoFailed error for ${memoFile}: ${err}`);
+  }
 }
 
 /**
@@ -484,9 +543,9 @@ function deliverPendingOutbox(
     }
 
     const entries = fs.readdirSync(outboxDir);
-    // Process only .md files, exclude history/
+    // Process only .md files — exclude hidden, ! (failed), and history/
     const memoFiles = entries.filter(
-      (e) => e.endsWith('.md') && !e.startsWith('.'),
+      (e) => e.endsWith('.md') && !e.startsWith('.') && !e.startsWith('!'),
     );
 
     for (const memoFile of memoFiles) {
@@ -495,9 +554,7 @@ function deliverPendingOutbox(
         const frontmatter = parseMemoFrontmatter(memoPath);
         const toField = frontmatter['to'] as string | undefined;
         if (!toField) {
-          outputChannel.appendLine(
-            `[HeartbeatMonitor] delivery: ${memoFile} has no 'to:' field — skipping`,
-          );
+          markMemoFailed(outboxDir, memoFile, memoPath, `missing 'to:' field`, outputChannel);
           failed++;
           continue;
         }
@@ -514,12 +571,10 @@ function deliverPendingOutbox(
           );
         }
 
-        // Extract role and optional town pattern
-        const rolePattern = extractTownPattern(normalizedToField);
+        // Extract role and optional pattern
+        const rolePattern = extractRolePattern(normalizedToField);
         if (!rolePattern) {
-          outputChannel.appendLine(
-            `[HeartbeatMonitor] delivery: ${memoFile} → ${normalizedToField} — invalid addressing format`,
-          );
+          markMemoFailed(outboxDir, memoFile, memoPath, `invalid addressing format: '${normalizedToField}'`, outputChannel);
           failed++;
           continue;
         }
@@ -528,9 +583,7 @@ function deliverPendingOutbox(
 
         const destScope = resolveRoleToScope(role);
         if (!destScope) {
-          outputChannel.appendLine(
-            `[HeartbeatMonitor] delivery: ${memoFile} → ${role} — unknown role`,
-          );
+          markMemoFailed(outboxDir, memoFile, memoPath, `unknown role: '${role}'`, outputChannel);
           failed++;
           continue;
         }
@@ -538,9 +591,10 @@ function deliverPendingOutbox(
         const destPath = resolveScopePath(scope, rootPath, destScope, worldRoot, countiesDir, pattern);
 
         if (destPath === 'AMBIGUOUS') {
-          outputChannel.appendLine(
-            `[HeartbeatMonitor] delivery: ${memoFile} → ${role} — ambiguous: TM exists in multiple towns. Use TM(*pattern) to specify a town.`,
-          );
+          const hint = destScope === 'town'
+            ? `Use ${role}(*<town-pattern>) to specify a town`
+            : `Use ${role}(<county-name>) to specify a county`;
+          markMemoFailed(outboxDir, memoFile, memoPath, `ambiguous recipient — ${hint}`, outputChannel);
           failed++;
           continue;
         }
