@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.21.0
+**Current version:** 0.22.0
 
 ---
 
 ## What's New
+
+**v0.22.0** — P7 enhanced `@wildwest` participant: `send`, `ack`, `archive` with [Confirm] buttons; county+town inbox sweep; `telegraph check`; `status` shows open memo + branch counts. Operator fixes: delivered filename resolves wildcard alias; warn bare `from: TM` in multi-town county.
 
 **v0.21.0** — P6 wwMCP server: read-only MCP server over stdio. Exposes `wildwest_status`, `wildwest_inbox`, `wildwest_board`, `wildwest_telegraph_check` tools. Disabled by default (`wildwest.mcp.enabled`). Actor-scoped, explicit opt-in, read-only.
 
@@ -148,6 +150,6 @@ VSCode creates session JSON stubs (480 bytes) when the chat panel opens, even if
 
 `wwMCP` exposes Wild West governance state as a read-only MCP server over stdio. Enable with `wildwest.mcp.enabled = true`. Tools: `wildwest_status`, `wildwest_inbox`, `wildwest_board`, `wildwest_telegraph_check`. Access is explicit opt-in; scope is determined at connection time. Write authority deferred to v1.0+.
 
-### `@wildwest` chat participant enhancements (P7 — v0.22.0)
+### `@wildwest` chat participant enhancements (P7 — v0.22.0 ✅)
 
-Extended chat participant with action-capable interactions: inline memo reading, send/ack workflows, and full telegraph sweep — all routed through existing `wildwest.*` commands.
+Action-capable `@wildwest` with send/ack/archive workflows, county+town inbox sweep, and telegraph check — all routed through registered `wildwest.*` commands.

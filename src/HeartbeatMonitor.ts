@@ -96,6 +96,21 @@ function scopeOf(rootPath: string): WildWestScope | null {
 }
 
 /**
+ * Read the alias from a .wildwest/registry.json at the given rootPath.
+ * Returns null if the registry is missing or unreadable.
+ */
+function readRegistryAlias(rootPath: string): string | null {
+  try {
+    const reg = JSON.parse(
+      fs.readFileSync(path.join(rootPath, '.wildwest', 'registry.json'), 'utf8'),
+    ) as Record<string, unknown>;
+    return (reg['alias'] as string) || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Walk parent directories from townRoot to find the nearest county root.
  * A county root is a directory containing .wildwest/registry.json with scope === 'county'.
  * Returns the county rootPath or null if not found.
@@ -572,6 +587,19 @@ function deliverPendingOutbox(
         const memoPath = path.join(outboxDir, memoFile);
         const frontmatter = parseMemoFrontmatter(memoPath);
         const toField = frontmatter['to'] as string | undefined;
+        const fromField = (frontmatter['from'] as string | undefined) ?? '';
+
+        // Fix 2: warn if from: is bare role with no town specifier in multi-town county
+        if (scope === 'county' && /^TM$/i.test(fromField.trim())) {
+          const towns = listTownsInCounty(rootPath);
+          if (towns.length > 1) {
+            outputChannel.appendLine(
+              `[HeartbeatMonitor] WARNING: ${memoFile} — 'from: TM' is ambiguous in ` +
+              `multi-town county (${towns.length} towns). Use 'from: TM(alias)'.`,
+            );
+          }
+        }
+
         if (!toField) {
           markMemoFailed(outboxDir, memoFile, memoPath, `missing 'to:' field`, outputChannel);
           failed++;
@@ -629,14 +657,29 @@ function deliverPendingOutbox(
           if (!fs.existsSync(destInboxDir)) {
             fs.mkdirSync(destInboxDir, { recursive: true });
           }
-          const destMemoPath = path.join(destInboxDir, memoFile);
+
+          // Fix 1: resolve wildcard pattern in filename to actual destination alias
+          let deliveredFilename = memoFile;
+          if (pattern) {
+            const destAlias = readRegistryAlias(destPath);
+            if (destAlias) {
+              // Replace role(*pattern) with role(alias) in the filename
+              const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              deliveredFilename = memoFile.replace(
+                new RegExp(`${role}\\(${escapedPattern}\\)`),
+                `${role}(${destAlias})`,
+              );
+            }
+          }
+
+          const destMemoPath = path.join(destInboxDir, deliveredFilename);
 
           // Copy original (without delivered_at) to destination
           const originalContent = fs.readFileSync(memoPath, 'utf8');
           fs.writeFileSync(destMemoPath, originalContent, 'utf8');
 
           outputChannel.appendLine(
-            `[HeartbeatMonitor] delivery: ${memoFile} → ${destPath}/.wildwest/telegraph/inbox/`,
+            `[HeartbeatMonitor] delivery: ${memoFile} → ${destPath}/.wildwest/telegraph/inbox/${deliveredFilename}`,
           );
         }
 
