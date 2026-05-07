@@ -1,14 +1,20 @@
 import { BatchChatConverter } from '../src/batchConverter';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 describe('BatchChatConverter', () => {
-  const testExportPath = path.join(__dirname, 'testdata');
-  const rawCopilotDir = path.join(testExportPath, 'raw', 'github-copilot');
-  const rawCodexDir = path.join(testExportPath, 'raw', 'chatgpt-codex');
-  const stagedDir = path.join(testExportPath, 'staged');
+  let testExportPath: string;
+  let rawCopilotDir: string;
+  let rawCodexDir: string;
+  let stagedDir: string;
 
-  beforeAll(() => {
+  beforeEach(() => {
+    testExportPath = fs.mkdtempSync(path.join(os.tmpdir(), 'wildwest-batch-converter-'));
+    rawCopilotDir = path.join(testExportPath, 'raw', 'github-copilot');
+    rawCodexDir = path.join(testExportPath, 'raw', 'chatgpt-codex');
+    stagedDir = path.join(testExportPath, 'staged');
+
     // Setup testdata directories and files
     fs.mkdirSync(rawCopilotDir, { recursive: true });
     fs.mkdirSync(rawCodexDir, { recursive: true });
@@ -62,7 +68,7 @@ describe('BatchChatConverter', () => {
     );
   });
 
-  afterAll(() => {
+  afterEach(() => {
     // Cleanup testdata
     fs.rmSync(testExportPath, { recursive: true, force: true });
   });

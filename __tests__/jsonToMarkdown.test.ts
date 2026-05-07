@@ -1,13 +1,18 @@
 import { convertJsonFileToMarkdown } from '../src/jsonToMarkdown';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 describe('jsonToMarkdown', () => {
-  const testDir = path.join(__dirname, 'testdata');
-  const jsonPath = path.join(testDir, 'session.json');
-  const mdPath = path.join(testDir, 'session.md');
+  let testDir: string;
+  let jsonPath: string;
+  let mdPath: string;
 
-  beforeAll(() => {
+  beforeEach(() => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wildwest-json-markdown-'));
+    jsonPath = path.join(testDir, 'session.json');
+    mdPath = path.join(testDir, 'session.md');
+
     fs.mkdirSync(testDir, { recursive: true });
     fs.writeFileSync(
       jsonPath,
@@ -43,7 +48,7 @@ describe('jsonToMarkdown', () => {
     );
   });
 
-  afterAll(() => {
+  afterEach(() => {
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
