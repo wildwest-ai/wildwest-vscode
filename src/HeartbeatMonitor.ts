@@ -281,15 +281,7 @@ function parseMemoFrontmatter(
 }
 
 /**
- * Extract role abbreviation from a to/from field.
- * E.g., "CD(RSn).Cpt" → "CD"
- */
-function extractRole(actorField: string): string | null {
-  const match = actorField.match(/^([A-Za-z]+)/);
-  return match ? match[1] : null;
-}
 
-/**
  * Resolve a role to its scope tier.
  * Based on SCOPE_ROLES mapping defined at top of file.
  */
@@ -303,6 +295,73 @@ function resolveRoleToScope(role: string): WildWestScope | null {
 }
 
 /**
+ * Extract town pattern from 'to:' field formats.
+ * E.g., "TM(*vscode)" → { role: "TM", pattern: "*vscode" }
+ * E.g., "CD" → { role: "CD", pattern: null }
+ */
+function extractTownPattern(toField: string): { role: string; pattern: string | null } | null {
+  // Match: word, optionally followed by (*pattern)
+  const match = toField.match(/^([A-Za-z]+)(?:\(\*([^)]+)\))?$/);
+  if (!match) return null;
+  const role = match[1];
+  const pattern = match[2] ? `*${match[2]}` : null;
+  return { role, pattern };
+}
+
+/**
+ * List towns in a county directory.
+ * Returns array of town info: { name: string; path: string; alias: string | null }
+ */
+function listTownsInCounty(countyPath: string): Array<{ name: string; path: string; alias: string | null }> {
+  const towns: Array<{ name: string; path: string; alias: string | null }> = [];
+  try {
+    if (!fs.existsSync(countyPath)) return towns;
+    const entries = fs.readdirSync(countyPath);
+    for (const entry of entries) {
+      const entryPath = path.join(countyPath, entry);
+      const stat = fs.statSync(entryPath);
+      if (!stat.isDirectory() || entry.startsWith('.')) continue;
+      // Check if this directory has a .wildwest/registry.json (indicating it's a town)
+      const regPath = path.join(entryPath, '.wildwest', 'registry.json');
+      if (fs.existsSync(regPath)) {
+        try {
+          const reg = JSON.parse(fs.readFileSync(regPath, 'utf8')) as Record<string, unknown>;
+          const alias = (reg['alias'] as string) || entry;
+          towns.push({ name: entry, path: entryPath, alias });
+        } catch {
+          // Invalid registry, skip
+        }
+      }
+    }
+  } catch {
+    // Directory read error, return empty
+  }
+  return towns;
+}
+
+/**
+ * Resolve a town by pattern matching.
+ * E.g., pattern "*vscode" matches town "wildwest-vscode"
+ * Supports glob patterns: *, **, ?, [abc]
+ */
+function resolveTownByPattern(pattern: string, towns: Array<{ name: string; path: string; alias: string | null }>): string | null {
+  if (!pattern || !towns.length) return null;
+  // Convert glob pattern to regex (simple implementation)
+  const regexPattern = pattern
+    .replace(/\./g, '\\.')
+    .replace(/\*/g, '.*')
+    .replace(/\?/g, '.');
+  const regex = new RegExp(`^${regexPattern}$`);
+  // Try to match against alias first, then name
+  for (const town of towns) {
+    if (regex.test(town.alias!) || regex.test(town.name)) {
+      return town.path;
+    }
+  }
+  return null;
+}
+
+/**
  * Resolve a destination scope to its filesystem path.
  * Given current scope (town) and destination scope (county/territory),
  * constructs the path using worldRoot and countiesDir configuration.
@@ -310,6 +369,7 @@ function resolveRoleToScope(role: string): WildWestScope | null {
  * Examples:
  * - From town ~/wildwest/counties/wildwest-ai/wildwest-vscode/ → county ~/wildwest/counties/wildwest-ai/
  * - From town/county → territory ~/wildwest/
+ * - From town → town (with pattern) ~/wildwest/counties/wildwest-ai/wildwest-framework/ (via pattern matching)
  */
 function resolveScopePath(
   currentScope: WildWestScope,
@@ -317,6 +377,7 @@ function resolveScopePath(
   destScope: WildWestScope,
   worldRoot: string,
   countiesDir: string,
+  townPattern?: string | null,
 ): string | null {
   // If destination is same scope, no delivery needed (local operation)
   if (currentScope === destScope) {
@@ -332,8 +393,6 @@ function resolveScopePath(
   if (destScope === 'county') {
     if (currentScope === 'town') {
       // Go up to parent county: ~/wildwest/counties/wildwest-ai/
-      const countyPath = path.join(worldRoot, countiesDir, '*'); // Will be replaced with actual alias
-      // For now, we infer by walking up the path
       // From /wildwest/counties/wildwest-ai/wildwest-vscode/ → /wildwest/counties/wildwest-ai/
       const parts = currentPath.split(path.sep);
       // Find the index of 'counties' and extract up to that + next level
@@ -347,7 +406,19 @@ function resolveScopePath(
   }
 
   if (destScope === 'town') {
-    // Can't resolve to another town without explicit routing
+    // Town-to-town delivery (with pattern)
+    if (currentScope === 'town' && townPattern) {
+      // Get parent county path
+      const parts = currentPath.split(path.sep);
+      const countiesIdx = parts.indexOf(countiesDir);
+      if (countiesIdx >= 0 && countiesIdx + 1 < parts.length) {
+        const countyPath = parts.slice(0, countiesIdx + 2).join(path.sep);
+        // List towns in county and match pattern
+        const towns = listTownsInCounty(countyPath);
+        const matchedTownPath = resolveTownByPattern(townPattern, towns);
+        return matchedTownPath;
+      }
+    }
     return null;
   }
 
@@ -361,10 +432,15 @@ function resolveScopePath(
  * Algorithm:
  * 1. Scan outbox/ for memos
  * 2. For each memo: parse 'to:' field
- * 3. Resolve destination scope (role → scope → path)
- * 4. Write delivered copy to destination inbox/
- * 5. Stamp delivered_at in original
- * 6. Archive original to outbox/history/
+ * 3. Extract role and optional town pattern
+ * 4. Resolve destination scope (role → scope → path, with pattern for towns)
+ * 5. Write delivered copy to destination inbox/
+ * 6. Stamp delivered_at in original
+ * 7. Archive original to outbox/history/
+ * 
+ * Supported formats:
+ * - New (v0.18.0+): "CD" (role-only), "TM(*vscode)" (role + pattern)
+ * - Old (deprecated): "CD(RSn).Cpt" (generates warning, still works)
  */
 function deliverPendingOutbox(
   rootPath: string,
@@ -401,15 +477,25 @@ function deliverPendingOutbox(
           continue;
         }
 
-        // Scope resolution: parse role → determine destination scope → resolve path
-        const role = extractRole(toField);
-        if (!role) {
+        // Check for old format and warn
+        const isOldFormat = /\([A-Za-z]\)\./.test(toField); // Matches "CD(RSn).Cpt"
+        if (isOldFormat) {
           outputChannel.appendLine(
-            `[HeartbeatMonitor] delivery: ${memoFile} → ${toField} — invalid role format`,
+            `[HeartbeatMonitor] delivery: ${memoFile} — old format '${toField}' (deprecated in v0.18.0, will break in v0.19.0). Use role-only format.`,
+          );
+        }
+
+        // Extract role and optional town pattern
+        const rolePattern = extractTownPattern(toField);
+        if (!rolePattern) {
+          outputChannel.appendLine(
+            `[HeartbeatMonitor] delivery: ${memoFile} → ${toField} — invalid addressing format`,
           );
           failed++;
           continue;
         }
+
+        const { role, pattern } = rolePattern;
 
         const destScope = resolveRoleToScope(role);
         if (!destScope) {
@@ -420,10 +506,10 @@ function deliverPendingOutbox(
           continue;
         }
 
-        const destPath = resolveScopePath(scope, rootPath, destScope, worldRoot, countiesDir);
+        const destPath = resolveScopePath(scope, rootPath, destScope, worldRoot, countiesDir, pattern);
 
         if (!destPath) {
-          // Local memo (same scope) — just archive, no remote delivery
+          // Local memo (same scope or no pattern for town-to-town)
           outputChannel.appendLine(
             `[HeartbeatMonitor] delivery: ${memoFile} → ${toField} (local, no remote delivery)`,
           );
