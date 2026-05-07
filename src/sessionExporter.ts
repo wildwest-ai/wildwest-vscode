@@ -5,7 +5,7 @@ import * as chokidar from 'chokidar';
 import { BatchChatConverter } from './batchConverter';
 import { convertJsonFileToMarkdown } from './jsonToMarkdown';
 import { generateIndex } from './generateIndex';
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import { PipelineAdapter } from './sessionPipeline';
 
 export class SessionExporter {
@@ -704,7 +704,7 @@ export class SessionExporter {
         });
         if (username) {
           try {
-            execSync(`git config user.name "${username}"`);
+            execFileSync('git', ['config', 'user.name', username]);
             vscode.window.showInformationMessage(
               `✅ Git username set to: ${username}`,
               'Restart Watcher'

@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.24.0
+**Current version:** 0.25.0
 
 ---
 
 ## What's New
+
+**v0.25.0** — Security fix: `git config user.name` now uses `execFileSync` with argument array instead of interpolated shell string, preventing command injection from user-supplied usernames.
 
 **v0.24.0** — VSIX hygiene: `.vscodeignore` now excludes `src/`, `__tests__/`, `.wildwest/`, `docs/`, `scripts/`, `build/`, and all `tsc` output from `dist/` except `dist/extension.js` (the esbuild bundle). Package reduced from 311 → 3 files.
 
