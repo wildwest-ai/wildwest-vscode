@@ -139,6 +139,11 @@
           "default": 1800000,
           "description": "World heartbeat active interval in ms when active_branches > 0 (default: 1800000 = 30 min). Overridden by registry.json heartbeat.interval_active_ms."
         },
+        "wildwest.claudeCode.hookPort": {
+          "type": "number",
+          "default": 7379,
+          "description": "Local HTTP port for Claude Code hook receiver (ClaudeCodeAdapter). Default: 7379. Change if port conflicts occur on shared workstations."
+        },
         "wildwest.worldRoot": {
           "type": "string",
           "default": "~/wildwest",

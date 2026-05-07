@@ -9,6 +9,8 @@ import { WorktreeManager } from './WorktreeManager';
 import { initTown } from './TownInit';
 import { TelegraphInbox } from './TelegraphInbox';
 import { TelegraphCommands } from './TelegraphCommands';
+import { AIToolBridge } from './AIToolBridge';
+import { ClaudeCodeAdapter } from './aiToolAdapters/ClaudeCodeAdapter';
 
 // ── Configuration types & helpers ──────────────────────────────────────────
 
@@ -35,6 +37,7 @@ let soloModeController: SoloModeController;
 let worktreeManager: WorktreeManager;
 let telegraphCommands: TelegraphCommands;
 let telegraphInbox: TelegraphInbox;
+let aiToolBridge: AIToolBridge;
 let outputChannel: vscode.OutputChannel;
 
 export function activate(context: vscode.ExtensionContext) {
@@ -54,6 +57,17 @@ export function activate(context: vscode.ExtensionContext) {
   telegraphInbox = new TelegraphInbox(outputChannel);
   telegraphCommands = new TelegraphCommands(outputChannel, heartbeatMonitor);
   telegraphCommands.register(context);
+
+  // ── AI Tool Bridge ────────────────────────────────────────────────────────
+  aiToolBridge = new AIToolBridge(outputChannel);
+  aiToolBridge.registerAdapter(new ClaudeCodeAdapter(outputChannel));
+  aiToolBridge.onEvent((event) => {
+    // turn-end and file-changed → trigger outbox delivery immediately
+    if (event.type === 'turn-end' || event.type === 'file-changed') {
+      heartbeatMonitor.deliverOutboxNow();
+    }
+  });
+  aiToolBridge.start();
 
   // ── Commands — devPair log (existing) ─────────────────────────────────────
   context.subscriptions.push(
@@ -178,4 +192,5 @@ export function deactivate() {
   heartbeatMonitor?.dispose();
   telegraphWatcher?.dispose();
   statusBarManager?.dispose();
+  aiToolBridge?.stop();
 }
