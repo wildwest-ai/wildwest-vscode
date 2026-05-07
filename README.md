@@ -2,6 +2,20 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
+**Current version:** 0.17.0 (v0.18.0 in development — telegraph protocol v2 simplification)
+
+---
+
+## What's New in v0.18.0 (Coming Soon)
+
+**Telegraph Protocol Simplification:**
+- **New addressing format**: Role-only (e.g., `CD`) replaces actor-specific format (e.g., `CD(RSn).Cpt`)
+- **Town-to-town routing**: Wildcard patterns (e.g., `TM(*vscode)`) enable county-wide cross-town delivery
+- **Backward compatible**: v0.18.0 accepts both formats; v0.19.0 removes old format support
+- **Comprehensive unit tests**: 32 test cases covering all addressing scenarios
+
+See: [Telegraph Addressing Protocol v0.18.0+](./docs/telegraph-addressing-v2.md)
+
 ---
 
 ## Features
