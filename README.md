@@ -2,17 +2,19 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.17.0 (v0.18.0 in development — telegraph protocol v2 simplification)
+**Current version:** 0.20.1
 
 ---
 
-## What's New in v0.18.0 (Coming Soon)
+## What's New
 
-**Telegraph Protocol Simplification:**
-- **New addressing format**: Role-only (e.g., `CD`) replaces actor-specific format (e.g., `CD(RSn).Cpt`)
-- **Town-to-town routing**: Wildcard patterns (e.g., `TM(*vscode)`) enable county-wide cross-town delivery
-- **Backward compatible**: v0.18.0 accepts both formats; v0.19.0 removes old format support
-- **Comprehensive unit tests**: 32 test cases covering all addressing scenarios
+**v0.20.1** — County outbox delivery fix: `beatTown()` and `deliverOutboxNow()` now walk parent directories to find and drain the county outbox on every heartbeat tick.
+
+**v0.20.0** — `@wildwest` Copilot Chat participant: query telegraph inbox, board branches, and town status from the Copilot Chat panel.
+
+**v0.19.0** — AIToolBridge + ClaudeCodeAdapter: HTTP hook receiver on `localhost:7379` for Claude Code stop/file-change events. `TownInit` now writes `.claude/settings.json` with hook config.
+
+**v0.18.0** — Telegraph protocol v2: role-only addressing (e.g., `CD`), wildcard town routing (e.g., `TM(*vscode)`), county-wide delivery.
 
 See: [Telegraph Addressing Protocol v0.18.0+](./docs/telegraph-addressing-v2.md)
 
@@ -96,6 +98,8 @@ Settings are available under `Preferences → Settings → Wild West`.
 | `wildwest.watchInterval` | `5000` | Poll interval in milliseconds |
 | `wildwest.autoExportOnChange` | `true` | Auto-export when chat data changes |
 | `wildwest.heartbeatInterval` | `300000` | Heartbeat interval in milliseconds (default: 5 min) |
+| `wildwest.worldRoot` | `~/wildwest` | World root directory |
+| `wildwest.claudeCode.hookPort` | `7379` | Port for Claude Code HTTP hook receiver |
 
 ---
 
@@ -113,7 +117,7 @@ Then reload the VSCode window (`Cmd+Shift+P` → **Developer: Reload Window**).
 
 ## Requirements
 
-- VS Code `^1.84.0`
+- VS Code `^1.90.0`
 - Git configured with `user.name` (used to organize export folders)
 
 ---
@@ -137,8 +141,10 @@ VSCode creates session JSON stubs (480 bytes) when the chat panel opens, even if
 
 ## Roadmap
 
-### MCP integration
+### MCP integration (P6 — v0.21.0)
 
-Wild West governance artifacts currently live as local files under `.wildwest/` (telegraph messages, scripts, docs). As the framework matures, these could migrate to an MCP server — exposing governance capabilities (`sendMessage`, `readTelegraph`, `reportHeartbeat`, etc.) as tools that any AI actor can call directly, regardless of editor or channel.
+`wwMCP` will expose Wild West governance state as a read-only MCP server. External AI tools can query governance state without filesystem access and without bypassing the telegraph protocol. Access is explicit opt-in; scope is determined at connection time by which workspace opens the connection. Write authority deferred to v1.0+.
 
-wildwest-vscode would evolve into the MCP host/transport layer, bridging VSCode UI with an MCP server. The `.wildwest/` directory would shrink to the worktree runtime only (fully gitignored), and Wild West would become a true actor-agnostic governance service.
+### `@wildwest` chat participant enhancements (P7 — v0.22.0)
+
+Extended chat participant with action-capable interactions: inline memo reading, send/ack workflows, and full telegraph sweep — all routed through existing `wildwest.*` commands.
