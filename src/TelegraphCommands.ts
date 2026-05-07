@@ -286,8 +286,10 @@ original_memo: ${originalFileName}
     subject: string,
     body: string
   ): void {
-    // Get current actor from workspace (hardcoded for now; could be dynamic)
-    const fromActor = 'TM(RHk).Cpt';
+    // Derive sender alias from registry; fall back to 'TM' if unreadable
+    const wwRoot = path.dirname(path.dirname(telegraphDir)); // telegraphDir/../.. = wsPath
+    const alias = this.readAliasFromRegistry(path.join(wwRoot, '.wildwest'));
+    const fromActor = alias ?? 'TM';
 
     // Build filename: YYYYMMDD-HHMMZ-to-<ToActor>-from-<FromActor>--<subject>.md
     const timestamp = this.getTimestamp();
@@ -324,5 +326,19 @@ subject: ${subject}
 
     this.outputChannel.appendLine(`[TelegraphCommands] Memo created in outbox: ${fileName}`);
     vscode.window.showInformationMessage(`Memo created in outbox: ${fileName}`);
+  }
+
+  /**
+   * Read alias from .wildwest/registry.json
+   */
+  private readAliasFromRegistry(wwRoot: string): string | null {
+    try {
+      const reg = JSON.parse(
+        fs.readFileSync(path.join(wwRoot, 'registry.json'), 'utf8'),
+      ) as Record<string, unknown>;
+      return (reg['alias'] as string) || null;
+    } catch {
+      return null;
+    }
   }
 }

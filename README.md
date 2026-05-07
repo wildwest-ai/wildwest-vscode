@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.25.1
+**Current version:** 0.25.2
 
 ---
 
 ## What's New
+
+**v0.25.2** — Fix `telegraphSend` hard-coded sender: `from:` field now reads alias from `.wildwest/registry.json` instead of hard-coding `TM(RHk).Cpt`. Falls back to `TM` if registry is unreadable.
 
 **v0.25.1** — Resource leak fixes: `StatusBarManager` now stores and disposes config/workspace listeners and the refresh interval on deactivate. `BatchChatConverter.run()` throws instead of calling `process.exit(1)` — safe to call from the extension; CLI entry point still exits on error.
 
