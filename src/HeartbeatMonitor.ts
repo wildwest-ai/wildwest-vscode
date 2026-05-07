@@ -96,6 +96,25 @@ function scopeOf(rootPath: string): WildWestScope | null {
 }
 
 /**
+ * Walk parent directories from townRoot to find the nearest county root.
+ * A county root is a directory containing .wildwest/registry.json with scope === 'county'.
+ * Returns the county rootPath or null if not found.
+ */
+function findCountyRoot(townRoot: string): string | null {
+  let current = path.dirname(townRoot);
+  const fsRoot = path.parse(current).root;
+  while (current !== fsRoot) {
+    if (scopeOf(current) === 'county') {
+      return current;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) break; // at filesystem root
+    current = parent;
+  }
+  return null;
+}
+
+/**
  * Validate if an actor role is valid for a given scope.
  * Returns true if role is in SCOPE_ROLES mapping for that scope.
  */
@@ -681,6 +700,11 @@ function beatTown(
   const scope = scopeOf(rootPath);
   if (scope === 'town') {
     deliverPendingOutbox(rootPath, scope, outputChannel, worldRoot, countiesDir);
+    // Also deliver county outbox if we can find the county root
+    const countyRoot = findCountyRoot(rootPath);
+    if (countyRoot) {
+      deliverPendingOutbox(countyRoot, 'county', outputChannel, worldRoot, countiesDir);
+    }
   }
 
   // Run telegraph cleanup
@@ -883,6 +907,11 @@ export class HeartbeatMonitor {
     if (!town) return;
     this.outputChannel.appendLine('[HeartbeatMonitor] outbox delivery triggered by new memo');
     deliverPendingOutbox(town.rootPath, town.scope, this.outputChannel, this.worldRoot, this.countiesDir);
+    // Also deliver county outbox
+    const countyRoot = findCountyRoot(town.rootPath);
+    if (countyRoot) {
+      deliverPendingOutbox(countyRoot, 'county', this.outputChannel, this.worldRoot, this.countiesDir);
+    }
   }
 
   dispose(): void {
