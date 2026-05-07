@@ -16,7 +16,7 @@ export type WildWestScope = 'town' | 'county' | 'territory';
 // Approved scope → roles mapping per CD decision
 const SCOPE_ROLES: Record<WildWestScope, string[]> = {
   'territory': ['G', 'RA'],
-  'county': ['S', 'CD', 'TM'],
+  'county': ['S', 'CD'],
   'town': ['Mayor', 'TM', 'HG'],
 };
 
@@ -394,7 +394,7 @@ function resolveScopePath(
   worldRoot: string,
   countiesDir: string,
   townPattern?: string | null,
-): string | null {
+): string | null | 'AMBIGUOUS' {
   // If destination is same scope, no delivery needed (local operation)
   if (currentScope === destScope) {
     return null;
@@ -422,20 +422,29 @@ function resolveScopePath(
   }
 
   if (destScope === 'town') {
-    // Town-to-town delivery (with pattern)
-    if (currentScope === 'town' && townPattern) {
-      // Get parent county path
-      const parts = currentPath.split(path.sep);
-      const countiesIdx = parts.indexOf(countiesDir);
-      if (countiesIdx >= 0 && countiesIdx + 1 < parts.length) {
-        const countyPath = parts.slice(0, countiesIdx + 2).join(path.sep);
-        // List towns in county and match pattern
-        const towns = listTownsInCounty(countyPath);
-        const matchedTownPath = resolveTownByPattern(townPattern, towns);
-        return matchedTownPath;
-      }
+    if (!townPattern) {
+      // TM (and other town roles) require a pattern when sent from county or territory
+      // — there are multiple towns; "to: TM" is ambiguous without (*pattern).
+      // From a town, no pattern = local (same scope), handled above.
+      return 'AMBIGUOUS';
     }
-    return null;
+    // Resolve county path depending on current scope
+    let countyPath: string | null = null;
+    const parts = currentPath.split(path.sep);
+    const countiesIdx = parts.indexOf(countiesDir);
+    if (currentScope === 'town') {
+      // Parent county: strip town segment
+      if (countiesIdx >= 0 && countiesIdx + 1 < parts.length) {
+        countyPath = parts.slice(0, countiesIdx + 2).join(path.sep);
+      }
+    } else if (currentScope === 'county') {
+      // Already at county
+      countyPath = currentPath;
+    }
+    // territory→town not supported (would need county disambiguation too)
+    if (!countyPath) return null;
+    const towns = listTownsInCounty(countyPath);
+    return resolveTownByPattern(townPattern, towns);
   }
 
   return null;
@@ -528,8 +537,16 @@ function deliverPendingOutbox(
 
         const destPath = resolveScopePath(scope, rootPath, destScope, worldRoot, countiesDir, pattern);
 
+        if (destPath === 'AMBIGUOUS') {
+          outputChannel.appendLine(
+            `[HeartbeatMonitor] delivery: ${memoFile} → ${role} — ambiguous: TM exists in multiple towns. Use TM(*pattern) to specify a town.`,
+          );
+          failed++;
+          continue;
+        }
+
         if (!destPath) {
-          // Local memo (same scope or no pattern for town-to-town)
+          // Local memo (same scope) or unresolvable
           outputChannel.appendLine(
             `[HeartbeatMonitor] delivery: ${memoFile} → ${toField} (local, no remote delivery)`,
           );
