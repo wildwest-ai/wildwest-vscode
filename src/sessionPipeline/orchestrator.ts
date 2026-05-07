@@ -12,7 +12,7 @@ import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { getTransformer } from './transformers';
 import { PacketWriter } from './packetWriter';
-import { SessionPacket, NormalizedTurn, Cursor } from './types';
+import { SessionPacket, NormalizedTurn } from './types';
 import { generateWwsid, generateDeviceId, getCursorType } from './utils';
 
 export interface PipelineOptions {
@@ -157,7 +157,7 @@ export class SessionExportPipeline {
     }
 
     const record = JSON.parse(fs.readFileSync(recordPath, 'utf8'));
-    const existingIndexes = new Set((record.turns || []).map((t: any) => t.turn_index));
+    const existingIndexes = new Set((record.turns || []).map((t: { turn_index: number }) => t.turn_index));
     const maxExisting = Math.max(...(Array.from(existingIndexes) as number[]), -1);
 
     // Return turns after max existing

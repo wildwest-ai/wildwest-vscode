@@ -5,7 +5,7 @@
  * Each tool (cpt, cld, ccx) has its own raw format and cursor tracking.
  */
 
-import { NormalizedTurn, Cursor, TurnMeta, ContentPart } from './types';
+import { NormalizedTurn, Cursor, ContentPart, PartKind, TurnMeta } from './types';
 
 /**
  * Tool-agnostic interface for session transformation
@@ -71,42 +71,42 @@ export class CopilotTransformer implements ISessionTransformer {
   }
 
   getCurrentCursor(rawSession: unknown): Cursor {
-    const session = rawSession as any;
+    const session = rawSession as Record<string, unknown>;
     // Most recent request_id is the current cursor
     // (Copilot stores requests in order; last one is the cursor)
-    const requests = session.requests || [];
+    const requests = (session['requests'] as Record<string, unknown>[]) || [];
     if (requests.length === 0) {
       return { type: 'request_id', value: -1 };
     }
     const lastRequest = requests[requests.length - 1];
-    return { type: 'request_id', value: lastRequest.requestId ?? requests.length - 1 };
+    return { type: 'request_id', value: (lastRequest['requestId'] as string | number | undefined) ?? requests.length - 1 };
   }
 
   transformTurns(rawSession: unknown): NormalizedTurn[] {
-    const session = rawSession as any;
-    const requests = session.requests || [];
+    const session = rawSession as Record<string, unknown>;
+    const requests = (session['requests'] as Record<string, unknown>[]) || [];
     const turns: NormalizedTurn[] = [];
     let turn_index = 0;
 
     for (const request of requests) {
       // User message
-      if (request.message) {
+      if (request['message']) {
         turns.push({
           turn_index: turn_index++,
           role: 'user',
-          content: this.extractTextContent(request.message),
-          parts: this.extractParts(request.message),
+          content: this.extractTextContent(request['message']),
+          parts: this.extractParts(request['message']),
           meta: {
-            tool_cursor_value: request.requestId ?? requests.indexOf(request),
-            ...request.meta,
+            tool_cursor_value: (request['requestId'] as string | number | undefined) ?? requests.indexOf(request),
+            ...(request['meta'] as TurnMeta | undefined),
           },
-          timestamp: request.timestamp || new Date().toISOString(),
+          timestamp: (request['timestamp'] as string | undefined) || new Date().toISOString(),
         });
       }
 
       // Assistant response (may have multiple parts: thinking + text)
-      if (request.response) {
-        const responseParts = this.extractParts(request.response);
+      if (request['response']) {
+        const responseParts = this.extractParts(request['response']);
 
         // If response has multiple parts, split them into separate turns
         // (following the spec: multi-part turns become separate indexed turns)
@@ -118,10 +118,10 @@ export class CopilotTransformer implements ISessionTransformer {
               content: part.kind === 'text' ? part.content : '',
               parts: [part],
               meta: {
-                tool_cursor_value: request.requestId ?? requests.indexOf(request),
-                ...request.meta,
+                tool_cursor_value: (request['requestId'] as string | number | undefined) ?? requests.indexOf(request),
+                ...(request['meta'] as TurnMeta | undefined),
               },
-              timestamp: request.responseTimestamp || new Date().toISOString(),
+              timestamp: (request['responseTimestamp'] as string | undefined) || new Date().toISOString(),
             });
           }
         } else {
@@ -129,13 +129,13 @@ export class CopilotTransformer implements ISessionTransformer {
           turns.push({
             turn_index: turn_index++,
             role: 'assistant',
-            content: this.extractTextContent(request.response),
+            content: this.extractTextContent(request['response']),
             parts: responseParts,
             meta: {
-              tool_cursor_value: request.requestId ?? requests.indexOf(request),
-              ...request.meta,
+              tool_cursor_value: (request['requestId'] as string | number | undefined) ?? requests.indexOf(request),
+              ...(request['meta'] as TurnMeta | undefined),
             },
-            timestamp: request.responseTimestamp || new Date().toISOString(),
+            timestamp: (request['responseTimestamp'] as string | undefined) || new Date().toISOString(),
           });
         }
       }
@@ -145,36 +145,38 @@ export class CopilotTransformer implements ISessionTransformer {
   }
 
   getSessionMetadata(rawSession: unknown) {
-    const session = rawSession as any;
+    const session = rawSession as Record<string, unknown>;
     return {
-      project_path: session.workspaceFolder || '',
+      project_path: (session['workspaceFolder'] as string) || '',
       session_type: 'chat' as const,
     };
   }
 
-  private extractParts(content: string | any): ContentPart[] {
+  private extractParts(content: unknown): ContentPart[] {
     if (typeof content === 'string') {
       return [{ kind: 'text' as const, content }];
     }
 
     // If content has structured parts (thinking + text)
-    if (content.parts && Array.isArray(content.parts)) {
-      return content.parts.map((part: any) => ({
-        kind: part.kind || 'text',
-        content: part.content || '',
-        thinking_id: part.thinking_id,
+    const structured = content as Record<string, unknown>;
+    if (structured['parts'] && Array.isArray(structured['parts'])) {
+      return (structured['parts'] as Record<string, unknown>[]).map((part) => ({
+        kind: ((part['kind'] as PartKind | undefined) ?? 'text') as PartKind,
+        content: (part['content'] as string) || '',
+        thinking_id: part['thinking_id'] as string | undefined,
       }));
     }
 
     return [{ kind: 'text' as const, content: JSON.stringify(content) }];
   }
 
-  private extractTextContent(content: string | any): string {
+  private extractTextContent(content: unknown): string {
     if (typeof content === 'string') return content;
-    if (content.parts && Array.isArray(content.parts)) {
-      return content.parts
-        .filter((p: any) => p.kind === 'text' || !p.kind)
-        .map((p: any) => p.content || '')
+    const structured = content as Record<string, unknown>;
+    if (structured['parts'] && Array.isArray(structured['parts'])) {
+      return (structured['parts'] as Record<string, unknown>[])
+        .filter((p) => p['kind'] === 'text' || !p['kind'])
+        .map((p) => (p['content'] as string) || '')
         .join('');
     }
     return '';
@@ -197,34 +199,34 @@ export class ClaudeCodeTransformer implements ISessionTransformer {
   }
 
   getCurrentCursor(rawSession: unknown): Cursor {
-    const session = rawSession as any;
-    const messages = session.messages || [];
+    const session = rawSession as Record<string, unknown>;
+    const messages = (session['messages'] as Record<string, unknown>[]) || [];
     if (messages.length === 0) {
       return { type: 'message_id', value: '' };
     }
     const lastMessage = messages[messages.length - 1];
-    return { type: 'message_id', value: lastMessage.id || '' };
+    return { type: 'message_id', value: (lastMessage['id'] as string) || '' };
   }
 
   transformTurns(rawSession: unknown): NormalizedTurn[] {
-    const session = rawSession as any;
-    const messages = session.messages || [];
+    const session = rawSession as Record<string, unknown>;
+    const messages = (session['messages'] as Record<string, unknown>[]) || [];
     const turns: NormalizedTurn[] = [];
 
     for (let i = 0; i < messages.length; i++) {
       const msg = messages[i];
-      const role = msg.role || 'user';
+      const role = (msg['role'] as string) || 'user';
 
       turns.push({
         turn_index: i,
         role: role as 'user' | 'assistant',
-        content: this.extractTextContent(msg.content),
-        parts: this.extractParts(msg.content),
+        content: this.extractTextContent(msg['content']),
+        parts: this.extractParts(msg['content']),
         meta: {
-          tool_cursor_value: msg.id || '',
-          ...msg.meta,
+          tool_cursor_value: (msg['id'] as string) || '',
+          ...(msg['meta'] as TurnMeta | undefined),
         },
-        timestamp: msg.timestamp || new Date().toISOString(),
+        timestamp: (msg['timestamp'] as string) || new Date().toISOString(),
       });
     }
 
@@ -232,35 +234,35 @@ export class ClaudeCodeTransformer implements ISessionTransformer {
   }
 
   getSessionMetadata(rawSession: unknown) {
-    const session = rawSession as any;
+    const session = rawSession as Record<string, unknown>;
     return {
-      project_path: session.projectPath || '',
+      project_path: (session['projectPath'] as string) || '',
       session_type: 'chat' as const,
     };
   }
 
-  private extractParts(content: any): ContentPart[] {
+  private extractParts(content: unknown): ContentPart[] {
     if (typeof content === 'string') {
       return [{ kind: 'text' as const, content }];
     }
 
     if (Array.isArray(content)) {
-      return content.map((part) => ({
-        kind: part.kind || 'text',
-        content: part.text || part.content || '',
-        thinking_id: part.thinking_id,
+      return (content as Record<string, unknown>[]).map((part) => ({
+        kind: ((part['kind'] as PartKind | undefined) ?? 'text') as PartKind,
+        content: (part['text'] as string) || (part['content'] as string) || '',
+        thinking_id: part['thinking_id'] as string | undefined,
       }));
     }
 
     return [{ kind: 'text' as const, content: JSON.stringify(content) }];
   }
 
-  private extractTextContent(content: any): string {
+  private extractTextContent(content: unknown): string {
     if (typeof content === 'string') return content;
     if (Array.isArray(content)) {
-      return content
-        .filter((p) => p.kind === 'text' || !p.kind)
-        .map((p) => p.text || p.content || '')
+      return (content as Record<string, unknown>[])
+        .filter((p) => p['kind'] === 'text' || !p['kind'])
+        .map((p) => (p['text'] as string) || (p['content'] as string) || '')
         .join('');
     }
     return '';
@@ -283,30 +285,30 @@ export class CodexTransformer implements ISessionTransformer {
   }
 
   getCurrentCursor(rawSession: unknown): Cursor {
-    const session = rawSession as any;
-    return { type: 'line_offset', value: session.line_count || 0 };
+    const session = rawSession as Record<string, unknown>;
+    return { type: 'line_offset', value: (session['line_count'] as number) || 0 };
   }
 
   transformTurns(rawSession: unknown): NormalizedTurn[] {
-    const session = rawSession as any;
-    const messages = session.messages || [];
+    const session = rawSession as Record<string, unknown>;
+    const messages = (session['messages'] as Record<string, unknown>[]) || [];
     const turns: NormalizedTurn[] = [];
 
     for (let i = 0; i < messages.length; i++) {
       const msg = messages[i];
-      const role = msg.role || 'user';
+      const role = (msg['role'] as string) || 'user';
 
       turns.push({
         turn_index: i,
         role: role as 'user' | 'assistant',
-        content: this.extractTextContent(msg.content),
-        parts: this.extractParts(msg.content),
+        content: this.extractTextContent(msg['content']),
+        parts: this.extractParts(msg['content']),
         meta: {
           tool_cursor_value: i, // Line offset in JSONL
-          ...msg.meta,
+          ...(msg['meta'] as TurnMeta | undefined),
         },
-        timestamp: msg.create_time
-          ? new Date(msg.create_time * 1000).toISOString()
+        timestamp: msg['create_time']
+          ? new Date((msg['create_time'] as number) * 1000).toISOString()
           : new Date().toISOString(),
       });
     }
@@ -314,32 +316,32 @@ export class CodexTransformer implements ISessionTransformer {
     return turns;
   }
 
-  getSessionMetadata(rawSession: unknown) {
+  getSessionMetadata(_rawSession: unknown) {
     return {
       project_path: '',
       session_type: 'chat' as const,
     };
   }
 
-  private extractParts(content: any): ContentPart[] {
+  private extractParts(content: unknown): ContentPart[] {
     if (typeof content === 'string') {
       return [{ kind: 'text' as const, content }];
     }
 
     if (Array.isArray(content)) {
-      return content.map((part) => ({
-        kind: part.type || 'text',
-        content: part.content || '',
+      return (content as Record<string, unknown>[]).map((part) => ({
+        kind: ((part['type'] as PartKind | undefined) ?? 'text') as PartKind,
+        content: (part['content'] as string) || '',
       }));
     }
 
     return [{ kind: 'text' as const, content: JSON.stringify(content) }];
   }
 
-  private extractTextContent(content: any): string {
+  private extractTextContent(content: unknown): string {
     if (typeof content === 'string') return content;
     if (Array.isArray(content)) {
-      return content.map((p) => p.content || '').join('');
+      return (content as Record<string, unknown>[]).map((p) => (p['content'] as string) || '').join('');
     }
     return '';
   }

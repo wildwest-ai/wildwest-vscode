@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.25.2
+**Current version:** 0.25.3
 
 ---
 
 ## What's New
+
+**v0.25.3** — Lint cleanup: eliminated all 29 ESLint warnings. Removed unused imports (`getTransformer`, `Cursor`, `SessionIndex`, `parsePacketFilename`, `padSequence`, `TurnMeta`). Typed all `any` usages in pipeline code (`Record<string, unknown>`, `PartKind`, `TurnMeta`, `Cursor` casts). Added `argsIgnorePattern: ^_` to ESLint config so `_`-prefixed params are allowed.
 
 **v0.25.2** — Fix `telegraphSend` hard-coded sender: `from:` field now reads alias from `.wildwest/registry.json` instead of hard-coding `TM(RHk).Cpt`. Falls back to `TM` if registry is unreadable.
 
