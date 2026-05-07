@@ -211,6 +211,12 @@ On each activation:
 # Release workflow (docs → bump → build → install → commit)
 npm run release
 
+# SemVer convention:
+#   MAJOR (x.0.0) — breaking changes, incompatible API
+#   MINOR (0.x.0) — new features, backwards-compatible  e.g. new commands, participants
+#   PATCH (0.0.x) — bug fixes, security fixes, refactors, chores (no new features)
+# Default bump is --minor; use --patch for all fix/chore releases.
+
 # Build extension only
 npm run esbuild
 

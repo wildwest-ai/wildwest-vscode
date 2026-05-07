@@ -1,5 +1,11 @@
 #!/bin/bash
 # Release workflow: docs update → version bump → build → package → [install] → commit
+#
+# SemVer convention:
+#   MAJOR (x.0.0) — breaking changes
+#   MINOR (0.x.0) — new features (new commands, participants, tools)
+#   PATCH (0.0.x) — bug fixes, security fixes, refactors, chores
+# Default bump is --minor. Pass --patch for fix/chore releases.
 
 set -e
 
