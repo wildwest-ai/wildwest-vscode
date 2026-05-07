@@ -34,8 +34,10 @@ The `.wildwest/registry.json` file contains metadata about a Wild West scope (to
 ### alias
 - **Type**: string
 - **Required**: yes
-- **Description**: Alphanumeric identifier for this scope (used in file paths and references).
+- **Description**: Alphanumeric identifier for this scope (used in file paths and references). 
+  - In v0.18.0+, also used for wildcard pattern matching in telegraph addressing (e.g., `TM(*vscode)` matches alias `wildwest-vscode`).
 - **Example**: `"wildwest-vscode"`, `"wildwest-ai"`
+- **Pattern matching** (v0.18.0+): Aliases support glob-style matching with `*` (any chars) and `?` (single char)
 
 ### scope
 - **Type**: enum: `"town" | "county" | "territory"`
