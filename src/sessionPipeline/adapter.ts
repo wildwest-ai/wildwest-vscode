@@ -13,7 +13,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { SessionExportPipeline } from './orchestrator';
-import { getTransformer } from './transformers';
 
 export interface PipelineAdapterOptions {
   sessionsDir: string;

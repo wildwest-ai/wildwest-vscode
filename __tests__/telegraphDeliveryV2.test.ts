@@ -152,7 +152,7 @@ describe('Telegraph Delivery v2 — Simplified Addressing', () => {
   // ─── Test 3: Backward Compatibility (Old Format) ─────────────────────────
   describe('Test 3: Old format detection (deprecation warning)', () => {
     it('should detect old format "CD(RSn).Cpt" as deprecated', () => {
-      const isOldFormat = /\([A-Za-z]\)\./.test('CD(RSn).Cpt');
+      const isOldFormat = /\([A-Za-z]+\)\./.test('CD(RSn).Cpt');
       expect(isOldFormat).toBe(true);
     });
 
@@ -337,7 +337,7 @@ describe('Telegraph Delivery v2 — Simplified Addressing', () => {
       expect(oldResult).toBeNull(); // Doesn't parse with new parser
 
       // But old format detection should still work
-      const isOld = /\([A-Za-z]\)\./.test('CD(RSn).Cpt');
+      const isOld = /\([A-Za-z]+\)\./.test('CD(RSn).Cpt');
       expect(isOld).toBe(true);
 
       // New format parses correctly
@@ -347,7 +347,7 @@ describe('Telegraph Delivery v2 — Simplified Addressing', () => {
 
     it('should warn on deprecated format in logging', () => {
       const toField = 'CD(RSn).Cpt';
-      const isDeprecated = /\([A-Za-z]\)\./.test(toField);
+      const isDeprecated = /\([A-Za-z]+\)\./.test(toField);
       if (isDeprecated) {
         mockLogger.log(`WARNING: ${toField} is deprecated format (v0.18.0). Use role-only format.`);
       }

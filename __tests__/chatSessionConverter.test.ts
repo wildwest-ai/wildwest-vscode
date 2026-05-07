@@ -1,12 +1,16 @@
 import { ChatSessionConverter } from '../src/chatSessionConverter';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 describe('ChatSessionConverter', () => {
-  const testDir = path.join(__dirname, 'testdata');
-  const sessionPath = path.join(testDir, 'copilot-session.json');
+  let testDir: string;
+  let sessionPath: string;
 
-  beforeAll(() => {
+  beforeEach(() => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wildwest-chat-session-'));
+    sessionPath = path.join(testDir, 'copilot-session.json');
+
     fs.mkdirSync(testDir, { recursive: true });
     fs.writeFileSync(
       sessionPath,
@@ -27,7 +31,7 @@ describe('ChatSessionConverter', () => {
     );
   });
 
-  afterAll(() => {
+  afterEach(() => {
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 

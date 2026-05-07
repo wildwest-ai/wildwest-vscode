@@ -1,5 +1,11 @@
 #!/bin/bash
 # Release workflow: docs update → version bump → build → package → [install] → commit
+#
+# SemVer convention:
+#   MAJOR (x.0.0) — breaking changes
+#   MINOR (0.x.0) — new features (new commands, participants, tools)
+#   PATCH (0.0.x) — bug fixes, security fixes, refactors, chores
+# Default bump is --minor. Pass --patch for fix/chore releases.
 
 set -e
 
@@ -32,12 +38,17 @@ done
 
 echo "🚀 Starting release workflow in $ROOT_DIR"
 
-# Step 1: Update docs (README.md / CHANGELOG placeholder)
-echo "📝 Updating documentation..."
-if [ -f "$ROOT_DIR/CHANGELOG.md" ]; then
-  echo "  ✓ CHANGELOG.md exists"
+# Step 1: Verify README.md is current
+echo "📝 Checking README.md..."
+CURRENT_VERSION=$(jq -r '.version' "$ROOT_DIR/package.json")
+if grep -q "$CURRENT_VERSION" "$ROOT_DIR/README.md"; then
+  echo "  ✓ README.md mentions v$CURRENT_VERSION"
 else
-  echo "  ⚠️  No CHANGELOG.md found — skipping doc update"
+  echo ""
+  echo "  ❌ README.md does not mention v$CURRENT_VERSION"
+  echo "     Update README.md (What's New section + Current version line) before releasing."
+  echo ""
+  exit 1
 fi
 
 # Step 2: Bump version
@@ -80,7 +91,7 @@ fi
 echo "💾 Committing changes..."
 NEW_VERSION=$(jq -r '.version' package.json)
 git add -A
-git commit -m "Release v$NEW_VERSION: telegraph scripts, schema_version guard, registry v2 migration"
+git commit -m "Release v$NEW_VERSION"
 
 echo "✅ Release v$NEW_VERSION complete!"
 echo ""

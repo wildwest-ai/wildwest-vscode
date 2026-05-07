@@ -1,62 +1,34 @@
 # TODO — wildwest-vscode
 
-> **Last updated:** 2026-05-01 16:30 UTC (12:30 EDT)
+> **Last updated:** 2026-05-07T23:02Z
+> **Review source:** `docs/20260507-2253Z-repo-review-findings.md`
 
 ---
 
-## staged/ — continuous incremental sync (fixed v0.7.1)
+## P1 — Blocking (next release)
 
-`staged/` is the interim MCP proxy. The v0.6.0 auto-sync ran once at startup only — active
-sessions updated after startup were never re-converted. Spotted when reading TM session 54f60505:
-raw/ had the latest content (12:36) but staged/ was stale (synced at 11:56).
+- [x] **Telegraph inbox v2 contract** — `TelegraphInbox` scans the telegraph root and only accepts `to-*`; it must scan `.wildwest/telegraph/inbox/` and accept `YYYYMMDD-HHMMZ-to-...` delivered filenames
+- [x] **Ack delivery path** — `telegraphAck` writes ack files to the telegraph root; all outbound memos/acks must be written to `outbox/` so delivery can route them
+- [x] **Heartbeat flagged state** — `beatTown()` treats normal `inbox/` and `outbox/` directories as flags; compute flagged state from unresolved memo files instead
+- [x] **Custom export path** — `PipelineAdapter` hard-codes `~/wildwest/sessions/{gitUsername}`; wire it to `wildwest.exportPath`
+- [x] **Extension lifecycle cleanup** — `SessionExporter.dispose()` does not clear polling; `deactivate()` does not await async shutdown
+- [x] **Command contributions** — registered commands like `startHeartbeat`, `stopHeartbeat`, `showStatus`, `openExportFolder`, `viewOutputLog`, and `openSettings` are not contributed in `package.json`
+- [x] **Git/worktree command safety** — replace shell-interpolated git calls with argument arrays and avoid branch checkout during `initTown`
+- [ ] **First-run consent** — startup currently scans AI session stores by default; add explicit provider consent/source scoping before broad export
+- [ ] **Identity block shape decision** — S(R) call needed (affects registry schema)
+- [ ] **`scope: "town"` field** — Add to `.wildwest/registry.json` for all scopes
+- [ ] **TownInit.ts fix** — Write `scope` field on registry creation
+- [ ] **SoloModeController.hasBranchDoc()** — Check correct path (stale reference)
 
-**Fix (v0.7.1):** fire `batchConvertSessions(true)` at the end of each `checkAllChatSessions()`
-poll cycle when activity is detected. `BatchChatConverter.isAlreadyConverted()` already uses mtime
-checks — only changed files are re-converted. staged/ now lags raw/ by at most one 5s poll cycle.
+## P2 — Nice-to-Have
 
----
-
-## vsix — output to build/ only (fixed v0.7.1)
-
-Root vsix files (0.5.5, 0.6.0, 0.7.0) were left in repo root — `.gitignore` correctly ignores
-root `*.vsix` and tracks only `build/*.vsix`. Root strays moved to `build/` in v0.7.1.
-`npm run package` uses `--out build/` — always use it, never bare `vsce package`.
-
----
-
-## MCP integration — future
-
-Migrate governance artifacts from local `.wildwest/` files to an MCP server. Governance capabilities become MCP tools callable by any actor regardless of editor or channel.
-
-- [ ] **MCP server** — expose `sendMessage`, `readTelegraph`, `reportHeartbeat`, `listWorktrees`, `getSoloTier` as MCP tools
-- [ ] **wildwest-vscode as MCP host** — bridge VSCode UI + file watching to the MCP transport layer
-- [ ] **`.wildwest/` shrinks to runtime only** — `telegraph/`, `scripts/`, `docs/` move server-side; only `worktrees/` remains locally (fully gitignored)
-- [ ] **Actor-agnostic** — Claude Code, Copilot, Codex all call the same MCP tools; no file-convention assumptions
-
-Out of scope until governance file layer is stable.
-
----
-
-## Command palette — category split
-
-Split the flat `Wild West` category into two groups so the palette is self-organizing:
-
-- [ ] **`Wild West: Sessions`** — Start/Stop Watcher, Export Now, Batch Convert, Convert to Markdown, Generate Index
-- [ ] **`Wild West: Governance`** — Start/Stop Heartbeat, View Telegraph, Solo Mode Report
-
-Change is purely in `package.json` `contributes.commands[*].category` — no code changes.
-
----
-
-## Status bar — Wild West features
-
-### Medium value, more effort
-
-- [ ] **Telegraph unread count** — `$(mail) N` badge when non-system files exist in `.wildwest/telegraph/`. `TelegraphWatcher` already watches the dir; count and badge.
-- [ ] **Last beat age** — show `N min ago` in the heartbeat tooltip (or inline). `.last-beat` mtime is already read in `checkLiveness()`; format the age as a human string. Catches stale-but-not-yet-expired heartbeats early.
-
----
-
-## Backlog — v0.15.x
-
-- [ ] **`wildwest.telegraphStatus` command (P4)** — Query and display current telegraph status (inbox count, unresolved memos, compliance state). Deferred pending session-open/close protocol maturation. Adopted in 0254Z decisions memo 2026-05-05.
+- [ ] **TelegraphService abstraction** — centralize address parsing, filename generation, inbox/outbox paths, ack generation, archiving, and delivery status
+- [ ] **Production-code telegraph tests** — replace copied/simplified test implementations with tests that import and exercise production delivery/inbox code
+- [ ] **Wild West Doctor command** — validate registry, worktree, outbox/inbox dirs, actor role, export path, MCP status, hook port, and stale heartbeat state
+- [ ] **Side panel** — show Inbox, Outbox, History, Board, Heartbeat, and Actor state in one VS Code view
+- [ ] **Memo action UX** — Ack Done, Blocked, Question, Defer, Archive, Open Source Memo, Retry Delivery
+- [ ] **Delivery receipts** — track pending, delivered, failed, acknowledged, and blocked per memo
+- [ ] **Privacy mode** — redact paths, environment-looking strings, and known secret patterns before staged export
+- [ ] **CLAUDE.md template** — Framework gap; auto-scaffold on `initTown`
+- [ ] **Registry validator** — Lint `.wildwest/registry.json` for schema compliance
+- [ ] **Release artifact hygiene** — move tracked historical VSIX files out of git and keep releases in GitHub Releases or CI artifacts

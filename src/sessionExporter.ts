@@ -5,7 +5,7 @@ import * as chokidar from 'chokidar';
 import { BatchChatConverter } from './batchConverter';
 import { convertJsonFileToMarkdown } from './jsonToMarkdown';
 import { generateIndex } from './generateIndex';
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import { PipelineAdapter } from './sessionPipeline';
 
 export class SessionExporter {
@@ -64,7 +64,7 @@ export class SessionExporter {
     try {
       const gitUsername = this.getGitUsername();
       this.pipelineAdapter = new PipelineAdapter({
-        sessionsDir: path.join(this.userHome, 'wildwest', 'sessions', gitUsername),
+        sessionsDir: this.exportPath,
         actor: gitUsername,
         projectPath: vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath,
       });
@@ -704,7 +704,7 @@ export class SessionExporter {
         });
         if (username) {
           try {
-            execSync(`git config user.name "${username}"`);
+            execFileSync('git', ['config', 'user.name', username]);
             vscode.window.showInformationMessage(
               `✅ Git username set to: ${username}`,
               'Restart Watcher'
@@ -832,7 +832,7 @@ export class SessionExporter {
     }
   }
 
-  async stop(): Promise<void> {
+  async stop(silent = false): Promise<void> {
     if (this.dbPollInterval) {
       clearInterval(this.dbPollInterval);
       this.dbPollInterval = null;
@@ -847,7 +847,9 @@ export class SessionExporter {
     this.exportedFiles.clear();
     this.lastDbStats.clear();
     this.updateStatusBar();
-    vscode.window.showInformationMessage('Wild West watcher stopped');
+    if (!silent) {
+      vscode.window.showInformationMessage('Wild West watcher stopped');
+    }
   }
 
   private startDatabasePolling(): void {
@@ -1587,6 +1589,12 @@ export class SessionExporter {
   }
 
   dispose(): void {
+    if (this.dbPollInterval) {
+      clearInterval(this.dbPollInterval);
+      this.dbPollInterval = null;
+    }
+    this.isWatching = false;
+
     // Close all open sessions before shutting down
     if (this.pipelineAdapter) {
       this.closeAllOpenSessions().catch((err) => {
@@ -1596,7 +1604,8 @@ export class SessionExporter {
     this.saveState();
     this.statusBar.dispose();
     if (this.watcher) {
-      this.watcher.close();
+      this.watcher.close().catch(() => {});
+      this.watcher = null;
     }
   }
 

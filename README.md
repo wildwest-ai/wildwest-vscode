@@ -2,17 +2,39 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.17.0 (v0.18.0 in development — telegraph protocol v2 simplification)
+**Current version:** 0.25.5
 
 ---
 
-## What's New in v0.18.0 (Coming Soon)
+## What's New
 
-**Telegraph Protocol Simplification:**
-- **New addressing format**: Role-only (e.g., `CD`) replaces actor-specific format (e.g., `CD(RSn).Cpt`)
-- **Town-to-town routing**: Wildcard patterns (e.g., `TM(*vscode)`) enable county-wide cross-town delivery
-- **Backward compatible**: v0.18.0 accepts both formats; v0.19.0 removes old format support
-- **Comprehensive unit tests**: 32 test cases covering all addressing scenarios
+**v0.25.5** — Telegraph and lifecycle fixes: `TelegraphInbox` now scans delivered v2 memos in `inbox/`, ack workflows queue outbound acks in `outbox/`, heartbeat no longer treats normal `inbox/`/`outbox/` directories as flags, the packet pipeline honors custom `wildwest.exportPath`, deactivation clears polling, heartbeat/status utility commands are contributed, and town/worktree git calls use argument arrays without switching the active checkout. Added production-focused `TelegraphInbox` tests.
+
+**v0.25.4** — Test isolation: `batchConverter`, `chatSessionConverter`, and `jsonToMarkdown` test suites now use `os.tmpdir()` temp directories per test instead of a shared `__tests__/testdata/` path, eliminating intermittent failures from Jest parallel-runner conflicts.
+
+**v0.25.3** — Lint cleanup: eliminated all 29 ESLint warnings. Removed unused imports (`getTransformer`, `Cursor`, `SessionIndex`, `parsePacketFilename`, `padSequence`, `TurnMeta`). Typed all `any` usages in pipeline code (`Record<string, unknown>`, `PartKind`, `TurnMeta`, `Cursor` casts). Added `argsIgnorePattern: ^_` to ESLint config so `_`-prefixed params are allowed.
+
+**v0.25.2** — Fix `telegraphSend` hard-coded sender: `from:` field now reads alias from `.wildwest/registry.json` instead of hard-coding `TM(RHk).Cpt`. Falls back to `TM` if registry is unreadable.
+
+**v0.25.1** — Resource leak fixes: `StatusBarManager` now stores and disposes config/workspace listeners and the refresh interval on deactivate. `BatchChatConverter.run()` throws instead of calling `process.exit(1)` — safe to call from the extension; CLI entry point still exits on error.
+
+**v0.25.0** — Security fix: `git config user.name` now uses `execFileSync` with argument array instead of interpolated shell string, preventing command injection from user-supplied usernames.
+
+**v0.24.0** — VSIX hygiene: `.vscodeignore` now excludes `src/`, `__tests__/`, `.wildwest/`, `docs/`, `scripts/`, `build/`, and all `tsc` output from `dist/` except `dist/extension.js` (the esbuild bundle). Package reduced from 311 → 3 files.
+
+**v0.23.0** — `npm test` green: lint gate fixed (`no-explicit-any` → warn), `extractResponseAndThinking` handles `kind='text'` responses, deprecated-format detector regex corrected to `[A-Za-z]+` for multi-char abbreviations (e.g. `RSn`). 7/7 suites, 68/68 tests.
+
+**v0.22.0** — P7 enhanced `@wildwest` participant: `send`, `ack`, `archive` with [Confirm] buttons; county+town inbox sweep; `telegraph check`; `status` shows open memo + branch counts. Operator fixes: delivered filename resolves wildcard alias; warn bare `from: TM` in multi-town county.
+
+**v0.21.0** — P6 wwMCP server: read-only MCP server over stdio. Exposes `wildwest_status`, `wildwest_inbox`, `wildwest_board`, `wildwest_telegraph_check` tools. Disabled by default (`wildwest.mcp.enabled`). Actor-scoped, explicit opt-in, read-only.
+
+**v0.20.1** — County outbox delivery fix: `beatTown()` and `deliverOutboxNow()` now walk parent directories to find and drain the county outbox on every heartbeat tick.
+
+**v0.20.0** — `@wildwest` Copilot Chat participant: query telegraph inbox, board branches, and town status from the Copilot Chat panel.
+
+**v0.19.0** — AIToolBridge + ClaudeCodeAdapter: HTTP hook receiver on `localhost:7379` for Claude Code stop/file-change events. `TownInit` now writes `.claude/settings.json` with hook config.
+
+**v0.18.0** — Telegraph protocol v2: role-only addressing (e.g., `CD`), wildcard town routing (e.g., `TM(*vscode)`), county-wide delivery.
 
 See: [Telegraph Addressing Protocol v0.18.0+](./docs/telegraph-addressing-v2.md)
 
@@ -96,6 +118,9 @@ Settings are available under `Preferences → Settings → Wild West`.
 | `wildwest.watchInterval` | `5000` | Poll interval in milliseconds |
 | `wildwest.autoExportOnChange` | `true` | Auto-export when chat data changes |
 | `wildwest.heartbeatInterval` | `300000` | Heartbeat interval in milliseconds (default: 5 min) |
+| `wildwest.mcp.enabled` | `false` | Enable the wwMCP server (read-only, stdio). Must be explicitly enabled. |
+| `wildwest.worldRoot` | `~/wildwest` | World root directory |
+| `wildwest.claudeCode.hookPort` | `7379` | Port for Claude Code HTTP hook receiver |
 
 ---
 
@@ -113,7 +138,7 @@ Then reload the VSCode window (`Cmd+Shift+P` → **Developer: Reload Window**).
 
 ## Requirements
 
-- VS Code `^1.84.0`
+- VS Code `^1.90.0`
 - Git configured with `user.name` (used to organize export folders)
 
 ---
@@ -137,8 +162,10 @@ VSCode creates session JSON stubs (480 bytes) when the chat panel opens, even if
 
 ## Roadmap
 
-### MCP integration
+### MCP integration (P6 — v0.21.0 ✅)
 
-Wild West governance artifacts currently live as local files under `.wildwest/` (telegraph messages, scripts, docs). As the framework matures, these could migrate to an MCP server — exposing governance capabilities (`sendMessage`, `readTelegraph`, `reportHeartbeat`, etc.) as tools that any AI actor can call directly, regardless of editor or channel.
+`wwMCP` exposes Wild West governance state as a read-only MCP server over stdio. Enable with `wildwest.mcp.enabled = true`. Tools: `wildwest_status`, `wildwest_inbox`, `wildwest_board`, `wildwest_telegraph_check`. Access is explicit opt-in; scope is determined at connection time. Write authority deferred to v1.0+.
 
-wildwest-vscode would evolve into the MCP host/transport layer, bridging VSCode UI with an MCP server. The `.wildwest/` directory would shrink to the worktree runtime only (fully gitignored), and Wild West would become a true actor-agnostic governance service.
+### `@wildwest` chat participant enhancements (P7 — v0.22.0 ✅)
+
+Action-capable `@wildwest` with send/ack/archive workflows, county+town inbox sweep, and telegraph check — all routed through registered `wildwest.*` commands.

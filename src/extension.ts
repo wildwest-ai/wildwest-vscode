@@ -9,6 +9,10 @@ import { WorktreeManager } from './WorktreeManager';
 import { initTown } from './TownInit';
 import { TelegraphInbox } from './TelegraphInbox';
 import { TelegraphCommands } from './TelegraphCommands';
+import { AIToolBridge } from './AIToolBridge';
+import { ClaudeCodeAdapter } from './aiToolAdapters/ClaudeCodeAdapter';
+import { registerChatParticipant } from './WildwestParticipant';
+import { registerMCPServer } from './mcp/wwMCPServer';
 
 // ── Configuration types & helpers ──────────────────────────────────────────
 
@@ -35,6 +39,7 @@ let soloModeController: SoloModeController;
 let worktreeManager: WorktreeManager;
 let telegraphCommands: TelegraphCommands;
 let telegraphInbox: TelegraphInbox;
+let aiToolBridge: AIToolBridge;
 let outputChannel: vscode.OutputChannel;
 
 export function activate(context: vscode.ExtensionContext) {
@@ -54,6 +59,23 @@ export function activate(context: vscode.ExtensionContext) {
   telegraphInbox = new TelegraphInbox(outputChannel);
   telegraphCommands = new TelegraphCommands(outputChannel, heartbeatMonitor);
   telegraphCommands.register(context);
+
+  // ── AI Tool Bridge ────────────────────────────────────────────────────────
+  aiToolBridge = new AIToolBridge(outputChannel);
+  aiToolBridge.registerAdapter(new ClaudeCodeAdapter(outputChannel));
+  aiToolBridge.onEvent((event) => {
+    // turn-end and file-changed → trigger outbox delivery immediately
+    if (event.type === 'turn-end' || event.type === 'file-changed') {
+      heartbeatMonitor.deliverOutboxNow();
+    }
+  });
+  aiToolBridge.start();
+
+  // ── @wildwest Copilot Chat participant (P3) ───────────────────────────────
+  registerChatParticipant(context, outputChannel);
+
+  // ── wwMCP server (P6) — stdio, opt-in via wildwest.mcp.enabled ───────────
+  registerMCPServer(context, outputChannel, heartbeatMonitor);
 
   // ── Commands — devPair log (existing) ─────────────────────────────────────
   context.subscriptions.push(
@@ -157,25 +179,29 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   // ── Config change listener ────────────────────────────────────────────────
-  vscode.workspace.onDidChangeConfiguration((e) => {
-    if (!e.affectsConfiguration('wildwest')) return;
-    const newConfig = vscode.workspace.getConfiguration('wildwest');
-    const enabled = newConfig.get<boolean>('enabled');
-    if (enabled && !heartbeatMonitor.isRunning()) {
-      heartbeatMonitor.start();
-      telegraphWatcher.start();
-    } else if (!enabled && heartbeatMonitor.isRunning()) {
-      heartbeatMonitor.stop();
-      telegraphWatcher.stop();
-    }
-  });
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (!e.affectsConfiguration('wildwest')) return;
+      const newConfig = vscode.workspace.getConfiguration('wildwest');
+      const enabled = newConfig.get<boolean>('enabled');
+      if (enabled && !heartbeatMonitor.isRunning()) {
+        heartbeatMonitor.start();
+        telegraphWatcher.start();
+      } else if (!enabled && heartbeatMonitor.isRunning()) {
+        heartbeatMonitor.stop();
+        telegraphWatcher.stop();
+      }
+    }),
+  );
 
   context.subscriptions.push(heartbeatMonitor, telegraphWatcher, soloModeController, statusBarManager);
 }
 
-export function deactivate() {
+export async function deactivate(): Promise<void> {
+  await exporter?.stop(true);
   exporter?.dispose();
   heartbeatMonitor?.dispose();
   telegraphWatcher?.dispose();
   statusBarManager?.dispose();
+  await aiToolBridge?.stop();
 }

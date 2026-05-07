@@ -6,10 +6,10 @@
     "type": "git",
     "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
   },
-  "version": "0.18.0",
+  "version": "0.25.5",
   "publisher": "wildwest-ai",
   "engines": {
-    "vscode": "^1.84.0"
+    "vscode": "^1.90.0"
   },
   "categories": [
     "Other"
@@ -51,6 +51,16 @@
         "category": "Wild West"
       },
       {
+        "command": "wildwest.startHeartbeat",
+        "title": "Start Heartbeat",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.stopHeartbeat",
+        "title": "Stop Heartbeat",
+        "category": "Wild West"
+      },
+      {
         "command": "wildwest.viewTelegraph",
         "title": "View Telegraph",
         "category": "Wild West"
@@ -76,6 +86,26 @@
         "category": "Wild West"
       },
       {
+        "command": "wildwest.showStatus",
+        "title": "Show Status",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.openExportFolder",
+        "title": "Open Export Folder",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.viewOutputLog",
+        "title": "View Output Log",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.openSettings",
+        "title": "Open Settings",
+        "category": "Wild West"
+      },
+      {
         "command": "wildwest.telegraphAck",
         "title": "Ack Telegraph Memo",
         "category": "Wild West"
@@ -84,6 +114,15 @@
         "command": "wildwest.telegraphSend",
         "title": "Send Telegraph Memo",
         "category": "Wild West"
+      }
+    ],
+    "chatParticipants": [
+      {
+        "id": "wildwest.participant",
+        "name": "wildwest",
+        "fullName": "Wild West",
+        "description": "Query Wild West governance state — telegraph inbox, board branches, town status",
+        "isSticky": false
       }
     ],
     "configuration": {
@@ -139,6 +178,16 @@
           "default": 1800000,
           "description": "World heartbeat active interval in ms when active_branches > 0 (default: 1800000 = 30 min). Overridden by registry.json heartbeat.interval_active_ms."
         },
+        "wildwest.claudeCode.hookPort": {
+          "type": "number",
+          "default": 7379,
+          "description": "Local HTTP port for Claude Code hook receiver (ClaudeCodeAdapter). Default: 7379. Change if port conflicts occur on shared workstations."
+        },
+        "wildwest.mcp.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable the wwMCP server (read-only MCP server over stdio). Default: false. Must be explicitly enabled by the actor."
+        },
         "wildwest.worldRoot": {
           "type": "string",
           "default": "~/wildwest",
@@ -190,6 +239,7 @@
     "typescript": "^5.x"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "chokidar": "^3.5.3"
   }
 }

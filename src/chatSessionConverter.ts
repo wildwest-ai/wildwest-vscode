@@ -278,8 +278,8 @@ class ChatSessionConverter {
       const value = typeof (item as { value?: string }).value === 'string' ? (item as { value?: string }).value : '';
       const kind = (item as { kind?: string | null }).kind;
       
-      // Actual response: kind is null/undefined (no kind field)
-      if ((kind === null || kind === undefined) && value) {
+      // Actual response: kind is null/undefined/text
+      if ((kind === null || kind === undefined || kind === 'text') && value) {
         responseText += value;
       }
       

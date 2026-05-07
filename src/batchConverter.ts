@@ -574,16 +574,15 @@ class BatchChatConverter {
       try {
         sessionFiles = this.findSessionFiles();
       } catch (error) {
-        console.error('❌ Error:', error instanceof Error ? error.message : String(error));
-        process.exit(1);
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('❌ Error:', msg);
+        throw new Error(msg);
       }
 
       if (sessionFiles.length === 0) {
         console.log('⚠️  No session files found in input directory');
         console.log('');
-        console.log('Expected files: {sessionId}.json (no date prefix)');
-        console.log('');
-        process.exit(1);
+        return; // no-op when called from extension; CLI caller handles exit
       }
 
       console.log(`Found ${sessionFiles.length} session file(s) to convert`);

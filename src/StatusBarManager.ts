@@ -8,6 +8,8 @@ import { HeartbeatMonitor } from './HeartbeatMonitor';
 export class StatusBarManager {
   private statusBarItem: vscode.StatusBarItem;
   private heartbeatMonitor: HeartbeatMonitor;
+  private disposables: vscode.Disposable[] = [];
+  private refreshInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(heartbeatMonitor: HeartbeatMonitor) {
     this.heartbeatMonitor = heartbeatMonitor;
@@ -47,19 +49,23 @@ export class StatusBarManager {
    */
   startListening(): void {
     // Update on actor or scope changes
-    vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('wildwest.actor')) {
-        this.updateDisplay();
-      }
-    });
+    this.disposables.push(
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration('wildwest.actor')) {
+          this.updateDisplay();
+        }
+      }),
+    );
 
     // Update on workspace folder changes
-    vscode.workspace.onDidChangeWorkspaceFolders(() => {
-      this.updateDisplay();
-    });
+    this.disposables.push(
+      vscode.workspace.onDidChangeWorkspaceFolders(() => {
+        this.updateDisplay();
+      }),
+    );
 
     // Periodic refresh (every 5 seconds) to catch scope changes
-    setInterval(() => {
+    this.refreshInterval = setInterval(() => {
       this.updateDisplay();
     }, 5000);
 
@@ -68,6 +74,14 @@ export class StatusBarManager {
   }
 
   dispose(): void {
+    if (this.refreshInterval !== null) {
+      clearInterval(this.refreshInterval);
+      this.refreshInterval = null;
+    }
+    for (const d of this.disposables) {
+      d.dispose();
+    }
+    this.disposables = [];
     this.statusBarItem.dispose();
   }
 }

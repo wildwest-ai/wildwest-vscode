@@ -176,7 +176,9 @@ export class TelegraphCommands {
     // Build ack filename: YYYYMMDD-HHMMZ-to-<FromActor>-from-<ToActor>--ack-<status>--<subject>.md
     const timestamp = this.getTimestamp();
     const ackFileName = `${timestamp}-to-${fromActor}-from-${toActor}--ack-${status}--${subject}.md`;
-    const ackPath = path.join(telegraphDir, ackFileName);
+    const outboxDir = path.join(telegraphDir, 'outbox');
+    fs.mkdirSync(outboxDir, { recursive: true });
+    const ackPath = path.join(outboxDir, ackFileName);
 
     // Build YAML frontmatter
     const isoTimestamp = this.getISO8601Timestamp();
@@ -201,20 +203,20 @@ original_memo: ${originalFileName}
       body = `# Acknowledged: ${status}`;
     }
 
-    // Write ack file
+    // Write ack file to outbox so the delivery operator can route it
     const ackContent = `${frontmatter}\n\n${body}\n`;
     fs.writeFileSync(ackPath, ackContent, 'utf8');
 
-    // Archive original to history/YYYY-MM-DD/
+    // Archive original to inbox/history/YYYY-MM-DD/
     const today = new Date().toISOString().split('T')[0];
-    const historyDir = path.join(telegraphDir, 'history', today);
+    const historyDir = path.join(inboxDir, 'history', today);
     if (!fs.existsSync(historyDir)) {
       fs.mkdirSync(historyDir, { recursive: true });
     }
     fs.renameSync(originalPath, path.join(historyDir, originalFileName));
 
-    this.outputChannel.appendLine(`[TelegraphCommands] Acked: ${ackFileName}`);
-    vscode.window.showInformationMessage(`Acked: ${ackFileName}`);
+    this.outputChannel.appendLine(`[TelegraphCommands] Ack queued in outbox: ${ackFileName}`);
+    vscode.window.showInformationMessage(`Ack queued: ${ackFileName}`);
   }
 
   /**
@@ -286,8 +288,10 @@ original_memo: ${originalFileName}
     subject: string,
     body: string
   ): void {
-    // Get current actor from workspace (hardcoded for now; could be dynamic)
-    const fromActor = 'TM(RHk).Cpt';
+    // Derive sender alias from registry; fall back to 'TM' if unreadable
+    const wwRoot = path.dirname(path.dirname(telegraphDir)); // telegraphDir/../.. = wsPath
+    const alias = this.readAliasFromRegistry(path.join(wwRoot, '.wildwest'));
+    const fromActor = alias ?? 'TM';
 
     // Build filename: YYYYMMDD-HHMMZ-to-<ToActor>-from-<FromActor>--<subject>.md
     const timestamp = this.getTimestamp();
@@ -324,5 +328,19 @@ subject: ${subject}
 
     this.outputChannel.appendLine(`[TelegraphCommands] Memo created in outbox: ${fileName}`);
     vscode.window.showInformationMessage(`Memo created in outbox: ${fileName}`);
+  }
+
+  /**
+   * Read alias from .wildwest/registry.json
+   */
+  private readAliasFromRegistry(wwRoot: string): string | null {
+    try {
+      const reg = JSON.parse(
+        fs.readFileSync(path.join(wwRoot, 'registry.json'), 'utf8'),
+      ) as Record<string, unknown>;
+      return (reg['alias'] as string) || null;
+    } catch {
+      return null;
+    }
   }
 }

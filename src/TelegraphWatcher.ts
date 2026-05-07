@@ -52,6 +52,27 @@ export class TelegraphWatcher {
       });
       this.watchers.push(inboxWatcher);
       this.outputChannel.appendLine(`[TelegraphWatcher] watching inbox: ${inboxDir}`);
+
+      // Outbox watcher: trigger immediate delivery when a new memo is added
+      const outboxDir = path.join(telegraphDir, 'outbox');
+      if (!fs.existsSync(outboxDir)) {
+        try {
+          fs.mkdirSync(outboxDir, { recursive: true });
+        } catch (err) {
+          this.outputChannel.appendLine(`[TelegraphWatcher] failed to create outbox: ${err}`);
+        }
+      }
+      const outboxWatcher = chokidar.watch(outboxDir, {
+        ignoreInitial: true,
+        depth: 0,
+        persistent: true,
+      });
+      outboxWatcher.on('add', (filePath) => this.onOutboxFile(filePath));
+      outboxWatcher.on('error', (err) => {
+        this.outputChannel.appendLine(`[TelegraphWatcher] error watching ${outboxDir}: ${err}`);
+      });
+      this.watchers.push(outboxWatcher);
+      this.outputChannel.appendLine(`[TelegraphWatcher] watching outbox: ${outboxDir}`);
       
       // Legacy watcher: telegraph root (migration period)
       // Watches for flat memos not in outbox/, inbox/, or history/
@@ -77,6 +98,23 @@ export class TelegraphWatcher {
 
   dispose(): void {
     this.stop();
+  }
+
+  private onOutboxFile(filePath: string): void {
+    const basename = path.basename(filePath);
+    if (!basename.endsWith('.md') || basename.startsWith('.') || basename.startsWith('!')) {
+      return;
+    }
+    // Guard: file must exist and have content — prevents double-fire when delivery
+    // moves the file before a second chokidar event fires against the same path.
+    try {
+      const stat = fs.statSync(filePath);
+      if (stat.size === 0) { return; }
+    } catch {
+      return; // File already gone — delivery already handled it
+    }
+    this.outputChannel.appendLine(`[TelegraphWatcher] new outbox memo: ${basename} — triggering immediate delivery`);
+    this.heartbeatMonitor.deliverOutboxNow();
   }
 
   private onInboxFile(filePath: string): void {

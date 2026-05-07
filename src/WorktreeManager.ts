@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
@@ -23,13 +23,13 @@ export class WorktreeManager {
     );
     const startDir = (governed ?? folders[0]).uri.fsPath;
     try {
-      const root = execSync('git rev-parse --show-toplevel', {
+      const root = execFileSync('git', ['rev-parse', '--show-toplevel'], {
         cwd: startDir,
         encoding: 'utf8',
       }).trim();
       // resolve to main checkout root (worktrees share the same git dir)
       // git-common-dir is absolute in a linked worktree (/path/.git), relative in the main one (.git)
-      const gitCommonDir = execSync('git -C "' + root + '" rev-parse --git-common-dir', {
+      const gitCommonDir = execFileSync('git', ['-C', root, 'rev-parse', '--git-common-dir'], {
         encoding: 'utf8',
       }).trim();
       const mainRoot = path.isAbsolute(gitCommonDir)
@@ -46,7 +46,7 @@ export class WorktreeManager {
     const root = this.getRepoRoot();
     if (!root) return [];
     try {
-      const raw = execSync('git worktree list --porcelain', {
+      const raw = execFileSync('git', ['worktree', 'list', '--porcelain'], {
         cwd: root,
         encoding: 'utf8',
       });

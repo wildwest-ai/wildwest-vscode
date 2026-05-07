@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
@@ -21,7 +21,7 @@ export async function initTown(outputChannel: vscode.OutputChannel): Promise<voi
   // ── Verify git repo ───────────────────────────────────────────────────────
   let repoRoot: string;
   try {
-    repoRoot = execSync('git rev-parse --show-toplevel', { cwd, encoding: 'utf8' }).trim();
+    repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8' }).trim();
   } catch {
     vscode.window.showErrorMessage('Wild West: selected folder is not a git repository.');
     return;
@@ -30,6 +30,8 @@ export async function initTown(outputChannel: vscode.OutputChannel): Promise<voi
   const repoName = path.basename(repoRoot);
   const wildwestDir = path.join(repoRoot, '.wildwest');
   const log = (msg: string) => outputChannel.appendLine(`[initTown] ${msg}`);
+  const git = (args: string[]): string =>
+    execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' }).trim();
 
   // ── Already initialized ───────────────────────────────────────────────────
   if (fs.existsSync(wildwestDir)) {
@@ -56,7 +58,7 @@ export async function initTown(outputChannel: vscode.OutputChannel): Promise<voi
         const wwuid = `town-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
         let remote = '';
         try {
-          remote = execSync('git config --get remote.origin.url', { cwd: repoRoot, encoding: 'utf8' }).trim();
+          remote = git(['config', '--get', 'remote.origin.url']);
         } catch { /* no remote set */ }
 
         const registry = {
@@ -76,13 +78,12 @@ export async function initTown(outputChannel: vscode.OutputChannel): Promise<voi
         progress.report({ message: 'Setting up _heartbeat branch…' });
         let heartbeatBranchExists = false;
         try {
-          execSync('git rev-parse --verify _heartbeat', { cwd: repoRoot, encoding: 'utf8' });
+          git(['rev-parse', '--verify', 'refs/heads/_heartbeat']);
           heartbeatBranchExists = true;
         } catch { /* create it */ }
 
         if (!heartbeatBranchExists) {
-          execSync('git checkout -b _heartbeat', { cwd: repoRoot, encoding: 'utf8' });
-          execSync('git checkout -', { cwd: repoRoot, encoding: 'utf8' });
+          git(['branch', '_heartbeat', 'HEAD']);
           log('created _heartbeat branch');
         } else {
           log('_heartbeat branch already exists — skipped');
@@ -93,11 +94,11 @@ export async function initTown(outputChannel: vscode.OutputChannel): Promise<voi
         const worktreePath = path.join(wildwestDir, 'worktrees', '_heartbeat');
         fs.mkdirSync(path.join(wildwestDir, 'worktrees'), { recursive: true });
 
-        try { execSync('git worktree prune', { cwd: repoRoot, encoding: 'utf8' }); } catch { /* ignore */ }
+        try { git(['worktree', 'prune']); } catch { /* ignore */ }
 
-        const wtList = execSync('git worktree list --porcelain', { cwd: repoRoot, encoding: 'utf8' });
+        const wtList = git(['worktree', 'list', '--porcelain']);
         if (!wtList.includes(worktreePath)) {
-          execSync(`git worktree add "${worktreePath}" _heartbeat`, { cwd: repoRoot, encoding: 'utf8' });
+          git(['worktree', 'add', worktreePath, '_heartbeat']);
           log('added _heartbeat worktree at .wildwest/worktrees/_heartbeat/');
         } else {
           log('_heartbeat worktree already exists — skipped');
@@ -106,16 +107,65 @@ export async function initTown(outputChannel: vscode.OutputChannel): Promise<voi
         // Step 5 — .gitignore
         progress.report({ message: 'Updating .gitignore…' });
         const gitignorePath = path.join(repoRoot, '.gitignore');
-        const ignoreEntry = '.wildwest/worktrees/';
+        const ignoreEntries = ['.wildwest/worktrees/', '.claude/settings.json'];
         const gitignoreContent = fs.existsSync(gitignorePath)
           ? fs.readFileSync(gitignorePath, 'utf8')
           : '';
-        if (!gitignoreContent.includes(ignoreEntry)) {
-          const sep = gitignoreContent.endsWith('\n') || gitignoreContent === '' ? '' : '\n';
-          fs.writeFileSync(gitignorePath, `${gitignoreContent}${sep}${ignoreEntry}\n`);
-          log('added .wildwest/worktrees/ to .gitignore');
+        let updatedGitignore = gitignoreContent;
+        for (const ignoreEntry of ignoreEntries) {
+          if (!updatedGitignore.includes(ignoreEntry)) {
+            const sep = updatedGitignore.endsWith('\n') || updatedGitignore === '' ? '' : '\n';
+            updatedGitignore = `${updatedGitignore}${sep}${ignoreEntry}\n`;
+          }
+        }
+        if (updatedGitignore !== gitignoreContent) {
+          fs.writeFileSync(gitignorePath, updatedGitignore);
+          log('updated .gitignore (added .wildwest/worktrees/, .claude/settings.json)');
         } else {
           log('.gitignore already up to date');
+        }
+
+        // Step 6 — .claude/settings.json (Claude Code hook config)
+        progress.report({ message: 'Writing .claude/settings.json hook config…' });
+        const port = vscode.workspace
+          .getConfiguration('wildwest')
+          .get<number>('claudeCode.hookPort', 7379);
+        const baseUrl = `http://localhost:${port}/hooks/claude`;
+        const claudeDir = path.join(repoRoot, '.claude');
+        const claudeSettingsPath = path.join(claudeDir, 'settings.json');
+        fs.mkdirSync(claudeDir, { recursive: true });
+
+        // Only write if file doesn't exist — don't clobber user customizations
+        if (!fs.existsSync(claudeSettingsPath)) {
+          const hookConfig = {
+            hooks: {
+              Stop: [
+                {
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `curl -sf -X POST ${baseUrl}/stop -H 'Content-Type: application/json' -d '{}' || true`,
+                    },
+                  ],
+                },
+              ],
+              PostToolUse: [
+                {
+                  matcher: 'Write|Edit|MultiEdit',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `curl -sf -X POST ${baseUrl}/file-changed -H 'Content-Type: application/json' -d '{}' || true`,
+                    },
+                  ],
+                },
+              ],
+            },
+          };
+          fs.writeFileSync(claudeSettingsPath, JSON.stringify(hookConfig, null, 2) + '\n');
+          log(`created .claude/settings.json (hooks → port ${port})`);
+        } else {
+          log('.claude/settings.json already exists — skipped (no overwrite)');
         }
 
         outputChannel.appendLine('');

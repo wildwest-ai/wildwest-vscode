@@ -14,9 +14,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 
-// Only filenames that start with "to-" and are not already acks
-const TO_ACTOR_RE = /^to-/;
-const SKIP_RE = /^\.last-beat$|--heartbeat--|^ack-/;
+const SKIP_RE = /^\.last-beat$|^\.gitkeep$|--heartbeat--|^ack-|--ack-/;
+const TIMESTAMPED_MEMO_RE = /^\d{8}-\d{4}Z-to-.+-from-.+--.+\.md$/;
+const LEGACY_TO_MEMO_RE = /^to-.+\.md$/;
 
 // Parse rule-23 filename: <ts>-to-<actor>-from-<actor>--<subject>.md
 const PARSE_MEMO_RE = /^(\d{8}-\d{4}Z)-to-(.+?)-from-(.+?)--(.+)\.md$/;
@@ -53,26 +53,44 @@ export class TelegraphInbox {
   }
 
   /**
-   * Return all pending (unacked, un-archived) to-* memos across all telegraph dirs.
-   * A memo is pending if it sits in the bus root (not history/) and matches `to-*`
-   * but is not already an `ack-*`.
+   * Return all pending (unacked, un-archived) memos across all telegraph inboxes.
+   * Also scans the bus root as a migration fallback for pre-v2 flat memos.
    */
   getPendingMemos(): Array<{ dir: string; filename: string }> {
     const result: Array<{ dir: string; filename: string }> = [];
-    for (const dir of this.getTelegraphDirs()) {
-      let entries: string[];
-      try {
-        entries = fs.readdirSync(dir);
-      } catch {
-        continue;
+    for (const telegraphDir of this.getTelegraphDirs()) {
+      const inboxDir = path.join(telegraphDir, 'inbox');
+      if (fs.existsSync(inboxDir)) {
+        result.push(...this.listPendingMemos(inboxDir));
       }
-      for (const f of entries.sort()) {
-        if (SKIP_RE.test(f)) continue;
-        if (!TO_ACTOR_RE.test(f)) continue;
+
+      // Migration fallback: pre-v2 flat memos may still live in telegraph root.
+      result.push(...this.listPendingMemos(telegraphDir));
+    }
+    return result;
+  }
+
+  private listPendingMemos(dir: string): Array<{ dir: string; filename: string }> {
+    const result: Array<{ dir: string; filename: string }> = [];
+    let entries: string[];
+    try {
+      entries = fs.readdirSync(dir);
+    } catch {
+      return result;
+    }
+    for (const f of entries.sort()) {
+      if (this.isPendingMemoFilename(f)) {
         result.push({ dir, filename: f });
       }
     }
     return result;
+  }
+
+  private isPendingMemoFilename(filename: string): boolean {
+    if (!filename.endsWith('.md')) return false;
+    if (filename.startsWith('.') || filename.startsWith('!')) return false;
+    if (SKIP_RE.test(filename)) return false;
+    return TIMESTAMPED_MEMO_RE.test(filename) || LEGACY_TO_MEMO_RE.test(filename);
   }
 
   /**
@@ -108,8 +126,7 @@ export class TelegraphInbox {
       this.outputChannel.appendLine(`[TelegraphInbox] could not open ${filename}`);
     }
 
-    // Derive town label for title  (…/<town>/.wildwest/telegraph)
-    const townLabel = path.basename(path.dirname(path.dirname(dir)));
+    const townLabel = this.deriveTownLabel(dir);
 
     const action = await vscode.window.showQuickPick<ActionItem>(
       [
@@ -215,15 +232,23 @@ export class TelegraphInbox {
       );
     }
 
-    // Write ack to bus root
-    fs.writeFileSync(path.join(dir, ackFilename), ackBody, 'utf-8');
+    // Write ack to outbox so the delivery operator can route it.
+    const telegraphDir = path.basename(dir) === 'inbox' ? path.dirname(dir) : dir;
+    const outboxDir = path.join(telegraphDir, 'outbox');
+    fs.mkdirSync(outboxDir, { recursive: true });
+    fs.writeFileSync(path.join(outboxDir, ackFilename), ackBody, 'utf-8');
 
     // Archive original → history/
     const historyDir = path.join(dir, 'history');
     fs.mkdirSync(historyDir, { recursive: true });
     fs.renameSync(path.join(dir, filename), path.join(historyDir, filename));
 
-    this.outputChannel.appendLine(`[TelegraphInbox] ack-${status} written: ${ackFilename}`);
-    vscode.window.showInformationMessage(`Wild West: ack written — ${ackFilename}`);
+    this.outputChannel.appendLine(`[TelegraphInbox] ack-${status} queued in outbox: ${ackFilename}`);
+    vscode.window.showInformationMessage(`Wild West: ack queued — ${ackFilename}`);
+  }
+
+  private deriveTownLabel(dir: string): string {
+    const telegraphDir = path.basename(dir) === 'inbox' ? path.dirname(dir) : dir;
+    return path.basename(path.dirname(path.dirname(telegraphDir)));
   }
 }

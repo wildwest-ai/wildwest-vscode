@@ -16,7 +16,7 @@ export type WildWestScope = 'town' | 'county' | 'territory';
 // Approved scope → roles mapping per CD decision
 const SCOPE_ROLES: Record<WildWestScope, string[]> = {
   'territory': ['G', 'RA'],
-  'county': ['S', 'CD', 'TM'],
+  'county': ['S', 'CD'],
   'town': ['Mayor', 'TM', 'HG'],
 };
 
@@ -92,6 +92,40 @@ function scopeOf(rootPath: string): WildWestScope | null {
 
   const s = reg['scope'];
   if (s === 'town' || s === 'county' || s === 'territory') return s;
+  return null;
+}
+
+/**
+ * Read the alias from a .wildwest/registry.json at the given rootPath.
+ * Returns null if the registry is missing or unreadable.
+ */
+function readRegistryAlias(rootPath: string): string | null {
+  try {
+    const reg = JSON.parse(
+      fs.readFileSync(path.join(rootPath, '.wildwest', 'registry.json'), 'utf8'),
+    ) as Record<string, unknown>;
+    return (reg['alias'] as string) || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Walk parent directories from townRoot to find the nearest county root.
+ * A county root is a directory containing .wildwest/registry.json with scope === 'county'.
+ * Returns the county rootPath or null if not found.
+ */
+function findCountyRoot(townRoot: string): string | null {
+  let current = path.dirname(townRoot);
+  const fsRoot = path.parse(current).root;
+  while (current !== fsRoot) {
+    if (scopeOf(current) === 'county') {
+      return current;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) break; // at filesystem root
+    current = parent;
+  }
   return null;
 }
 
@@ -261,17 +295,33 @@ function parseMemoFrontmatter(
 ): Record<string, unknown> {
   try {
     const content = fs.readFileSync(memoPath, 'utf8');
-    // Extract frontmatter between --- and ---
-    const match = content.match(/^---\n([\s\S]*?)\n---/);
-    if (!match) return {};
-    const frontmatter = match[1];
     const result: Record<string, unknown> = {};
-    const lines = frontmatter.split('\n');
-    for (const line of lines) {
-      const [key, ...valueParts] = line.split(':');
-      if (key && valueParts.length > 0) {
-        const value = valueParts.join(':').trim();
-        result[key.trim()] = value;
+
+    // Try YAML frontmatter first (--- block)
+    const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
+    if (yamlMatch) {
+      const lines = yamlMatch[1].split('\n');
+      for (const line of lines) {
+        const [key, ...valueParts] = line.split(':');
+        if (key && valueParts.length > 0) {
+          result[key.trim()] = valueParts.join(':').trim();
+        }
+      }
+      return result;
+    }
+
+    // Fallback: parse Markdown bold header format (**Key:** value)
+    // Handles hand-written memos like: **To:** CD(RSn)
+    const mdFieldMap: Record<string, string> = {
+      'To': 'to',
+      'From': 'from',
+      'Date': 'date',
+      'Re': 'subject',
+    };
+    for (const [mdKey, yamlKey] of Object.entries(mdFieldMap)) {
+      const mdMatch = content.match(new RegExp(`\\*\\*${mdKey}:\\*\\*\\s*(.+)`));
+      if (mdMatch) {
+        result[yamlKey] = mdMatch[1].trim();
       }
     }
     return result;
@@ -295,16 +345,18 @@ function resolveRoleToScope(role: string): WildWestScope | null {
 }
 
 /**
- * Extract town pattern from 'to:' field formats.
- * E.g., "TM(*vscode)" → { role: "TM", pattern: "*vscode" }
- * E.g., "CD" → { role: "CD", pattern: null }
+ * Extract role and optional pattern from 'to:' field.
+ * Handles:
+ *   "CD"            → { role: "CD", pattern: null }
+ *   "TM(*vscode)"   → { role: "TM", pattern: "*vscode" }  (glob)
+ *   "CD(wildwest-ai)" → { role: "CD", pattern: "wildwest-ai" } (exact)
  */
-function extractTownPattern(toField: string): { role: string; pattern: string | null } | null {
-  // Match: word, optionally followed by (*pattern)
-  const match = toField.match(/^([A-Za-z]+)(?:\(\*([^)]+)\))?$/);
+function extractRolePattern(toField: string): { role: string; pattern: string | null } | null {
+  // Match: word, optionally followed by (*pattern) or (pattern)
+  const match = toField.match(/^([A-Za-z]+)(?:\((\*?[^)]+)\))?$/);
   if (!match) return null;
   const role = match[1];
-  const pattern = match[2] ? `*${match[2]}` : null;
+  const pattern = match[2] ?? null;
   return { role, pattern };
 }
 
@@ -344,21 +396,54 @@ function listTownsInCounty(countyPath: string): Array<{ name: string; path: stri
  * E.g., pattern "*vscode" matches town "wildwest-vscode"
  * Supports glob patterns: *, **, ?, [abc]
  */
-function resolveTownByPattern(pattern: string, towns: Array<{ name: string; path: string; alias: string | null }>): string | null {
-  if (!pattern || !towns.length) return null;
-  // Convert glob pattern to regex (simple implementation)
-  const regexPattern = pattern
-    .replace(/\./g, '\\.')
-    .replace(/\*/g, '.*')
-    .replace(/\?/g, '.');
-  const regex = new RegExp(`^${regexPattern}$`);
-  // Try to match against alias first, then name
-  for (const town of towns) {
-    if (regex.test(town.alias!) || regex.test(town.name)) {
-      return town.path;
+/**
+ * Resolve a name-or-path pattern against a list of { name, path, alias } entries.
+ * If pattern starts with *, treat as glob. Otherwise, exact match against alias or name.
+ */
+function resolveByPattern(pattern: string, entries: Array<{ name: string; path: string; alias: string | null }>): string | null {
+  if (!pattern || !entries.length) return null;
+  let regex: RegExp;
+  if (pattern.startsWith('*')) {
+    const regexPattern = pattern
+      .replace(/\./g, '\\.')
+      .replace(/\*/g, '.*')
+      .replace(/\?/g, '.');
+    regex = new RegExp(`^${regexPattern}$`);
+  } else {
+    // Exact match
+    regex = new RegExp(`^${pattern.replace(/\./g, '\\.')}$`);
+  }
+  for (const entry of entries) {
+    if ((entry.alias && regex.test(entry.alias)) || regex.test(entry.name)) {
+      return entry.path;
     }
   }
   return null;
+}
+
+/**
+ * List counties in a territory (worldRoot/countiesDir/).
+ */
+function listCountiesInTerritory(worldRoot: string, countiesDir: string): Array<{ name: string; path: string; alias: string | null }> {
+  const counties: Array<{ name: string; path: string; alias: string | null }> = [];
+  try {
+    const countiesRoot = path.join(worldRoot, countiesDir);
+    if (!fs.existsSync(countiesRoot)) return counties;
+    for (const entry of fs.readdirSync(countiesRoot)) {
+      const entryPath = path.join(countiesRoot, entry);
+      if (!fs.statSync(entryPath).isDirectory() || entry.startsWith('.')) continue;
+      const regPath = path.join(entryPath, '.wildwest', 'registry.json');
+      if (fs.existsSync(regPath)) {
+        try {
+          const reg = JSON.parse(fs.readFileSync(regPath, 'utf8')) as Record<string, unknown>;
+          counties.push({ name: entry, path: entryPath, alias: (reg['alias'] as string) || null });
+        } catch {
+          counties.push({ name: entry, path: entryPath, alias: null });
+        }
+      }
+    }
+  } catch { /* ignore */ }
+  return counties;
 }
 
 /**
@@ -377,52 +462,85 @@ function resolveScopePath(
   destScope: WildWestScope,
   worldRoot: string,
   countiesDir: string,
-  townPattern?: string | null,
-): string | null {
-  // If destination is same scope, no delivery needed (local operation)
+  pattern?: string | null,
+): string | null | 'AMBIGUOUS' {
+  // Same scope = local, no remote delivery
   if (currentScope === destScope) {
     return null;
   }
 
-  // Hierarchy: territory > county > town
   if (destScope === 'territory') {
-    // Always go to worldRoot
     return worldRoot;
   }
 
   if (destScope === 'county') {
     if (currentScope === 'town') {
-      // Go up to parent county: ~/wildwest/counties/wildwest-ai/
-      // From /wildwest/counties/wildwest-ai/wildwest-vscode/ → /wildwest/counties/wildwest-ai/
+      // Town → parent county (no pattern needed — one parent)
       const parts = currentPath.split(path.sep);
-      // Find the index of 'counties' and extract up to that + next level
       const countiesIdx = parts.indexOf(countiesDir);
       if (countiesIdx >= 0 && countiesIdx + 1 < parts.length) {
         return parts.slice(0, countiesIdx + 2).join(path.sep);
       }
+      return null;
     }
-    // If already at county or territory, can't resolve to county
+    if (currentScope === 'territory') {
+      // Territory → county: requires county pattern (multiple counties exist)
+      if (!pattern) return 'AMBIGUOUS';
+      const counties = listCountiesInTerritory(worldRoot, countiesDir);
+      return resolveByPattern(pattern, counties);
+    }
     return null;
   }
 
   if (destScope === 'town') {
-    // Town-to-town delivery (with pattern)
-    if (currentScope === 'town' && townPattern) {
-      // Get parent county path
-      const parts = currentPath.split(path.sep);
-      const countiesIdx = parts.indexOf(countiesDir);
+    // Town roles (Mayor, TM, HG) require a pattern — multiple towns exist
+    if (!pattern) return 'AMBIGUOUS';
+    let countyPath: string | null = null;
+    const parts = currentPath.split(path.sep);
+    const countiesIdx = parts.indexOf(countiesDir);
+    if (currentScope === 'town') {
       if (countiesIdx >= 0 && countiesIdx + 1 < parts.length) {
-        const countyPath = parts.slice(0, countiesIdx + 2).join(path.sep);
-        // List towns in county and match pattern
-        const towns = listTownsInCounty(countyPath);
-        const matchedTownPath = resolveTownByPattern(townPattern, towns);
-        return matchedTownPath;
+        countyPath = parts.slice(0, countiesIdx + 2).join(path.sep);
       }
+    } else if (currentScope === 'county') {
+      countyPath = currentPath;
     }
-    return null;
+    // territory→town not supported (county must be specified first)
+    if (!countyPath) return null;
+    const towns = listTownsInCounty(countyPath);
+    return resolveByPattern(pattern, towns);
   }
 
   return null;
+}
+
+/**
+ * Mark a memo as permanently failed by:
+ * 1. Injecting (!) into the 'to:' field so the problem is self-documenting
+ * 2. Renaming the file with a '!' prefix so it's skipped on future beats
+ */
+function markMemoFailed(
+  outboxDir: string,
+  memoFile: string,
+  memoPath: string,
+  reason: string,
+  outputChannel: vscode.OutputChannel,
+): void {
+  try {
+    let content = fs.readFileSync(memoPath, 'utf8');
+    // Inject (!) into YAML to: field
+    content = content.replace(/^(to:\s*)(\S[^\n]*)$/m, '$1$2(!)');
+    // Inject (!) into Markdown **To:** field (if no YAML)
+    content = content.replace(/^(\*\*To:\*\*\s*)(\S[^\n]*)$/m, '$1$2(!)');
+    const failedPath = path.join(outboxDir, `!${memoFile}`);
+    fs.writeFileSync(failedPath, content, 'utf8');
+    fs.unlinkSync(memoPath);
+    outputChannel.appendLine(
+      `[HeartbeatMonitor] delivery FAILED: ${memoFile} → renamed to !${memoFile} (${reason})`,
+    );
+  } catch (err) {
+    outputChannel.appendLine(`[HeartbeatMonitor] markMemoFailed error for ${memoFile}: ${err}`);
+  }
 }
 
 /**
@@ -459,9 +577,9 @@ function deliverPendingOutbox(
     }
 
     const entries = fs.readdirSync(outboxDir);
-    // Process only .md files, exclude history/
+    // Process only .md files — exclude hidden, ! (failed), and history/
     const memoFiles = entries.filter(
-      (e) => e.endsWith('.md') && !e.startsWith('.'),
+      (e) => e.endsWith('.md') && !e.startsWith('.') && !e.startsWith('!'),
     );
 
     for (const memoFile of memoFiles) {
@@ -469,28 +587,41 @@ function deliverPendingOutbox(
         const memoPath = path.join(outboxDir, memoFile);
         const frontmatter = parseMemoFrontmatter(memoPath);
         const toField = frontmatter['to'] as string | undefined;
+        const fromField = (frontmatter['from'] as string | undefined) ?? '';
+
+        // Fix 2: warn if from: is bare role with no town specifier in multi-town county
+        if (scope === 'county' && /^TM$/i.test(fromField.trim())) {
+          const towns = listTownsInCounty(rootPath);
+          if (towns.length > 1) {
+            outputChannel.appendLine(
+              `[HeartbeatMonitor] WARNING: ${memoFile} — 'from: TM' is ambiguous in ` +
+              `multi-town county (${towns.length} towns). Use 'from: TM(alias)'.`,
+            );
+          }
+        }
+
         if (!toField) {
-          outputChannel.appendLine(
-            `[HeartbeatMonitor] delivery: ${memoFile} has no 'to:' field — skipping`,
-          );
+          markMemoFailed(outboxDir, memoFile, memoPath, `missing 'to:' field`, outputChannel);
           failed++;
           continue;
         }
 
-        // Check for old format and warn
-        const isOldFormat = /\([A-Za-z]\)\./.test(toField); // Matches "CD(RSn).Cpt"
+        // Detect and normalize old format: "CD(RSn).Cpt" or "CD(RSn)" → "CD"
+        // Old format: parenthetical suffix that does NOT start with * (actor suffix, not town pattern)
+        const isOldFormat = /\([^*][^)]*\)/.test(toField);
+        const normalizedToField = isOldFormat
+          ? toField.replace(/\([^*][^)]*\)(\.\w+)?/g, '').trim()
+          : toField;
         if (isOldFormat) {
           outputChannel.appendLine(
-            `[HeartbeatMonitor] delivery: ${memoFile} — old format '${toField}' (deprecated in v0.18.0, will break in v0.19.0). Use role-only format.`,
+            `[HeartbeatMonitor] delivery: ${memoFile} — old format '${toField}' normalized to '${normalizedToField}' (deprecated in v0.18.0, will break in v0.19.0). Use role-only format.`,
           );
         }
 
-        // Extract role and optional town pattern
-        const rolePattern = extractTownPattern(toField);
+        // Extract role and optional pattern
+        const rolePattern = extractRolePattern(normalizedToField);
         if (!rolePattern) {
-          outputChannel.appendLine(
-            `[HeartbeatMonitor] delivery: ${memoFile} → ${toField} — invalid addressing format`,
-          );
+          markMemoFailed(outboxDir, memoFile, memoPath, `invalid addressing format: '${normalizedToField}'`, outputChannel);
           failed++;
           continue;
         }
@@ -499,17 +630,24 @@ function deliverPendingOutbox(
 
         const destScope = resolveRoleToScope(role);
         if (!destScope) {
-          outputChannel.appendLine(
-            `[HeartbeatMonitor] delivery: ${memoFile} → ${role} — unknown role`,
-          );
+          markMemoFailed(outboxDir, memoFile, memoPath, `unknown role: '${role}'`, outputChannel);
           failed++;
           continue;
         }
 
         const destPath = resolveScopePath(scope, rootPath, destScope, worldRoot, countiesDir, pattern);
 
+        if (destPath === 'AMBIGUOUS') {
+          const hint = destScope === 'town'
+            ? `Use ${role}(*<town-pattern>) to specify a town`
+            : `Use ${role}(<county-name>) to specify a county`;
+          markMemoFailed(outboxDir, memoFile, memoPath, `ambiguous recipient — ${hint}`, outputChannel);
+          failed++;
+          continue;
+        }
+
         if (!destPath) {
-          // Local memo (same scope or no pattern for town-to-town)
+          // Local memo (same scope) or unresolvable
           outputChannel.appendLine(
             `[HeartbeatMonitor] delivery: ${memoFile} → ${toField} (local, no remote delivery)`,
           );
@@ -519,14 +657,29 @@ function deliverPendingOutbox(
           if (!fs.existsSync(destInboxDir)) {
             fs.mkdirSync(destInboxDir, { recursive: true });
           }
-          const destMemoPath = path.join(destInboxDir, memoFile);
+
+          // Fix 1: resolve wildcard pattern in filename to actual destination alias
+          let deliveredFilename = memoFile;
+          if (pattern) {
+            const destAlias = readRegistryAlias(destPath);
+            if (destAlias) {
+              // Replace role(*pattern) with role(alias) in the filename
+              const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              deliveredFilename = memoFile.replace(
+                new RegExp(`${role}\\(${escapedPattern}\\)`),
+                `${role}(${destAlias})`,
+              );
+            }
+          }
+
+          const destMemoPath = path.join(destInboxDir, deliveredFilename);
 
           // Copy original (without delivered_at) to destination
           const originalContent = fs.readFileSync(memoPath, 'utf8');
           fs.writeFileSync(destMemoPath, originalContent, 'utf8');
 
           outputChannel.appendLine(
-            `[HeartbeatMonitor] delivery: ${memoFile} → ${destPath}/.wildwest/telegraph/inbox/`,
+            `[HeartbeatMonitor] delivery: ${memoFile} → ${destPath}/.wildwest/telegraph/inbox/${deliveredFilename}`,
           );
         }
 
@@ -575,6 +728,47 @@ function deliverPendingOutbox(
   return { delivered, failed };
 }
 
+function isActionableMemoFile(filename: string): boolean {
+  return (
+    filename.endsWith('.md') &&
+    !filename.startsWith('.') &&
+    filename !== '.gitkeep' &&
+    !filename.includes('-heartbeat--')
+  );
+}
+
+function hasActionableTelegraphFiles(telegraphDir: string): boolean {
+  try {
+    if (!fs.existsSync(telegraphDir)) return false;
+
+    const rootEntries = fs.readdirSync(telegraphDir);
+    const hasLegacyRootMemo = rootEntries.some((e) =>
+      e !== 'history' &&
+      e !== 'inbox' &&
+      e !== 'outbox' &&
+      isActionableMemoFile(e)
+    );
+    if (hasLegacyRootMemo) return true;
+
+    const inboxDir = path.join(telegraphDir, 'inbox');
+    if (fs.existsSync(inboxDir)) {
+      const hasInboxMemo = fs.readdirSync(inboxDir).some((e) => isActionableMemoFile(e));
+      if (hasInboxMemo) return true;
+    }
+
+    const outboxDir = path.join(telegraphDir, 'outbox');
+    if (fs.existsSync(outboxDir)) {
+      const hasFailedOutboxMemo = fs.readdirSync(outboxDir).some((e) =>
+        e.startsWith('!') && e.endsWith('.md')
+      );
+      if (hasFailedOutboxMemo) return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 function beatTown(
   rootPath: string,
   outputChannel: vscode.OutputChannel,
@@ -590,6 +784,11 @@ function beatTown(
   const scope = scopeOf(rootPath);
   if (scope === 'town') {
     deliverPendingOutbox(rootPath, scope, outputChannel, worldRoot, countiesDir);
+    // Also deliver county outbox if we can find the county root
+    const countyRoot = findCountyRoot(rootPath);
+    if (countyRoot) {
+      deliverPendingOutbox(countyRoot, 'county', outputChannel, worldRoot, countiesDir);
+    }
   }
 
   // Run telegraph cleanup
@@ -616,15 +815,7 @@ function beatTown(
     }
   }
 
-  // Scan telegraph for non-heartbeat, non-sentinel, non-history files = flags
-  let flagged = false;
-  try {
-    flagged = fs.readdirSync(telegraphDir).some(
-      (e) => !e.startsWith('.') && e !== 'history' && !e.includes('-heartbeat--'),
-    );
-  } catch { /* telegraph dir may not exist yet */ }
-
-  return flagged ? 'flagged' : 'alive';
+  return hasActionableTelegraphFiles(telegraphDir) ? 'flagged' : 'alive';
 }
 
 function beatCounty(
@@ -780,6 +971,23 @@ export class HeartbeatMonitor {
     const current = this.scopeStates.get(town.rootPath);
     if (current === 'stopped') return;
     this.scopeStates.set(town.rootPath, flagged ? 'flagged' : 'alive');
+  }
+
+  /**
+   * Trigger immediate outbox delivery for the town scope.
+   * Called by TelegraphWatcher when a new outbox memo is detected,
+   * so delivery happens immediately rather than waiting for the next beat.
+   */
+  deliverOutboxNow(): void {
+    const town = this.scopes.find((s) => s.scope === 'town');
+    if (!town) return;
+    this.outputChannel.appendLine('[HeartbeatMonitor] outbox delivery triggered by new memo');
+    deliverPendingOutbox(town.rootPath, town.scope, this.outputChannel, this.worldRoot, this.countiesDir);
+    // Also deliver county outbox
+    const countyRoot = findCountyRoot(town.rootPath);
+    if (countyRoot) {
+      deliverPendingOutbox(countyRoot, 'county', this.outputChannel, this.worldRoot, this.countiesDir);
+    }
   }
 
   dispose(): void {

@@ -14,14 +14,10 @@ import {
   SessionPacket,
   NormalizedTurn,
   SessionRecord,
-  SessionIndex,
   IndexEntry,
+  Cursor,
 } from './types';
-import {
-  generatePacketFilename,
-  parsePacketFilename,
-  padSequence,
-} from './utils';
+import { generatePacketFilename } from './utils';
 
 export interface PacketWriterOptions {
   /** Base directory for staged/ output (e.g., ~/wildwest/sessions/raw/../staged) */
@@ -176,7 +172,7 @@ export class PacketWriter {
     packet: SessionPacket,
     projectPath: string,
     sessionType: 'chat' | 'edit',
-    toolCursor?: any
+    toolCursor?: unknown
   ): Promise<void> {
     const sessionRecordPath = path.join(
       this.stagedDir,
@@ -226,7 +222,7 @@ export class PacketWriter {
       // Update metadata
       record.last_turn_at = packet.created_at;
       record.turn_count = record.turns.length;
-      record.cursor = toolCursor || {
+      record.cursor = (toolCursor as Cursor | undefined) || {
         type: this.getCursorType(packet.tool),
         value: this.extractCursorValue(record.turns[record.turns.length - 1]),
       };
@@ -247,13 +243,13 @@ export class PacketWriter {
   private updateIndex(record: SessionRecord): void {
     const indexPath = path.join(this.stagedDir, 'storage', 'index.json');
 
-    let index: any = { schema_version: '1', updated_at: new Date().toISOString(), sessions: [] };
+    let index: { schema_version: string; updated_at: string; sessions: IndexEntry[] } = { schema_version: '1', updated_at: new Date().toISOString(), sessions: [] };
     if (fs.existsSync(indexPath)) {
       index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
     }
 
     // Upsert session in index
-    const existingIdx = index.sessions.findIndex((s: any) => s.wwsid === record.wwsid);
+    const existingIdx = index.sessions.findIndex((s: IndexEntry) => s.wwsid === record.wwsid);
     const entry: IndexEntry = {
       wwsid: record.wwsid,
       tool: record.tool,
