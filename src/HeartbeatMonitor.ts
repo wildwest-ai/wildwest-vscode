@@ -261,17 +261,33 @@ function parseMemoFrontmatter(
 ): Record<string, unknown> {
   try {
     const content = fs.readFileSync(memoPath, 'utf8');
-    // Extract frontmatter between --- and ---
-    const match = content.match(/^---\n([\s\S]*?)\n---/);
-    if (!match) return {};
-    const frontmatter = match[1];
     const result: Record<string, unknown> = {};
-    const lines = frontmatter.split('\n');
-    for (const line of lines) {
-      const [key, ...valueParts] = line.split(':');
-      if (key && valueParts.length > 0) {
-        const value = valueParts.join(':').trim();
-        result[key.trim()] = value;
+
+    // Try YAML frontmatter first (--- block)
+    const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
+    if (yamlMatch) {
+      const lines = yamlMatch[1].split('\n');
+      for (const line of lines) {
+        const [key, ...valueParts] = line.split(':');
+        if (key && valueParts.length > 0) {
+          result[key.trim()] = valueParts.join(':').trim();
+        }
+      }
+      return result;
+    }
+
+    // Fallback: parse Markdown bold header format (**Key:** value)
+    // Handles hand-written memos like: **To:** CD(RSn)
+    const mdFieldMap: Record<string, string> = {
+      'To': 'to',
+      'From': 'from',
+      'Date': 'date',
+      'Re': 'subject',
+    };
+    for (const [mdKey, yamlKey] of Object.entries(mdFieldMap)) {
+      const mdMatch = content.match(new RegExp(`\\*\\*${mdKey}:\\*\\*\\s*(.+)`));
+      if (mdMatch) {
+        result[yamlKey] = mdMatch[1].trim();
       }
     }
     return result;
