@@ -1,9 +1,54 @@
+# Version control
 .github/**
 .vscode/**
 .git/**
+.gitignore
+
+# Dev dependencies
 node_modules/**
+
+# Source (compiled output is dist/)
+src/**
+__tests__/**
+
+# Build artifacts (only dist/extension.js is the esbuild bundle; all else is tsc output)
 dist/*.map
+dist/**/*.map
+dist/**/*.d.ts
+dist/**/*.d.ts.map
+dist/aiToolAdapters/**
+dist/mcp/**
+dist/sessionPipeline/**
+dist/AIToolBridge.*
+dist/batchConverter.*
+dist/chatSessionConverter.*
+dist/extension.d.ts
+dist/generateIndex.*
+dist/HeartbeatMonitor.*
+dist/jsonToMarkdown.*
+dist/sessionExporter.*
+dist/SoloModeController.*
+dist/StatusBarManager.*
+dist/TelegraphCommands.*
+dist/TelegraphInbox.*
+dist/TelegraphWatcher.*
+dist/TownInit.*
+dist/WildwestParticipant.*
+dist/WorktreeManager.*
+build/**
+
+# Config / tooling
 tsconfig.json
+tsconfig.jest.json
+jest.config.js
+.eslintrc.json
+
+# Governance / project management (not part of extension runtime)
+.wildwest/**
+docs/**
+scripts/**
+
+# Working notes
 TODO.md
-README.md
-.wildwest/worktrees/**
+DONE.md
+CLAUDE.md
