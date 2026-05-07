@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.25.0
+**Current version:** 0.25.1
 
 ---
 
 ## What's New
+
+**v0.25.1** — Resource leak fixes: `StatusBarManager` now stores and disposes config/workspace listeners and the refresh interval on deactivate. `BatchChatConverter.run()` throws instead of calling `process.exit(1)` — safe to call from the extension; CLI entry point still exits on error.
 
 **v0.25.0** — Security fix: `git config user.name` now uses `execFileSync` with argument array instead of interpolated shell string, preventing command injection from user-supplied usernames.
 
