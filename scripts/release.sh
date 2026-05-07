@@ -91,7 +91,7 @@ fi
 echo "💾 Committing changes..."
 NEW_VERSION=$(jq -r '.version' package.json)
 git add -A
-git commit -m "Release v$NEW_VERSION: telegraph scripts, schema_version guard, registry v2 migration"
+git commit -m "Release v$NEW_VERSION"
 
 echo "✅ Release v$NEW_VERSION complete!"
 echo ""

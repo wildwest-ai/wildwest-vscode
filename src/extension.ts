@@ -179,26 +179,29 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   // ── Config change listener ────────────────────────────────────────────────
-  vscode.workspace.onDidChangeConfiguration((e) => {
-    if (!e.affectsConfiguration('wildwest')) return;
-    const newConfig = vscode.workspace.getConfiguration('wildwest');
-    const enabled = newConfig.get<boolean>('enabled');
-    if (enabled && !heartbeatMonitor.isRunning()) {
-      heartbeatMonitor.start();
-      telegraphWatcher.start();
-    } else if (!enabled && heartbeatMonitor.isRunning()) {
-      heartbeatMonitor.stop();
-      telegraphWatcher.stop();
-    }
-  });
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (!e.affectsConfiguration('wildwest')) return;
+      const newConfig = vscode.workspace.getConfiguration('wildwest');
+      const enabled = newConfig.get<boolean>('enabled');
+      if (enabled && !heartbeatMonitor.isRunning()) {
+        heartbeatMonitor.start();
+        telegraphWatcher.start();
+      } else if (!enabled && heartbeatMonitor.isRunning()) {
+        heartbeatMonitor.stop();
+        telegraphWatcher.stop();
+      }
+    }),
+  );
 
   context.subscriptions.push(heartbeatMonitor, telegraphWatcher, soloModeController, statusBarManager);
 }
 
-export function deactivate() {
+export async function deactivate(): Promise<void> {
+  await exporter?.stop(true);
   exporter?.dispose();
   heartbeatMonitor?.dispose();
   telegraphWatcher?.dispose();
   statusBarManager?.dispose();
-  aiToolBridge?.stop();
+  await aiToolBridge?.stop();
 }

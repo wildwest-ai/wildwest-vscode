@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
   },
-  "version": "0.25.4",
+  "version": "0.25.5",
   "publisher": "wildwest-ai",
   "engines": {
     "vscode": "^1.90.0"
@@ -51,6 +51,16 @@
         "category": "Wild West"
       },
       {
+        "command": "wildwest.startHeartbeat",
+        "title": "Start Heartbeat",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.stopHeartbeat",
+        "title": "Stop Heartbeat",
+        "category": "Wild West"
+      },
+      {
         "command": "wildwest.viewTelegraph",
         "title": "View Telegraph",
         "category": "Wild West"
@@ -73,6 +83,26 @@
       {
         "command": "wildwest.menu",
         "title": "Menu",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.showStatus",
+        "title": "Show Status",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.openExportFolder",
+        "title": "Open Export Folder",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.viewOutputLog",
+        "title": "View Output Log",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.openSettings",
+        "title": "Open Settings",
         "category": "Wild West"
       },
       {

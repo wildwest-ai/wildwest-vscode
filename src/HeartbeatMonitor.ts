@@ -728,6 +728,47 @@ function deliverPendingOutbox(
   return { delivered, failed };
 }
 
+function isActionableMemoFile(filename: string): boolean {
+  return (
+    filename.endsWith('.md') &&
+    !filename.startsWith('.') &&
+    filename !== '.gitkeep' &&
+    !filename.includes('-heartbeat--')
+  );
+}
+
+function hasActionableTelegraphFiles(telegraphDir: string): boolean {
+  try {
+    if (!fs.existsSync(telegraphDir)) return false;
+
+    const rootEntries = fs.readdirSync(telegraphDir);
+    const hasLegacyRootMemo = rootEntries.some((e) =>
+      e !== 'history' &&
+      e !== 'inbox' &&
+      e !== 'outbox' &&
+      isActionableMemoFile(e)
+    );
+    if (hasLegacyRootMemo) return true;
+
+    const inboxDir = path.join(telegraphDir, 'inbox');
+    if (fs.existsSync(inboxDir)) {
+      const hasInboxMemo = fs.readdirSync(inboxDir).some((e) => isActionableMemoFile(e));
+      if (hasInboxMemo) return true;
+    }
+
+    const outboxDir = path.join(telegraphDir, 'outbox');
+    if (fs.existsSync(outboxDir)) {
+      const hasFailedOutboxMemo = fs.readdirSync(outboxDir).some((e) =>
+        e.startsWith('!') && e.endsWith('.md')
+      );
+      if (hasFailedOutboxMemo) return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 function beatTown(
   rootPath: string,
   outputChannel: vscode.OutputChannel,
@@ -774,15 +815,7 @@ function beatTown(
     }
   }
 
-  // Scan telegraph for non-heartbeat, non-sentinel, non-history files = flags
-  let flagged = false;
-  try {
-    flagged = fs.readdirSync(telegraphDir).some(
-      (e) => !e.startsWith('.') && e !== 'history' && !e.includes('-heartbeat--'),
-    );
-  } catch { /* telegraph dir may not exist yet */ }
-
-  return flagged ? 'flagged' : 'alive';
+  return hasActionableTelegraphFiles(telegraphDir) ? 'flagged' : 'alive';
 }
 
 function beatCounty(

@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.25.4
+**Current version:** 0.25.5
 
 ---
 
 ## What's New
+
+**v0.25.5** — Telegraph and lifecycle fixes: `TelegraphInbox` now scans delivered v2 memos in `inbox/`, ack workflows queue outbound acks in `outbox/`, heartbeat no longer treats normal `inbox/`/`outbox/` directories as flags, the packet pipeline honors custom `wildwest.exportPath`, deactivation clears polling, heartbeat/status utility commands are contributed, and town/worktree git calls use argument arrays without switching the active checkout. Added production-focused `TelegraphInbox` tests.
 
 **v0.25.4** — Test isolation: `batchConverter`, `chatSessionConverter`, and `jsonToMarkdown` test suites now use `os.tmpdir()` temp directories per test instead of a shared `__tests__/testdata/` path, eliminating intermittent failures from Jest parallel-runner conflicts.
 
