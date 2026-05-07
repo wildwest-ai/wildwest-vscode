@@ -1,6 +1,25 @@
 # DONE — wildwest-vscode
 
-> **Last updated:** 2026-05-02 UTC
+> **Last updated:** 2026-05-07T12:46Z UTC
+
+---
+
+## AI Tool Hook Integration Proposal ✓ 2026-05-07
+
+- [x] **Research complete** — documented all AI tool APIs (Claude Code, Codex CLI, GitHub Copilot) in [docs/20260507-1204Z-ai-tool-programmatic-apis.md](./docs/20260507-1204Z-ai-tool-programmatic-apis.md)
+- [x] **Architecture designed** — adapter layer established to support Claude Code, Codex, Copilot, and future tools
+- [x] **Proposal drafted** — full P1–P6 roadmap with implementation sequence, scope decisions, open questions in [docs/20260507-1213Z-proposal-ai-hook-integration.md](./docs/20260507-1213Z-proposal-ai-hook-integration.md)
+- [x] **Governance scope clarified** — extension remains governance framework (not orchestration); foundation laid for future orchestration if ROI emerges
+- [x] **Cross-scope visibility** — wwMCP design includes Territory, County, Town scope queries
+
+---
+
+## Comprehensive repository review complete ✓ 2026-05-07
+
+- [x] **Full repo review performed** — reviewed source, tests, package config, release script, docs, and packaged VSIX contents; `.wildwest/` was excluded from scope per request
+- [x] **Review artifact written** — findings saved to [docs/REVIEW-COMPREHENSIVE-20260507-1145Z.md](./docs/REVIEW-COMPREHENSIVE-20260507-1145Z.md)
+- [x] **Verification recorded** — `npm test` is red at lint, and direct Jest has 4 failing tests across chat session conversion and telegraph v2 transition coverage
+- [x] **Follow-up backlog created** — release blockers and high-value follow-ups added to TODO.md
 
 ---
 
