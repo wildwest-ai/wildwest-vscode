@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.20.1
+**Current version:** 0.21.0
 
 ---
 
 ## What's New
+
+**v0.21.0** — P6 wwMCP server: read-only MCP server over stdio. Exposes `wildwest_status`, `wildwest_inbox`, `wildwest_board`, `wildwest_telegraph_check` tools. Disabled by default (`wildwest.mcp.enabled`). Actor-scoped, explicit opt-in, read-only.
 
 **v0.20.1** — County outbox delivery fix: `beatTown()` and `deliverOutboxNow()` now walk parent directories to find and drain the county outbox on every heartbeat tick.
 
@@ -98,6 +100,7 @@ Settings are available under `Preferences → Settings → Wild West`.
 | `wildwest.watchInterval` | `5000` | Poll interval in milliseconds |
 | `wildwest.autoExportOnChange` | `true` | Auto-export when chat data changes |
 | `wildwest.heartbeatInterval` | `300000` | Heartbeat interval in milliseconds (default: 5 min) |
+| `wildwest.mcp.enabled` | `false` | Enable the wwMCP server (read-only, stdio). Must be explicitly enabled. |
 | `wildwest.worldRoot` | `~/wildwest` | World root directory |
 | `wildwest.claudeCode.hookPort` | `7379` | Port for Claude Code HTTP hook receiver |
 
@@ -141,9 +144,9 @@ VSCode creates session JSON stubs (480 bytes) when the chat panel opens, even if
 
 ## Roadmap
 
-### MCP integration (P6 — v0.21.0)
+### MCP integration (P6 — v0.21.0 ✅)
 
-`wwMCP` will expose Wild West governance state as a read-only MCP server. External AI tools can query governance state without filesystem access and without bypassing the telegraph protocol. Access is explicit opt-in; scope is determined at connection time by which workspace opens the connection. Write authority deferred to v1.0+.
+`wwMCP` exposes Wild West governance state as a read-only MCP server over stdio. Enable with `wildwest.mcp.enabled = true`. Tools: `wildwest_status`, `wildwest_inbox`, `wildwest_board`, `wildwest_telegraph_check`. Access is explicit opt-in; scope is determined at connection time. Write authority deferred to v1.0+.
 
 ### `@wildwest` chat participant enhancements (P7 — v0.22.0)
 

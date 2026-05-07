@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
   },
-  "version": "0.20.1",
+  "version": "0.21.0",
   "publisher": "wildwest-ai",
   "engines": {
     "vscode": "^1.90.0"
@@ -153,6 +153,11 @@
           "default": 7379,
           "description": "Local HTTP port for Claude Code hook receiver (ClaudeCodeAdapter). Default: 7379. Change if port conflicts occur on shared workstations."
         },
+        "wildwest.mcp.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable the wwMCP server (read-only MCP server over stdio). Default: false. Must be explicitly enabled by the actor."
+        },
         "wildwest.worldRoot": {
           "type": "string",
           "default": "~/wildwest",
@@ -204,6 +209,7 @@
     "typescript": "^5.x"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "chokidar": "^3.5.3"
   }
 }

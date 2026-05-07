@@ -12,6 +12,7 @@ import { TelegraphCommands } from './TelegraphCommands';
 import { AIToolBridge } from './AIToolBridge';
 import { ClaudeCodeAdapter } from './aiToolAdapters/ClaudeCodeAdapter';
 import { registerChatParticipant } from './WildwestParticipant';
+import { registerMCPServer } from './mcp/wwMCPServer';
 
 // ── Configuration types & helpers ──────────────────────────────────────────
 
@@ -72,6 +73,9 @@ export function activate(context: vscode.ExtensionContext) {
 
   // ── @wildwest Copilot Chat participant (P3) ───────────────────────────────
   registerChatParticipant(context, outputChannel);
+
+  // ── wwMCP server (P6) — stdio, opt-in via wildwest.mcp.enabled ───────────
+  registerMCPServer(context, outputChannel, heartbeatMonitor);
 
   // ── Commands — devPair log (existing) ─────────────────────────────────────
   context.subscriptions.push(
