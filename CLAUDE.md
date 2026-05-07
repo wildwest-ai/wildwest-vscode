@@ -3,7 +3,7 @@
 **Town:** wildwest-vscode  
 **County:** wildwest-ai  
 **Scope:** town  
-**Version:** 0.13.2  
+**Version:** 0.25.4  
 
 ---
 
@@ -127,20 +127,20 @@ TM(RHk).Cpt
 
 ## 6. Current Open Work
 
-See `~/wildwest/TODO.md` for full board. **As of 2026-05-03:**
+See `TODO.md` for full board. **As of 2026-05-07:**
 
-### P1 — Blocking v0.10.0 Release
+### P1 — Blocking (next release)
 
+- [ ] **TelegraphInbox format** — `TelegraphInbox` doesn't recognize `YYYYMMDD-HHMMZ-to-...` delivered filenames; needs scan of `.wildwest/telegraph/inbox/`
+- [ ] **Custom export path** — `PipelineAdapter` hard-codes `~/wildwest/sessions/{gitUsername}`; wire to `wildwest.exportPath` config setting
 - [ ] **Identity block shape decision** — S(R) call needed (affects registry schema)
 - [ ] **`scope: "town"` field** — Add to `.wildwest/registry.json` for all scopes
 - [ ] **TownInit.ts fix** — Write `scope` field on registry creation
 - [ ] **SoloModeController.hasBranchDoc()** — Check correct path (stale reference)
-- [x] **World root configurability** — v0.11.0 shipped (registry `path` removal + config settings)
 
 ### P2 — Nice-to-Have
 
 - [ ] **CLAUDE.md template** — Framework gap; auto-scaffold on `initTown`
-- [ ] **Empty session filter** — Skip sessions with `requests.length === 0` (Copilot stubs)
 - [ ] **Registry validator** — Lint `.wildwest/registry.json` for schema compliance
 
 ---
@@ -165,12 +165,18 @@ On each activation:
 
 | Component | File | Purpose |
 |---|---|---|
-| **HeartbeatMonitor** | `src/HeartbeatMonitor.ts` | Detects scope liveness (town, county, world) via sentinel files |
+| **HeartbeatMonitor** | `src/HeartbeatMonitor.ts` | Detects scope liveness (town, county, world) via sentinel files; delivers county outbox on every town beat |
 | **TelegraphWatcher** | `src/TelegraphWatcher.ts` | Watches telegraph inbox for new memos |
-| **SessionExporter** | `src/sessionExporter.ts` | Exports Copilot chat sessions to markdown |
+| **TelegraphCommands** | `src/TelegraphCommands.ts` | `sendMemo` / `ackMemo` commands; reads sender alias from registry |
+| **WildwestParticipant** | `src/WildwestParticipant.ts` | `@wildwest` Copilot Chat participant — inbox, send, ack, archive, status |
+| **SessionExporter** | `src/sessionExporter.ts` | Exports Copilot chat sessions to markdown; shell-safe git config |
 | **SoloModeController** | `src/SoloModeController.ts` | Detects solo session branching patterns |
+| **StatusBarManager** | `src/StatusBarManager.ts` | Status bar item; disposes all listeners and refresh interval on deactivate |
 | **WorktreeManager** | `src/WorktreeManager.ts` | Manages git worktree operations |
-| **TownInit** | `src/TownInit.ts` | Scaffolds new town `.wildwest/registry.json` |
+| **TownInit** | `src/TownInit.ts` | Scaffolds new town `.wildwest/registry.json` + `.claude/settings.json` |
+| **AIToolBridge** | `src/AIToolBridge.ts` | HTTP hook receiver (port 7379) for Claude Code stop/file-change events |
+| **wwMCP** | `src/mcp/` | Read-only MCP server over stdio; exposes `wildwest_status`, `wildwest_inbox`, `wildwest_board` |
+| **SessionPipeline** | `src/sessionPipeline/` | Cursor-based delta export: adapter, orchestrator, packet writer, transformers (cpt/cld/ccx) |
 
 **Settings (v0.11.0+):**
 
@@ -189,9 +195,12 @@ On each activation:
 
 ## 9. Known Limitations
 
-- **Copilot response text:** Initially thought unavailable; fixed in v0.8.0+ to capture `kind=None` text fragments. Full response + thinking both preserved.
+- **Copilot response text:** Fixed in v0.8.0+. Captures `kind=None` and `kind='text'` fragments (v0.23.0). Full response + thinking both preserved.
 - **Empty sessions:** VSCode creates stub session entries on chat open even with no messages. Handled in v0.8.0+ by filter.
 - **Registry `path` field:** Removed in v0.11.0. Paths now derived from `alias + worldRoot + countiesDir` (convention-based).
+- **TelegraphInbox format:** Doesn't yet recognize `YYYYMMDD-HHMMZ-to-...` delivered filenames. Inbox scan path also needs updating to `.wildwest/telegraph/inbox/`.
+- **Custom export path:** `PipelineAdapter` hard-codes `~/wildwest/sessions/{gitUsername}` instead of reading `wildwest.exportPath` config.
+- **SoloModeController:** `hasBranchDoc()` may reference a stale path — not yet verified.
 
 ---
 
@@ -247,6 +256,6 @@ This CLAUDE.md is manually written (interim artifact). Once the framework ships 
 
 ---
 
-**Last Updated:** 2026-05-03T12:43Z  
-**By:** CD(RSn).Cld (memo 20260503-1243Z)  
+**Last Updated:** 2026-05-07T16:31Z  
+**By:** TM(RHk).Cpt  
 **For:** TM(RHk).Cpt cold-start briefing
