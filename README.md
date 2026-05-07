@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.22.0
+**Current version:** 0.23.0
 
 ---
 
 ## What's New
+
+**v0.23.0** — `npm test` green: lint gate fixed (`no-explicit-any` → warn), `extractResponseAndThinking` handles `kind='text'` responses, deprecated-format detector regex corrected to `[A-Za-z]+` for multi-char abbreviations (e.g. `RSn`). 7/7 suites, 68/68 tests.
 
 **v0.22.0** — P7 enhanced `@wildwest` participant: `send`, `ack`, `archive` with [Confirm] buttons; county+town inbox sweep; `telegraph check`; `status` shows open memo + branch counts. Operator fixes: delivered filename resolves wildcard alias; warn bare `from: TM` in multi-town county.
 
