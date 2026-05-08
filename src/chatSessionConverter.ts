@@ -38,7 +38,7 @@ interface ChatSession {
 
 interface ChatReplayFormat {
   exportedAt: string;
-  wwsid?: string;
+  wwuid?: string;
   github_userid: string;
   user_timezone_offset: string;
   totalPrompts: number;
@@ -324,11 +324,11 @@ class ChatSessionConverter {
   /**
    * Save chatreplay.json to file
    */
-  saveChatReplayJson(outputPath: string, wwsid?: string): void {
+  saveChatReplayJson(outputPath: string, wwuid?: string): void {
     const content = this.generateChatReplayJson();
-    if (wwsid) {
+    if (wwuid) {
       const { exportedAt, ...rest } = content;
-      fs.writeFileSync(outputPath, JSON.stringify({ exportedAt, wwsid, ...rest }, null, 2), 'utf8');
+      fs.writeFileSync(outputPath, JSON.stringify({ exportedAt, wwuid, ...rest }, null, 2), 'utf8');
     } else {
       fs.writeFileSync(outputPath, JSON.stringify(content, null, 2), 'utf8');
     }

@@ -1,44 +1,57 @@
 /**
  * Session Export Pipeline — Utilities
  * 
- * Helper functions for wwsid and device_id generation, padding, etc.
+ * Helper functions for wwuid generation, padding, etc.
  */
 
 import { v5 as uuidv5 } from 'uuid';
 import * as os from 'os';
 
 /**
- * UUIDv5 namespaces as defined in spec
+ * Single WW namespace for all entity types.
+ * Type is baked into the hash input, so IDs are globally unique across types.
  */
-export const WW_SESSION_NAMESPACE = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
-export const WW_DEVICE_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+export const WW_NAMESPACE = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+
+/** Valid entity types for wwuid generation */
+export type WwuidType = 'session' | 'device' | 'memo' | 'town' | 'county' | 'territory';
 
 /**
- * Generate deterministic wwsid (wildwest session ID)
+ * Generate a deterministic wwuid (Wild West Universal ID)
  * 
- * Same (tool, tool_sid) always produces the same wwsid.
- * Idempotent across runs and devices.
+ * `type` is baked into the hash input, guaranteeing global uniqueness across
+ * entity types even within the same namespace. Same (type, ...parts) always
+ * produces the same wwuid — idempotent across runs and devices.
  * 
- * @param tool Tool code ('cpt', 'cld', 'ccx')
- * @param tool_sid Tool-native session ID
+ * @param type   Entity type ('session', 'device', 'memo', 'town', ...)
+ * @param parts  Discriminating parts unique to this entity
  * @returns UUIDv5 string
+ * 
+ * @example
+ *   generateWwuid('session', 'cpt', 'abc123')   // session ID
+ *   generateWwuid('device',  'macbook-pro')      // device ID
+ *   generateWwuid('memo',    'TM', 'CD', '20260508-1707Z', 'release-done') // memo ID
+ *   generateWwuid('town',    'wildwest-vscode')  // town ID
  */
-export function generateWwsid(tool: string, tool_sid: string): string {
-  const input = `${tool}:${tool_sid}`;
-  return uuidv5(input, WW_SESSION_NAMESPACE);
+export function generateWwuid(type: WwuidType, ...parts: string[]): string {
+  const input = `${type}:${parts.join(':')}`;
+  return uuidv5(input, WW_NAMESPACE);
 }
 
 /**
- * Generate deterministic device_id
- * 
- * Uses system hostname as the basis. Assumes single user per device.
- * In multi-user environments, could be extended to include username.
- * 
- * @returns UUIDv5 string
+ * @deprecated Use generateWwuid('session', tool, tool_sid) instead.
+ * Kept for backward compatibility during migration.
+ */
+export function generateWwsid(tool: string, tool_sid: string): string {
+  return generateWwuid('session', tool, tool_sid);
+}
+
+/**
+ * @deprecated Use generateWwuid('device', hostname) instead.
+ * Kept for backward compatibility during migration.
  */
 export function generateDeviceId(): string {
-  const hostname = os.hostname();
-  return uuidv5(hostname, WW_DEVICE_NAMESPACE);
+  return generateWwuid('device', os.hostname());
 }
 
 /**
@@ -54,15 +67,15 @@ export function padSequence(value: number): string {
 /**
  * Generate packet filename
  * 
- * Format: <wwsid>-<seq_from_padded>-<seq_to_padded>.json
+ * Format: <wwuid>-<seq_from_padded>-<seq_to_padded>.json
  * 
- * @param wwsid Wildwest session ID
+ * @param wwuid Wildwest universal ID for the session
  * @param seq_from First turn index in packet
  * @param seq_to Last turn index in packet
  * @returns Filename (no path)
  */
-export function generatePacketFilename(wwsid: string, seq_from: number, seq_to: number): string {
-  return `${wwsid}-${padSequence(seq_from)}-${padSequence(seq_to)}.json`;
+export function generatePacketFilename(wwuid: string, seq_from: number, seq_to: number): string {
+  return `${wwuid}-${padSequence(seq_from)}-${padSequence(seq_to)}.json`;
 }
 
 /**

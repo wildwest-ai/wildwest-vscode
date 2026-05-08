@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { HeartbeatMonitor } from './HeartbeatMonitor';
+import { generateWwuid } from './sessionPipeline/utils';
 import {
   telegraphTimestamp,
   telegraphISOTimestamp,
@@ -167,7 +168,9 @@ export class TelegraphCommands {
 
     // Build YAML frontmatter
     const isoTimestamp = this.getISO8601Timestamp();
+    const wwuid = generateWwuid('memo', fromActor, toActor, isoTimestamp, subject);
     const frontmatter = `---
+wwuid: ${wwuid}
 from: ${toActor}
 to: ${fromActor}
 type: ack
@@ -288,7 +291,9 @@ original_memo: ${originalFileName}
 
     // Build YAML frontmatter
     const isoTimestamp = this.getISO8601Timestamp();
+    const wwuid = generateWwuid('memo', fromActor, toActor, isoTimestamp, subject);
     const frontmatter = `---
+wwuid: ${wwuid}
 from: ${fromActor}
 to: ${toActor}
 type: ${type}

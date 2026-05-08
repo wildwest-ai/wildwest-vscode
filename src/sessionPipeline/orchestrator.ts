@@ -13,7 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getTransformer } from './transformers';
 import { PacketWriter } from './packetWriter';
 import { SessionPacket, NormalizedTurn } from './types';
-import { generateWwsid, generateDeviceId, getCursorType } from './utils';
+import { generateWwuid, generateDeviceId, getCursorType } from './utils';
 import { redactTurns } from '../PrivacyFilter';
 
 export interface PipelineOptions {
@@ -107,11 +107,11 @@ export class SessionExportPipeline {
       ? redactTurns(allTurns, this.homeDir)
       : allTurns;
 
-    // 3. Generate wwsid
-    const wwsid = generateWwsid(tool, tool_sid);
+    // 3. Generate wwuid
+    const wwuid = generateWwuid('session', tool, tool_sid);
 
     // 4. Check cursor to determine delta
-    const newTurns = this.filterNewTurns(wwsid, filteredTurns);
+    const newTurns = this.filterNewTurns(wwuid, filteredTurns);
 
     if (newTurns.length === 0 && !closed) {
       // No new turns and not closed — skip packet
@@ -121,7 +121,7 @@ export class SessionExportPipeline {
     // 5. Write packet
     const turnsForPacket = newTurns.length > 0 ? newTurns : filteredTurns;
     try {
-      await this.packetWriter.writePacket(wwsid, tool, tool_sid, turnsForPacket, closed);
+      await this.packetWriter.writePacket(wwuid, tool, tool_sid, turnsForPacket, closed);
     } catch (error) {
       throw new Error(`Packet write failed: ${error}`);
     }
@@ -131,7 +131,8 @@ export class SessionExportPipeline {
       const packet: SessionPacket = {
         schema_version: '1',
         packet_id: uuidv4(),
-        wwsid,
+        wwuid,
+        wwuid_type: 'session',
         tool,
         tool_sid,
         author: this.author,
@@ -162,12 +163,12 @@ export class SessionExportPipeline {
    * Checks existing session record and returns turns with
    * turn_index >= (max existing + 1)
    */
-  private filterNewTurns(wwsid: string, allTurns: NormalizedTurn[]): NormalizedTurn[] {
+  private filterNewTurns(wwuid: string, allTurns: NormalizedTurn[]): NormalizedTurn[] {
     const recordPath = path.join(
       this.stagedDir,
       'storage',
       'sessions',
-      `${wwsid}.json`
+      `${wwuid}.json`
     );
 
     if (!fs.existsSync(recordPath)) {

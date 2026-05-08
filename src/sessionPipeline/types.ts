@@ -53,12 +53,13 @@ export interface Cursor {
 /**
  * Packet — delta export unit containing a sequence of turns
  * 
- * File: staged/packets/<wwsid>-<seq_from_padded>-<seq_to_padded>.json
+ * File: staged/packets/<wwuid>-<seq_from_padded>-<seq_to_padded>.json
  */
 export interface SessionPacket {
   schema_version: '1';
   packet_id: string; // UUIDv4
-  wwsid: string; // UUIDv5 (deterministic from tool + tool_sid)
+  wwuid: string; // UUIDv5 — generateWwuid('session', tool, tool_sid)
+  wwuid_type: 'session';
   tool: 'cld' | 'cpt' | 'ccx';
   tool_sid: string; // Tool-native session ID
   author: string; // Git username of session author (e.g., 'reneyap')
@@ -73,11 +74,12 @@ export interface SessionPacket {
 /**
  * Session Record — accumulated full history
  * 
- * File: staged/storage/sessions/<wwsid>.json
+ * File: staged/storage/sessions/<wwuid>.json
  */
 export interface SessionRecord {
   schema_version: '1';
-  wwsid: string;
+  wwuid: string;
+  wwuid_type: 'session';
   tool: 'cld' | 'cpt' | 'ccx';
   tool_sid: string;
   author: string;
@@ -98,7 +100,8 @@ export interface SessionRecord {
  * Stored in staged/storage/index.json under sessions[]
  */
 export interface IndexEntry {
-  wwsid: string;
+  wwuid: string;
+  wwuid_type: 'session';
   tool: 'cld' | 'cpt' | 'ccx';
   tool_sid: string;
   author: string;

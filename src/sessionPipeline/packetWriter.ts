@@ -2,7 +2,7 @@
  * Session Export Pipeline — Packet Writer
  * 
  * Writes delta packets to staged/packets/ with:
- * - Idempotency on (wwsid, turn_index)
+ * - Idempotency on (wwuid, turn_index)
  * - Gap detection and rejection
  * - Deterministic packet_id generation
  */
@@ -56,11 +56,11 @@ export class PacketWriter {
    * Write a packet to staged/packets/
    * 
    * Enforces:
-   * - Idempotency on (wwsid, turn_index)
+   * - Idempotency on (wwuid, turn_index)
    * - Gap detection (seq_to of packet N must equal seq_from of packet N+1)
    * - Deterministic packet_id
-   * 
-   * @param wwsid Wildwest session ID
+   *
+   * @param wwuid Wildwest universal ID for this session
    * @param tool Tool code
    * @param tool_sid Tool-native session ID
    * @param turns Normalized turns for this packet
@@ -69,7 +69,7 @@ export class PacketWriter {
    * @returns Path to written packet file
    */
   async writePacket(
-    wwsid: string,
+    wwuid: string,
     tool: 'cld' | 'cpt' | 'ccx',
     tool_sid: string,
     turns: NormalizedTurn[],
@@ -83,23 +83,21 @@ export class PacketWriter {
     const seq_to = turns[turns.length - 1].turn_index;
 
     // Check idempotency: if any turn is already stored, skip
-    const existingRecord = this.loadSessionRecord(wwsid);
+    const existingRecord = this.loadSessionRecord(wwuid);
     if (existingRecord && existingRecord.turn_count > 0) {
       const existingTurns = new Set(existingRecord.turns.map((t) => t.turn_index));
       const newTurns = turns.filter((t) => !existingTurns.has(t.turn_index));
 
       if (newTurns.length === 0) {
         // All turns already stored — this is a no-op (idempotent)
-        const filename = generatePacketFilename(wwsid, seq_from, seq_to);
+        const filename = generatePacketFilename(wwuid, seq_from, seq_to);
         return path.join(this.stagedDir, 'packets', filename);
       }
 
       // Partial overlap — update seq range to new turns only
-      // This handles the case where some turns in the packet are new
       const actualSeqFrom = newTurns[0].turn_index;
       const actualSeqTo = newTurns[newTurns.length - 1].turn_index;
 
-      // Check gap: expect seq_from to be existingTurns.max + 1
       const maxExisting = Math.max(...Array.from(existingTurns));
       if (actualSeqFrom > maxExisting + 1) {
         throw new Error(
@@ -107,9 +105,8 @@ export class PacketWriter {
         );
       }
 
-      // Write packet with new turns only
       return this.writeDeltaPacket(
-        wwsid,
+        wwuid,
         tool,
         tool_sid,
         newTurns,
@@ -119,17 +116,15 @@ export class PacketWriter {
       );
     }
 
-    // First packet or no prior record — write all turns
-    // Check seq_from is 0 for first packet
     if (!existingRecord && seq_from !== 0) {
       throw new Error(`First packet must start at seq_from=0, got ${seq_from}`);
     }
 
-    return this.writeDeltaPacket(wwsid, tool, tool_sid, turns, seq_from, seq_to, closed);
+    return this.writeDeltaPacket(wwuid, tool, tool_sid, turns, seq_from, seq_to, closed);
   }
 
   private writeDeltaPacket(
-    wwsid: string,
+    wwuid: string,
     tool: 'cld' | 'cpt' | 'ccx',
     tool_sid: string,
     turns: NormalizedTurn[],
@@ -140,7 +135,8 @@ export class PacketWriter {
     const packet: SessionPacket = {
       schema_version: '1',
       packet_id: uuidv4(),
-      wwsid,
+      wwuid,
+      wwuid_type: 'session',
       tool,
       tool_sid,
       author: this.author,
@@ -152,7 +148,7 @@ export class PacketWriter {
       turns,
     };
 
-    const filename = generatePacketFilename(wwsid, seq_from, seq_to);
+    const filename = generatePacketFilename(wwuid, seq_from, seq_to);
     const filepath = path.join(this.stagedDir, 'packets', filename);
 
     fs.writeFileSync(filepath, JSON.stringify(packet, null, 2), 'utf8');
@@ -163,7 +159,7 @@ export class PacketWriter {
    * Apply a packet to storage — accumulate turns in session record
    * 
    * Updates:
-   * - staged/storage/sessions/<wwsid>.json
+   * - staged/storage/sessions/<wwuid>.json
    * - staged/storage/index.json
    * 
    * Idempotent: applying the same packet twice is a no-op.
@@ -178,16 +174,16 @@ export class PacketWriter {
       this.stagedDir,
       'storage',
       'sessions',
-      `${packet.wwsid}.json`
+      `${packet.wwuid}.json`
     );
 
-    let record = this.loadSessionRecord(packet.wwsid);
+    let record = this.loadSessionRecord(packet.wwuid);
 
     if (!record) {
-      // First packet — create new session record
       record = {
         schema_version: '1',
-        wwsid: packet.wwsid,
+        wwuid: packet.wwuid,
+        wwuid_type: 'session',
         tool: packet.tool,
         tool_sid: packet.tool_sid,
         author: packet.author,
@@ -249,9 +245,10 @@ export class PacketWriter {
     }
 
     // Upsert session in index
-    const existingIdx = index.sessions.findIndex((s: IndexEntry) => s.wwsid === record.wwsid);
+    const existingIdx = index.sessions.findIndex((s: IndexEntry) => s.wwuid === record.wwuid);
     const entry: IndexEntry = {
-      wwsid: record.wwsid,
+      wwuid: record.wwuid,
+      wwuid_type: 'session',
       tool: record.tool,
       tool_sid: record.tool_sid,
       author: record.author,
@@ -274,8 +271,8 @@ export class PacketWriter {
     fs.writeFileSync(indexPath, JSON.stringify(index, null, 2), 'utf8');
   }
 
-  private loadSessionRecord(wwsid: string): SessionRecord | null {
-    const recordPath = path.join(this.stagedDir, 'storage', 'sessions', `${wwsid}.json`);
+  private loadSessionRecord(wwuid: string): SessionRecord | null {
+    const recordPath = path.join(this.stagedDir, 'storage', 'sessions', `${wwuid}.json`);
     if (!fs.existsSync(recordPath)) {
       return null;
     }

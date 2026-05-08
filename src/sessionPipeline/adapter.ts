@@ -154,7 +154,7 @@ export class PipelineAdapter {
   /**
    * Get index of sessions currently in storage
    */
-  async getStoredSessions(): Promise<Array<{ wwsid: string; tool: string; turn_count: number }>> {
+  async getStoredSessions(): Promise<Array<{ wwuid: string; tool: string; turn_count: number }>> {
     const indexPath = path.join(this.pipeline.getStagedDir(), 'storage', 'index.json');
     if (!fs.existsSync(indexPath)) {
       return [];

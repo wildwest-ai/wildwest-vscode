@@ -13,6 +13,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { generateWwuid } from './sessionPipeline/utils';
 import { telegraphTimestamp, archiveMemo, getTelegraphDirs as wwGetTelegraphDirs, parseFrontmatter } from './TelegraphService';
 
 const SKIP_RE = /^\.last-beat$|^\.gitkeep$|--heartbeat--|^ack-|--ack-/;
@@ -221,8 +222,10 @@ export class TelegraphInbox {
     const replyFilename = `${ts}-to-${fromIdentity}-from-${toIdentity}--${reSubject}.md`;
 
     const isoNow = new Date().toISOString();
+    const replyWwuid = generateWwuid('memo', toIdentity, fromIdentity, isoNow, reSubject);
     const replyBody = [
       `---`,
+      `wwuid: ${replyWwuid}`,
       `from: ${toIdentity}`,
       `to: ${fromIdentity}`,
       `type: reply`,
@@ -292,8 +295,10 @@ export class TelegraphInbox {
       ackFilename = `${ts}-to-${fromIdentity}-from-${toIdentity}--ack-${status}--${subject}.md`;
 
       const isoNow = new Date().toISOString();
+      const ackWwuid = generateWwuid('memo', toIdentity, fromIdentity, isoNow, `ack-${status}--${subject}`);
       const lines = [
         `---`,
+        `wwuid: ${ackWwuid}`,
         `from: ${toIdentity}`,
         `to: ${fromIdentity}`,
         `type: ack-${status}`,
