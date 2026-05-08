@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.16
+**Current version:** 0.31.17
 
 ---
 
 ## What's New
+
+**v0.31.17** — Poll cycle now runs `processRawSessions()` on idle ticks when `staged/storage/index.json` is missing (recovery mode). Handles the case where storage was deleted but no raw-file activity is detected, so the state-change gate doesn't block pipeline rebuild.
 
 **v0.31.16** — `exportNow()` now calls `pipelineAdapter.processRawSessions()` after scanning providers. Export Now creates `staged/storage/` from scratch if deleted and fully populates the index in one shot.
 

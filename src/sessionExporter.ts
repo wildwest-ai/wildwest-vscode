@@ -903,6 +903,15 @@ export class SessionExporter {
         // TODO(v0.32): Legacy staged/ sync disabled — replaced by sessionPipeline.
         // this.batchConvertSessions(true).catch(() => { /* silent */ });
       } else {
+        // Run pipeline even on idle if storage index is missing (e.g. storage was deleted)
+        if (this.pipelineAdapter) {
+          const indexPath = path.join(this.pipelineAdapter.getStagedDir(), 'storage', 'index.json');
+          if (!fs.existsSync(indexPath)) {
+            this.pipelineAdapter.processRawSessions().catch((err) => {
+              this.log(`${this.getTimestamp('warn')} Pipeline recovery error: ${err}`);
+            });
+          }
+        }
         // Only log heartbeat dot, do not log state file saves for idle cycles
         // (No state file log at all for idle cycles)
         this.log('.', true);
