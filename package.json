@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
   },
-  "version": "0.29.0",
+  "version": "0.29.1",
   "publisher": "wildwest-ai",
   "engines": {
     "vscode": "^1.90.0"
@@ -58,6 +58,11 @@
       {
         "command": "wildwest.stopHeartbeat",
         "title": "Stop Heartbeat",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.restartAdapter",
+        "title": "Restart AI Tool Adapter",
         "category": "Wild West"
       },
       {

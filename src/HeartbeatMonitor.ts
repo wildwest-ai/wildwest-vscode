@@ -950,16 +950,18 @@ export class HeartbeatMonitor {
   }
 
   checkLiveness(): HeartbeatState {
-    // Report town liveness for status bar (primary concern for the user)
-    const town = this.scopes.find((s) => s.scope === 'town');
-    if (!town) return 'stopped';
-    const sentinel = sentinelPath(town.rootPath, 'town');
+    // Report town liveness for status bar (primary concern for the user).
+    // Fall back to county if this workspace has no town scope (e.g. county-level window).
+    const primary = this.scopes.find((s) => s.scope === 'town')
+      ?? this.scopes.find((s) => s.scope === 'county');
+    if (!primary) return 'stopped';
+    const sentinel = sentinelPath(primary.rootPath, primary.scope);
     try {
       const stat = fs.statSync(sentinel);
-      const staleMs = STALE_MULTIPLIER * effectiveIntervalMs(town.rootPath, 'town');
+      const staleMs = STALE_MULTIPLIER * effectiveIntervalMs(primary.rootPath, primary.scope);
       const ageMs = Date.now() - stat.mtimeMs;
       if (ageMs >= staleMs) return 'stopped';
-      return this.scopeStates.get(town.rootPath) ?? 'stopped';
+      return this.scopeStates.get(primary.rootPath) ?? 'stopped';
     } catch {
       return 'stopped';
     }

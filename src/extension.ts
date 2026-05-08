@@ -169,6 +169,13 @@ export function activate(context: vscode.ExtensionContext) {
       telegraphWatcher.stop();
       outputChannel.appendLine('[wildwest] heartbeat stopped');
     }),
+    vscode.commands.registerCommand('wildwest.restartAdapter', async () => {
+      outputChannel.appendLine('[wildwest] restarting AI tool adapter...');
+      await aiToolBridge.stop();
+      await aiToolBridge.start();
+      outputChannel.appendLine('[wildwest] AI tool adapter restarted');
+      vscode.window.showInformationMessage('Wild West: AI tool adapter restarted.');
+    }),
     vscode.commands.registerCommand('wildwest.viewTelegraph', () => {
       const hwt = worktreeManager.getHeartbeatWorktree();
       if (!hwt) {
