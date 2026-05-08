@@ -412,6 +412,7 @@ export class SidePanelProvider
     };
     return [
       action('Export Now', 'wildwest.exportNow', 'sync'),
+      action('Rebuild Index', 'wildwest.rebuildIndex', 'database'),
       action('Open Export Folder', 'wildwest.openExportFolder', 'folder-opened'),
       action('Doctor', 'wildwest.doctor', 'heart'),
       action('Validate Registry', 'wildwest.validateRegistry', 'shield'),

@@ -1342,6 +1342,19 @@ export class SessionExporter {
     }
   }
 
+  async rebuildIndex(): Promise<void> {
+    if (!this.pipelineAdapter) {
+      vscode.window.showWarningMessage('Pipeline not initialised — start the watcher first.');
+      return;
+    }
+    try {
+      const count = this.pipelineAdapter.rebuildIndexFromRecords();
+      vscode.window.showInformationMessage(`Index rebuilt: ${count} sessions indexed.`);
+    } catch (error) {
+      vscode.window.showErrorMessage(`Rebuild index failed: ${error}`);
+    }
+  }
+
   private walkDir(dir: string, callback: (file: string) => void): void {
     if (!fs.existsSync(dir)) return;
     

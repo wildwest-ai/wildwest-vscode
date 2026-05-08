@@ -59,11 +59,12 @@ export class PipelineAdapter {
       return false;
     }
 
-    // If storage index is gone, raw/ is the SSOT — reset mtime cache so all
-    // raw files are reprocessed from scratch to rebuild storage.
+    // If storage index is gone, rebuild it from existing session records first.
+    // This avoids filterNewTurns skipping sessions that already have records,
+    // while also patching any stale project_path values (e.g. ccx cwd fix).
     const indexPath = path.join(this.pipeline.getStagedDir(), 'storage', 'index.json');
     if (!fs.existsSync(indexPath)) {
-      this.lastProcessedMtime.clear();
+      this.rebuildIndexFromRecords();
     }
 
     for (const toolRawName of Object.values(TOOL_RAW_DIRS)) {
@@ -182,5 +183,73 @@ export class PipelineAdapter {
    */
   getStagedDir(): string {
     return this.pipeline.getStagedDir();
+  }
+
+  /**
+   * Rebuild index.json by scanning staged/storage/sessions/*.json.
+   * Also patches project_path for ccx sessions from raw session_meta.payload.cwd.
+   * Returns number of sessions indexed.
+   */
+  rebuildIndexFromRecords(): number {
+    const stagedDir = this.pipeline.getStagedDir();
+    const sessionsDir = path.join(stagedDir, 'storage', 'sessions');
+    const indexPath = path.join(stagedDir, 'storage', 'index.json');
+    const rawDir = path.join(stagedDir, '..', 'raw');
+
+    if (!fs.existsSync(sessionsDir)) return 0;
+
+    const files = fs.readdirSync(sessionsDir).filter((f) => f.endsWith('.json'));
+    const sessions: unknown[] = [];
+
+    for (const file of files) {
+      try {
+        const record = JSON.parse(fs.readFileSync(path.join(sessionsDir, file), 'utf8')) as Record<string, unknown>;
+
+        // For ccx sessions, patch project_path from raw session_meta.payload.cwd
+        if (record['tool'] === 'ccx') {
+          const rawPath = path.join(rawDir, 'chatgpt-codex', `${record['tool_sid']}.jsonl`);
+          const rawPathJson = path.join(rawDir, 'chatgpt-codex', `${record['tool_sid']}.json`);
+          const rp = fs.existsSync(rawPath) ? rawPath : fs.existsSync(rawPathJson) ? rawPathJson : null;
+          if (rp) {
+            const content = fs.readFileSync(rp, 'utf8');
+            const metaLine = content.split('\n').find((l) => {
+              try { return JSON.parse(l)['type'] === 'session_meta'; } catch { return false; }
+            });
+            if (metaLine) {
+              const meta = JSON.parse(metaLine) as Record<string, unknown>;
+              const cwd = ((meta['payload'] as Record<string, unknown> | undefined)?.['cwd'] as string | undefined);
+              if (cwd) record['project_path'] = cwd;
+            }
+          }
+          // Also update the session record on disk with patched project_path
+          fs.writeFileSync(path.join(sessionsDir, file), JSON.stringify(record, null, 2), 'utf8');
+        }
+
+        sessions.push({
+          wwuid: record['wwuid'],
+          wwuid_type: record['wwuid_type'] ?? 'session',
+          tool: record['tool'],
+          tool_sid: record['tool_sid'],
+          author: record['author'],
+          device_id: record['device_id'],
+          session_type: record['session_type'],
+          project_path: record['project_path'],
+          created_at: record['created_at'],
+          last_turn_at: record['last_turn_at'],
+          closed_at: record['closed_at'] ?? null,
+          turn_count: record['turn_count'],
+        });
+      } catch { /* skip corrupt records */ }
+    }
+
+    const index = {
+      schema_version: '1',
+      updated_at: new Date().toISOString(),
+      sessions,
+    };
+    fs.mkdirSync(path.dirname(indexPath), { recursive: true });
+    fs.writeFileSync(indexPath, JSON.stringify(index, null, 2), 'utf8');
+
+    return sessions.length;
   }
 }
