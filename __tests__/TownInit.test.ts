@@ -1,0 +1,78 @@
+jest.mock('vscode', () => ({
+  workspace: { workspaceFolders: [], getConfiguration: () => ({ get: () => 7379 }) },
+  window: {
+    showErrorMessage: jest.fn(),
+    showInformationMessage: jest.fn(),
+    showQuickPick: jest.fn(),
+    withProgress: jest.fn(),
+  },
+  ProgressLocation: { Notification: 15 },
+}), { virtual: true });
+
+import { generateClaudeMd } from '../src/TownInit';
+
+describe('generateClaudeMd', () => {
+  const vars = {
+    alias: 'test-town',
+    wwuid: '83b09a8d-6587-46bb-9e98-880d56db39b2',
+    remote: 'https://github.com/wildwest-ai/test-town',
+  };
+
+  it('includes alias in heading and identity table', () => {
+    const md = generateClaudeMd(vars);
+    expect(md).toContain('# CLAUDE.md — test-town Town');
+    expect(md).toContain('`test-town`');
+  });
+
+  it('includes wwuid in identity table', () => {
+    const md = generateClaudeMd(vars);
+    expect(md).toContain('`83b09a8d-6587-46bb-9e98-880d56db39b2`');
+  });
+
+  it('includes remote URL', () => {
+    const md = generateClaudeMd(vars);
+    expect(md).toContain('https://github.com/wildwest-ai/test-town');
+  });
+
+  it('falls back to (not set) when remote is null', () => {
+    const md = generateClaudeMd({ ...vars, remote: null });
+    expect(md).toContain('(not set)');
+    expect(md).not.toContain('undefined');
+  });
+
+  it('includes scope: town', () => {
+    const md = generateClaudeMd(vars);
+    expect(md).toContain('**Scope:** town');
+  });
+
+  it('includes required sections', () => {
+    const md = generateClaudeMd(vars);
+    for (const section of [
+      '## 1. Identity',
+      '## 2. Active Roles',
+      '## 3. Cold-Start Checklist',
+      '## 4. Key Paths',
+      '## 5. Telegraph Rules',
+      '## 6. Open Work',
+      '## 7. Quick Commands',
+    ]) {
+      expect(md).toContain(section);
+    }
+  });
+
+  it('includes generation attribution', () => {
+    const md = generateClaudeMd(vars);
+    expect(md).toContain('wildwest-vscode initTown');
+  });
+
+  it('includes a Last Updated date in ISO format', () => {
+    const md = generateClaudeMd(vars);
+    expect(md).toMatch(/\*\*Last Updated:\*\* \d{4}-\d{2}-\d{2}/);
+  });
+
+  it('returns a non-empty string', () => {
+    const md = generateClaudeMd(vars);
+    expect(typeof md).toBe('string');
+    expect(md.length).toBeGreaterThan(200);
+  });
+});

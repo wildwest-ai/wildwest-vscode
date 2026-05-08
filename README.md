@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.25.13
+**Current version:** 0.26.0
 
 ---
 
 ## What's New
+
+**v0.26.0** — CLAUDE.md template: `wildwest.initTown` now generates a `CLAUDE.md` at the repo root (skips if already exists). Template includes identity block (alias, wwuid, remote, scope), cold-start checklist, key paths, telegraph rules, and quick commands — pre-filled from registry data. 9 new tests; 13 suites, 153 total.
 
 **v0.25.13** — Privacy mode: new `wildwest.privacy.enabled` setting (default: off). When enabled, session export pipeline redacts secrets (GitHub tokens, AWS keys, Bearer tokens, sk- keys, env assignments), absolute paths, and home directory references from turn content before writing staged packets. 27 new tests; 12 suites, 144 total.
 
