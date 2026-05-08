@@ -16,6 +16,8 @@ import { registerMCPServer } from './mcp/wwMCPServer';
 import { runDoctor } from './WildwestDoctor';
 import { runValidateRegistry } from './RegistryValidator';
 import { SidePanelProvider } from './SidePanelProvider';
+import { getDeliveryReceipts, statusIcon } from './DeliveryReceipts';
+import { getTelegraphDirs } from './TelegraphService';
 
 // ── Configuration types & helpers ──────────────────────────────────────────
 
@@ -124,6 +126,7 @@ export function activate(context: vscode.ExtensionContext) {
         { label: 'Init Town',                 command: 'wildwest.initTown' },
         { label: 'Process Inbox',             command: 'wildwest.processInbox' },
         { label: 'View Telegraph',            command: 'wildwest.viewTelegraph' },
+        { label: 'Delivery Receipts',         command: 'wildwest.showReceipts' },
         { label: 'Solo Mode Report',          command: 'wildwest.soloModeReport' },
         { label: 'Settings', kind: vscode.QuickPickItemKind.Separator },
         { label: 'Reset Session Export Consent', command: 'wildwest.resetSessionConsent' },
@@ -199,6 +202,25 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('wildwest.doctor', () =>
       runDoctor(context, outputChannel, heartbeatMonitor),
     ),
+    vscode.commands.registerCommand('wildwest.showReceipts', async () => {
+      const allReceipts = getTelegraphDirs().flatMap((dir) => getDeliveryReceipts(dir));
+      if (allReceipts.length === 0) {
+        vscode.window.showInformationMessage('Wild West: no sent memos found.');
+        return;
+      }
+      const items = allReceipts.map((r) => ({
+        label: `${statusIcon(r.status)} ${r.subject}`,
+        description: r.status + (r.deliveredAt ? ` · ${r.deliveredAt}` : ''),
+        receipt: r,
+      }));
+      const pick = await vscode.window.showQuickPick(items, {
+        placeHolder: 'Delivery receipts — select to open memo',
+        matchOnDescription: true,
+      });
+      if (pick) {
+        vscode.commands.executeCommand('vscode.open', vscode.Uri.file(pick.receipt.filePath));
+      }
+    }),
   );
 
   // ── Auto-start ────────────────────────────────────────────────────────────

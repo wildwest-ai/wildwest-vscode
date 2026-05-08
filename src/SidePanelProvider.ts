@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { HeartbeatMonitor } from './HeartbeatMonitor';
 import { getTelegraphDirs } from './TelegraphService';
+import { DeliveryReceipt, getDeliveryReceipts, statusIcon } from './DeliveryReceipts';
 
 // ── SidePanelItem ────────────────────────────────────────────────────────────
 
@@ -72,11 +73,13 @@ export class SidePanelProvider
     const outboxFiles = this.collectTelegraphFiles('outbox');
     const historyFiles = this.collectTelegraphFiles('history');
     const boardFiles = this.collectBoardFiles();
+    const receipts = this.collectAllReceipts();
     return [
       this.sectionItem('Inbox', 'inbox', inboxFiles.length),
       this.sectionItem('Outbox', 'outbox', outboxFiles.length),
       this.sectionItem('History', 'history', historyFiles.length),
       this.sectionItem('Board', 'board', boardFiles.length),
+      this.sectionItem('Receipts', 'receipts', receipts.length),
       new SidePanelItem('Heartbeat', vscode.TreeItemCollapsibleState.Collapsed, 'heartbeat'),
       new SidePanelItem('Actor', vscode.TreeItemCollapsibleState.Collapsed, 'actor'),
     ];
@@ -93,6 +96,7 @@ export class SidePanelProvider
       case 'outbox':    return this.memoItems(this.collectTelegraphFiles('outbox'));
       case 'history':   return this.memoItems(this.collectTelegraphFiles('history'));
       case 'board':     return this.boardChildren();
+      case 'receipts':  return this.receiptsChildren();
       case 'heartbeat': return this.heartbeatChildren();
       case 'actor':     return this.actorChildren();
       default:          return [];
@@ -124,6 +128,28 @@ export class SidePanelProvider
     return files.map(({ dir, file }) => {
       const uri = vscode.Uri.file(path.join(dir, file));
       return new SidePanelItem(file, vscode.TreeItemCollapsibleState.None, undefined, uri);
+    });
+  }
+
+  // ── Receipts ──────────────────────────────────────────────────────────────
+
+  private collectAllReceipts(): DeliveryReceipt[] {
+    const all: DeliveryReceipt[] = [];
+    for (const telegraphDir of getTelegraphDirs()) {
+      all.push(...getDeliveryReceipts(telegraphDir));
+    }
+    return all;
+  }
+
+  private receiptsChildren(): SidePanelItem[] {
+    const receipts = this.collectAllReceipts();
+    if (receipts.length === 0) {
+      return [new SidePanelItem('(no sent memos)', vscode.TreeItemCollapsibleState.None)];
+    }
+    return receipts.map((r) => {
+      const label = `${statusIcon(r.status)} ${r.subject}`;
+      const uri = vscode.Uri.file(r.filePath);
+      return new SidePanelItem(label, vscode.TreeItemCollapsibleState.None, undefined, uri);
     });
   }
 

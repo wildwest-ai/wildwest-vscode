@@ -74,12 +74,12 @@ describe('SidePanelProvider', () => {
     jest.clearAllMocks();
   });
 
-  it('returns 6 root sections with correct sectionIds', () => {
+  it('returns 7 root sections with correct sectionIds', () => {
     const provider = new SidePanelProvider(mockMonitor);
     const roots = provider.getChildren();
-    expect(roots).toHaveLength(6);
+    expect(roots).toHaveLength(7);
     expect(roots.map((r) => r.sectionId)).toEqual([
-      'inbox', 'outbox', 'history', 'board', 'heartbeat', 'actor',
+      'inbox', 'outbox', 'history', 'board', 'receipts', 'heartbeat', 'actor',
     ]);
     provider.dispose();
   });
@@ -148,6 +148,30 @@ describe('SidePanelProvider', () => {
     const children = provider.getChildren(boardSection);
     expect(children).toHaveLength(1);
     expect((children[0] as SidePanelItem).label).toBe('(no branches)');
+    provider.dispose();
+  });
+
+  it('receipts section shows pending memos from outbox/', () => {
+    fs.writeFileSync(
+      path.join(outboxDir, '20260508-1200Z-to-CD-from-TM--review-pr.md'),
+      '---\nfrom: TM\nto: CD\n---\n\nBody.\n',
+    );
+    const provider = new SidePanelProvider(mockMonitor);
+    const receiptsSection = provider.getChildren().find((r) => r.sectionId === 'receipts')!;
+    expect(receiptsSection.label).toContain('(1)');
+    const children = provider.getChildren(receiptsSection);
+    expect(children).toHaveLength(1);
+    expect((children[0] as SidePanelItem).label).toContain('review-pr');
+    expect((children[0] as SidePanelItem).label).toContain('○'); // pending icon
+    provider.dispose();
+  });
+
+  it('receipts section shows (no sent memos) when outbox is empty', () => {
+    const provider = new SidePanelProvider(mockMonitor);
+    const receiptsSection = provider.getChildren().find((r) => r.sectionId === 'receipts')!;
+    const children = provider.getChildren(receiptsSection);
+    expect(children).toHaveLength(1);
+    expect((children[0] as SidePanelItem).label).toBe('(no sent memos)');
     provider.dispose();
   });
 

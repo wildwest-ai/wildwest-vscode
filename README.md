@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.28.0
+**Current version:** 0.29.0
 
 ---
 
 ## What's New
+
+**v0.29.0** — Delivery receipts: new `DeliveryReceipts` module tracks status of all outbound memos — `pending` (in outbox), `failed` (!-prefixed), `delivered` (in outbox/history), `acknowledged` (ack-done received), `blocked` (ack-blocked received). Side panel Receipts section shows live status with icons (○ ✓ ✓✓ ✗ ⚠). `wildwest.showReceipts` QuickPick command opens any memo directly. 19 new tests; 15 suites, 190 total.
 
 **v0.28.0** — Side panel: new activity bar icon (⭐) adds a persistent **Wild West** view with 6 collapsible sections — Inbox, Outbox, History, Board, Heartbeat, and Actor. Each section shows live file counts and file entries that open on click. Heartbeat section shows state/scope/last-beat; Actor section reads alias from registry and role from settings. Auto-refreshes every 10 s; manual refresh button in view title bar. `wildwest.refreshSidePanel` command. 11 new tests; 14 suites, 171 total.
 
