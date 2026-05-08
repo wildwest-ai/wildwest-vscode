@@ -2,11 +2,15 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.6
+**Current version:** 0.31.8
 
 ---
 
 ## What's New
+
+**v0.31.8** — Legacy `batchConvertSessions` calls disabled in `sessionExporter.ts` (startup scan, poll cycle, manual trigger). Staged flat-file export replaced by `sessionPipeline`. `TODO(v0.32)` markers left for cleanup.
+
+**v0.31.7** — Unified `generateWwuid(type, ...parts)` replaces `generateWwsid()` and `generateDeviceId()`. Single `WW_NAMESPACE`; type baked into hash input for global uniqueness. `wwsid` field renamed to `wwuid` across all pipeline types (`SessionPacket`, `SessionRecord`, `IndexEntry`), `packetWriter`, `orchestrator`, `adapter`, `batchConverter`, `chatSessionConverter`. `wwuid` added to telegraph memo frontmatter in `TelegraphCommands` and `TelegraphInbox` (send, ack, reply). Deprecated shims kept for backward compat.
 
 **v0.31.6** — Deep rename: `actor`→`identity` and `devPair`→`dyad` completed across all pipeline types, session records, staged JSON schema (`actors[i].identity`), MCP board output, test fixtures, and all comments. `getActor()`→`getAuthor()` in SessionExportPipeline (git username stored as `author`). `validateActorForScope()`→`validateIdentityForScope()` in HeartbeatMonitor. Zero `actor`/`devPair` symbol references remaining.
 

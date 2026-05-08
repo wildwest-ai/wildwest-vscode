@@ -818,8 +818,8 @@ export class SessionExporter {
         this.log(`${this.getTimestamp()} Initial scan complete. State initialized.`);
       }
 
-      // Auto-convert raw/ → staged/ on every startup (staged/ is interim MCP proxy)
-      await this.batchConvertSessions(true);
+      // TODO(v0.32): Legacy staged/ sync disabled — replaced by sessionPipeline.
+      // await this.batchConvertSessions(true);
 
       // Start polling after any initial scan
       this.isWatching = true;
@@ -900,9 +900,8 @@ export class SessionExporter {
           });
         }
         
-        // Incremental staged/ sync: re-convert only raw files changed this cycle
-        // (BatchChatConverter.isAlreadyConverted uses mtime — unchanged files are skipped)
-        this.batchConvertSessions(true).catch(() => { /* silent */ });
+        // TODO(v0.32): Legacy staged/ sync disabled — replaced by sessionPipeline.
+        // this.batchConvertSessions(true).catch(() => { /* silent */ });
       } else {
         // Only log heartbeat dot, do not log state file saves for idle cycles
         // (No state file log at all for idle cycles)
@@ -1287,43 +1286,46 @@ export class SessionExporter {
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       vscode.window.showInformationMessage(`Manual export triggered: ${timestamp}`);
 
-      // Workspace storage chatSessions (legacy location)
-      // + global emptyWindowChatSessions (new location, VS Code >= early 2026)
-      const sessionDirs = [
-        ...this.getWorkspaceStoragePaths(this.userHome),
-        ...this.getGlobalChatSessionPaths(this.userHome),
-      ];
-      for (const chatSessionsPath of sessionDirs) {
-        if (!fs.existsSync(chatSessionsPath)) continue;
-        const sessions = fs.readdirSync(chatSessionsPath);
-        for (const sessionFile of sessions) {
-          if (this.isCopilotSessionFile(sessionFile)) {
-            const fullPath = path.join(chatSessionsPath, sessionFile);
-            this.exportChatSession(fullPath, sessionFile);
-          }
-        }
-      }
+      // TODO(v0.32): Legacy flat-file export disabled — replaced by sessionPipeline.
+      // Re-enable or remove after sessionPipeline is fully operational.
 
-      // Scan Codex CLI sessions and export to raw/chatgpt-codex/
-      const codexSessionsPath = this.getCodexSessionsPath(this.userHome);
-      if (fs.existsSync(codexSessionsPath)) {
-        this.collectFiles(codexSessionsPath, (filepath) => filepath.endsWith('.jsonl')).forEach((filepath) => {
-          this.exportCodexSession(filepath);
-        });
-      }
+      // // Workspace storage chatSessions (legacy location)
+      // // + global emptyWindowChatSessions (new location, VS Code >= early 2026)
+      // const sessionDirs = [
+      //   ...this.getWorkspaceStoragePaths(this.userHome),
+      //   ...this.getGlobalChatSessionPaths(this.userHome),
+      // ];
+      // for (const chatSessionsPath of sessionDirs) {
+      //   if (!fs.existsSync(chatSessionsPath)) continue;
+      //   const sessions = fs.readdirSync(chatSessionsPath);
+      //   for (const sessionFile of sessions) {
+      //     if (this.isCopilotSessionFile(sessionFile)) {
+      //       const fullPath = path.join(chatSessionsPath, sessionFile);
+      //       this.exportChatSession(fullPath, sessionFile);
+      //     }
+      //   }
+      // }
 
-      // Scan Copilot Edits (agent mode) sessions and export to raw/copilot-edits/
-      for (const stateFile of this.getCopilotEditSessionFiles(this.userHome)) {
-        this.exportEditSession(stateFile);
-      }
+      // // Scan Codex CLI sessions and export to raw/chatgpt-codex/
+      // const codexSessionsPath = this.getCodexSessionsPath(this.userHome);
+      // if (fs.existsSync(codexSessionsPath)) {
+      //   this.collectFiles(codexSessionsPath, (filepath) => filepath.endsWith('.jsonl')).forEach((filepath) => {
+      //     this.exportCodexSession(filepath);
+      //   });
+      // }
 
-      // Scan Claude Code sessions and export to raw/claude-code/
-      const claudeProjectsPath = this.getClaudeProjectsPath(this.userHome);
-      if (fs.existsSync(claudeProjectsPath)) {
-        this.collectFiles(claudeProjectsPath, (filepath) => filepath.endsWith('.jsonl')).forEach((filepath) => {
-          this.exportClaudeSession(filepath);
-        });
-      }
+      // // Scan Copilot Edits (agent mode) sessions and export to raw/copilot-edits/
+      // for (const stateFile of this.getCopilotEditSessionFiles(this.userHome)) {
+      //   this.exportEditSession(stateFile);
+      // }
+
+      // // Scan Claude Code sessions and export to raw/claude-code/
+      // const claudeProjectsPath = this.getClaudeProjectsPath(this.userHome);
+      // if (fs.existsSync(claudeProjectsPath)) {
+      //   this.collectFiles(claudeProjectsPath, (filepath) => filepath.endsWith('.jsonl')).forEach((filepath) => {
+      //     this.exportClaudeSession(filepath);
+      //   });
+      // }
     } catch (error) {
       vscode.window.showErrorMessage(`Export failed: ${error}`);
     }
@@ -1421,7 +1423,8 @@ export class SessionExporter {
     } else if (selected.label.includes('Export Now')) {
       await this.exportNow();
     } else if (selected.label.includes('Batch Convert')) {
-      await this.batchConvertSessions();
+      // TODO(v0.32): Legacy batch convert disabled — replaced by sessionPipeline.
+      // await this.batchConvertSessions();
     } else if (selected.label.includes('Convert to Markdown')) {
       await this.convertExportsToMarkdown();
     } else if (selected.label.includes('Generate Markdown Index')) {
