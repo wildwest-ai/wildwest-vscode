@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.14
+**Current version:** 0.31.15
 
 ---
 
 ## What's New
+
+**v0.31.15** — Fix session date buckets: replaced rolling 48h `age < 2 * dayMs` window with calendar-date boundaries (`todayMs`, `yesterdayMs`, `last7dMs`). "Yesterday" now correctly shows all sessions whose date falls on the previous calendar day regardless of current time.
 
 **v0.31.14** — Sessions section in side panel now has a clickable **Sort: Created / Sort: Updated** toggle row. Default is `Created`. Click cycles between grouping by `created_at` (session start) or `last_turn_at` (most recent activity). Persists for the session lifetime. `wildwest.toggleSessionSortBy` command registered.
 

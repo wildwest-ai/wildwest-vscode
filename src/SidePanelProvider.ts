@@ -143,16 +143,17 @@ export class SidePanelProvider
       const dayMs = 86_400_000;
       const todayStart = new Date(); todayStart.setHours(0,0,0,0);
       const todayMs = todayStart.getTime();
+      const yesterdayMs = todayMs - dayMs;
+      const last7dMs = todayMs - 7 * dayMs;
       for (const session of (index.sessions ?? [])) {
         try {
           const ts = sortBy === 'updated'
             ? (session.last_turn_at ?? session.created_at)
             : (session.created_at ?? session.last_turn_at);
           const mtime = new Date(ts).getTime();
-          const age = now - mtime;
           if (mtime >= todayMs) counts.today++;
-          else if (age < 2 * dayMs) counts.yesterday++;
-          else if (age < 7 * dayMs) counts.last7d++;
+          else if (mtime >= yesterdayMs) counts.yesterday++;
+          else if (mtime >= last7dMs) counts.last7d++;
           else counts.older++;
         } catch { /* skip */ }
       }
