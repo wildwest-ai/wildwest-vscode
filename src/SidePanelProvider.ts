@@ -39,7 +39,6 @@ export class SidePanelProvider
   private isWatching: boolean = false;
   private exportPath: string = '';
   private sessionSortBy: 'created' | 'updated' = 'created';
-  private sessionScope: 'town' | 'county' | 'territory' = 'territory';
 
   constructor(private readonly heartbeatMonitor: HeartbeatMonitor) {
     this.refreshInterval = setInterval(() => this.refresh(), REFRESH_INTERVAL_MS);
@@ -59,14 +58,6 @@ export class SidePanelProvider
   /** Toggle session date grouping between created and updated. */
   toggleSessionSortBy(): void {
     this.sessionSortBy = this.sessionSortBy === 'created' ? 'updated' : 'created';
-    this.refresh();
-  }
-
-  /** Cycle scope: territory → county → town → territory. */
-  toggleSessionScope(): void {
-    const cycle: Array<'territory' | 'county' | 'town'> = ['territory', 'county', 'town'];
-    const idx = cycle.indexOf(this.sessionScope);
-    this.sessionScope = cycle[(idx + 1) % cycle.length];
     this.refresh();
   }
 
@@ -149,6 +140,55 @@ export class SidePanelProvider
 
   // ── Sessions ───────────────────────────────────────────────────────────────
 
+  /**
+   * Read scope + alias from workspace registry and resolve the path filter.
+   * Returns { scope, label, filterPath } where filterPath is the prefix to match
+   * against session.project_path, or null for no filter (territory).
+   */
+  private readRegistryScope(): { scope: string; label: string; filterPath: string | null } {
+    const townRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+    if (!townRoot) return { scope: 'territory', label: 'Territory', filterPath: null };
+    try {
+      const regPath = path.join(townRoot, '.wildwest', 'registry.json');
+      if (!fs.existsSync(regPath)) return { scope: 'territory', label: 'Territory', filterPath: null };
+      const reg = JSON.parse(fs.readFileSync(regPath, 'utf8')) as Record<string, unknown>;
+      const scope = (reg['scope'] as string) || 'territory';
+      const alias = (reg['alias'] as string) || path.basename(townRoot);
+      if (scope === 'town') {
+        return { scope, label: alias, filterPath: townRoot };
+      }
+      if (scope === 'county') {
+        // This workspace IS the county root
+        return { scope, label: alias, filterPath: townRoot };
+      }
+      return { scope: 'territory', label: alias, filterPath: null };
+    } catch {
+      return { scope: 'territory', label: 'Territory', filterPath: null };
+    }
+  }
+
+  /**
+   * Walk parent dirs from townRoot to find the county root
+   * (nearest ancestor with scope === 'county' in its registry).
+   */
+  private findCountyRoot(townRoot: string): string | null {
+    let current = path.dirname(townRoot);
+    const fsRoot = path.parse(current).root;
+    while (current !== fsRoot) {
+      try {
+        const regPath = path.join(current, '.wildwest', 'registry.json');
+        if (fs.existsSync(regPath)) {
+          const reg = JSON.parse(fs.readFileSync(regPath, 'utf8')) as Record<string, unknown>;
+          if (reg['scope'] === 'county') return current;
+        }
+      } catch { /* skip */ }
+      const parent = path.dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
+    return null;
+  }
+
   private loadAndBucketSessions(sortBy: 'created' | 'updated'): {
     today: Record<string, unknown>[];
     yesterday: Record<string, unknown>[];
@@ -166,13 +206,19 @@ export class SidePanelProvider
 
       // ── Scope filter ──────────────────────────────────────────────────────
       const townRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
-      const countyRoot = townRoot ? path.dirname(townRoot) : '';
+      const { scope, filterPath } = this.readRegistryScope();
+      let countyRoot: string | null = null;
+      if (scope === 'town') {
+        countyRoot = this.findCountyRoot(townRoot);
+      }
       const scopeFilter = (session: S): boolean => {
-        if (this.sessionScope === 'territory') return true;
         const pp = (session['project_path'] as string) || '';
-        if (this.sessionScope === 'town') return pp === townRoot;
-        if (this.sessionScope === 'county') return countyRoot !== '' && pp.startsWith(countyRoot + path.sep);
-        return true;
+        if (scope === 'town') return pp === filterPath;
+        if (scope === 'county') {
+          const root = filterPath ?? countyRoot;
+          return root !== null && (pp === root || pp.startsWith(root + path.sep));
+        }
+        return true; // territory
       };
       const dayMs = 86_400_000;
       const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
@@ -235,24 +281,23 @@ export class SidePanelProvider
     sortItem.tooltip = 'Click to toggle between Created and Updated date';
     sortItem.command = { command: 'wildwest.toggleSessionSortBy', title: 'Toggle Session Sort' };
 
-    const SCOPE_LABELS: Record<string, string> = { town: 'Scope: Town', county: 'Scope: County', territory: 'Scope: Territory' };
-    const SCOPE_ICONS: Record<string, string> = { town: 'home', county: 'organization', territory: 'globe' };
-    const scopeItem = new SidePanelItem(SCOPE_LABELS[this.sessionScope], vscode.TreeItemCollapsibleState.None);
-    scopeItem.iconPath = new vscode.ThemeIcon(SCOPE_ICONS[this.sessionScope]);
-    scopeItem.tooltip = 'Click to cycle: Territory → County → Town';
-    scopeItem.command = { command: 'wildwest.toggleSessionScope', title: 'Toggle Session Scope' };
-
     const counts = this.countStagedSessions(this.sessionSortBy);
-    const makeBucket = (label: string, sectionId: string, count: number): SidePanelItem => {
+    const { scope, label: scopeLabel } = this.readRegistryScope();
+    const SCOPE_ICONS: Record<string, string> = { town: 'home', county: 'organization', territory: 'globe' };
+    const scopeDisplay = new SidePanelItem(`Scope: ${scope}  [${scopeLabel}]`, vscode.TreeItemCollapsibleState.None);
+    scopeDisplay.iconPath = new vscode.ThemeIcon(SCOPE_ICONS[scope] ?? 'globe');
+    scopeDisplay.tooltip = 'Filter set by .wildwest/registry.json scope field';
+
+    const makeBucket = (lbl: string, sectionId: string, count: number): SidePanelItem => {
       const state = count > 0
         ? vscode.TreeItemCollapsibleState.Collapsed
         : vscode.TreeItemCollapsibleState.None;
-      const item = new SidePanelItem(`${label}   ${count}`, state, sectionId);
+      const item = new SidePanelItem(`${lbl}   ${count}`, state, sectionId);
       item.iconPath = new vscode.ThemeIcon('history');
       return item;
     };
-    const toolBadge = (label: string, count: number): SidePanelItem => {
-      const item = new SidePanelItem(`${label}   ${count}`, vscode.TreeItemCollapsibleState.None);
+    const toolBadge = (lbl: string, count: number): SidePanelItem => {
+      const item = new SidePanelItem(`${lbl}   ${count}`, vscode.TreeItemCollapsibleState.None);
       item.iconPath = new vscode.ThemeIcon('robot');
       return item;
     };
@@ -269,7 +314,7 @@ export class SidePanelProvider
     return [
       watcherItem,
       sortItem,
-      scopeItem,
+      scopeDisplay,
       makeBucket('Today', 'sessions:today', counts.today),
       makeBucket('Yesterday', 'sessions:yesterday', counts.yesterday),
       makeBucket('Last 7 days', 'sessions:last7d', counts.last7d),
