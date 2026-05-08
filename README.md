@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.25.6
+**Current version:** 0.25.7
 
 ---
 
 ## What's New
+
+**v0.25.7** — First-run consent: session export now requires explicit user approval on first activation. A one-time dialog ("Allow" / "Not now") gates `SessionExporter.start()`. Consent stored in `globalState`; revoke via `Wild West: Reset Session Export Consent` command. Heartbeat and telegraph start regardless of consent.
 
 **v0.25.6** — Self-addressed telegraph delivery fix: same-scope recipients now resolve to the current town path, so outbox memos addressed to the current town are delivered into the local inbox and archived through the normal delivery path. Added regression coverage for local inbox delivery.
 

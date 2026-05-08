@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
   },
-  "version": "0.25.6",
+  "version": "0.25.7",
   "publisher": "wildwest-ai",
   "engines": {
     "vscode": "^1.90.0"
@@ -88,6 +88,11 @@
       {
         "command": "wildwest.showStatus",
         "title": "Show Status",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.resetSessionConsent",
+        "title": "Reset Session Export Consent",
         "category": "Wild West"
       },
       {

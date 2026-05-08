@@ -111,6 +111,8 @@ export function activate(context: vscode.ExtensionContext) {
         { label: 'Process Inbox',             command: 'wildwest.processInbox' },
         { label: 'View Telegraph',            command: 'wildwest.viewTelegraph' },
         { label: 'Solo Mode Report',          command: 'wildwest.soloModeReport' },
+        { label: 'Settings', kind: vscode.QuickPickItemKind.Separator },
+        { label: 'Reset Session Export Consent', command: 'wildwest.resetSessionConsent' },
       ];
       const commandMap = new Map(
         ITEMS.filter((i) => i.command).map((i) => [i.label, i.command!]),
@@ -167,15 +169,46 @@ export function activate(context: vscode.ExtensionContext) {
       const info = scope ? `Scope: ${scope}\nActor: ${actor || '(not declared)'}` : 'No Wild West scope detected';
       vscode.window.showInformationMessage(`Wild West Status\n${info}`);
     }),
+    vscode.commands.registerCommand('wildwest.resetSessionConsent', () => {
+      context.globalState.update('wildwest.sessionScanConsented', false);
+      exporter.stop();
+      vscode.window.showInformationMessage(
+        'Wild West: Session export consent reset. Reload window to be prompted again.',
+      );
+      outputChannel.appendLine('[wildwest] session export consent reset by user');
+    }),
   );
 
   // ── Auto-start ────────────────────────────────────────────────────────────
   const config = vscode.workspace.getConfiguration('wildwest');
   if (config.get<boolean>('enabled') !== false) {
-    exporter.start();
     statusBarManager.startListening();
     heartbeatMonitor.start();
     telegraphWatcher.start();
+
+    // Session export requires explicit first-run consent (OWASP A01: access
+    // control — don't read user data stores without permission).
+    const CONSENT_KEY = 'wildwest.sessionScanConsented';
+    const consented = context.globalState.get<boolean>(CONSENT_KEY, false);
+    if (consented) {
+      exporter.start();
+    } else {
+      vscode.window
+        .showInformationMessage(
+          'Wild West: Allow session export? The extension can read Copilot chat sessions and export them to your sessions directory.',
+          'Allow',
+          'Not now',
+        )
+        .then((choice) => {
+          if (choice === 'Allow') {
+            context.globalState.update(CONSENT_KEY, true);
+            exporter.start();
+            outputChannel.appendLine('[wildwest] session export consent granted');
+          } else {
+            outputChannel.appendLine('[wildwest] session export skipped — consent not given');
+          }
+        });
+    }
   }
 
   // ── Config change listener ────────────────────────────────────────────────
