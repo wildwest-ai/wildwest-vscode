@@ -3,7 +3,7 @@
 **Town:** wildwest-vscode  
 **County:** wildwest-ai  
 **Scope:** town  
-**Version:** 0.25.4  
+**Version:** 0.25.6  
 
 ---
 
@@ -127,12 +127,11 @@ TM(RHk).Cpt
 
 ## 6. Current Open Work
 
-See `TODO.md` for full board. **As of 2026-05-07:**
+See `TODO.md` for full board. **As of 2026-05-08:**
 
 ### P1 — Blocking (next release)
 
-- [ ] **TelegraphInbox format** — `TelegraphInbox` doesn't recognize `YYYYMMDD-HHMMZ-to-...` delivered filenames; needs scan of `.wildwest/telegraph/inbox/`
-- [ ] **Custom export path** — `PipelineAdapter` hard-codes `~/wildwest/sessions/{gitUsername}`; wire to `wildwest.exportPath` config setting
+- [ ] **First-run consent** — startup scans AI session stores by default; add explicit provider consent/source scoping before broad export
 - [ ] **Identity block shape decision** — S(R) call needed (affects registry schema)
 - [ ] **`scope: "town"` field** — Add to `.wildwest/registry.json` for all scopes
 - [ ] **TownInit.ts fix** — Write `scope` field on registry creation
@@ -140,8 +139,14 @@ See `TODO.md` for full board. **As of 2026-05-07:**
 
 ### P2 — Nice-to-Have
 
+- [ ] **TelegraphService abstraction** — centralize address parsing, filename generation, inbox/outbox paths, ack generation, archiving, delivery status
+- [ ] **Production-code telegraph tests** — exercise production delivery/inbox code paths
+- [ ] **Wild West Doctor command** — validate registry, worktrees, actor role, export path, MCP status, hook port, stale heartbeat
+- [ ] **Side panel** — Inbox, Outbox, History, Board, Heartbeat, Actor state in one VSCode view
+- [ ] **Privacy mode** — redact paths, env strings, secrets before staged export
 - [ ] **CLAUDE.md template** — Framework gap; auto-scaffold on `initTown`
 - [ ] **Registry validator** — Lint `.wildwest/registry.json` for schema compliance
+- [ ] **Release artifact hygiene** — move historical VSIX files out of git; use GitHub Releases or CI artifacts
 
 ---
 
@@ -198,8 +203,7 @@ On each activation:
 - **Copilot response text:** Fixed in v0.8.0+. Captures `kind=None` and `kind='text'` fragments (v0.23.0). Full response + thinking both preserved.
 - **Empty sessions:** VSCode creates stub session entries on chat open even with no messages. Handled in v0.8.0+ by filter.
 - **Registry `path` field:** Removed in v0.11.0. Paths now derived from `alias + worldRoot + countiesDir` (convention-based).
-- **TelegraphInbox format:** Doesn't yet recognize `YYYYMMDD-HHMMZ-to-...` delivered filenames. Inbox scan path also needs updating to `.wildwest/telegraph/inbox/`.
-- **Custom export path:** `PipelineAdapter` hard-codes `~/wildwest/sessions/{gitUsername}` instead of reading `wildwest.exportPath` config.
+- **First-run consent:** Extension scans AI session stores on startup without explicit user consent or provider scoping. Fix pending.
 - **SoloModeController:** `hasBranchDoc()` may reference a stale path — not yet verified.
 
 ---
@@ -256,6 +260,6 @@ This CLAUDE.md is manually written (interim artifact). Once the framework ships 
 
 ---
 
-**Last Updated:** 2026-05-07T16:31Z  
+**Last Updated:** 2026-05-08T01:00Z  
 **By:** TM(RHk).Cpt  
 **For:** TM(RHk).Cpt cold-start briefing
