@@ -108,6 +108,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('wildwest.stopWatcher', () => exporter.stop()),
     vscode.commands.registerCommand('wildwest.exportNow', () => exporter.exportNow()),
     vscode.commands.registerCommand('wildwest.toggleSessionSortBy', () => sidePanelProvider?.toggleSessionSortBy()),
+    vscode.commands.registerCommand('wildwest.toggleSessionScope', () => sidePanelProvider?.toggleSessionScope()),
     vscode.commands.registerCommand('wildwest.batchConvert', () => exporter.batchConvertSessions()),
     vscode.commands.registerCommand('wildwest.convertToMarkdown', () => exporter.convertExportsToMarkdown()),
     vscode.commands.registerCommand('wildwest.generateIndex', () => exporter.generateMarkdownIndex()),

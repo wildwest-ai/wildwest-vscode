@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.24
+**Current version:** 0.31.25
 
 ---
 
 ## What's New
+
+**v0.31.25** — Sessions scope filter: click "Scope: Territory / County / Town" button to cycle. Town = current workspace only; County = all projects under `path.dirname(workspace)`; Territory = all (previous default). `toggleSessionScope` command registered. Filter applied in `loadAndBucketSessions` before bucketing.
 
 **v0.31.24** — Last 7 days bucket groups sessions by local calendar date (Thu May 7, Wed May 6 …). Each day is a collapsible node; expand to see sessions. Dispatch via `sessions:last7d:YYYY-MM-DD` sectionId. All timestamps are local timezone (`toLocaleTimeString`/`toLocaleDateString`).
 
