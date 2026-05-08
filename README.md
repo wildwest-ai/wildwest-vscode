@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.31.2
+**Current version:** 0.31.3
 
 ---
 
 ## What's New
+
+**v0.31.3** — batchConverter: all staged JSON files now include a stable `wwsid` (UUIDv5) field for framework-grade session identity across all three providers (Copilot `cpt`, Claude Code `cld`, Codex CLI `ccx`).
 
 **v0.31.2** — Side panel overhaul: Heartbeat, Actor, Sessions, and Utilities sections redesigned.
 - **Heartbeat** now shows state icon, scope, town alias (from registry), and last beat timestamp

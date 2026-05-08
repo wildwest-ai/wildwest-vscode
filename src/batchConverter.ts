@@ -21,6 +21,7 @@ import * as path from 'path';
 import { execSync } from 'child_process';
 import { ChatSessionConverter } from './chatSessionConverter';
 import { convertJsonFileToMarkdown } from './jsonToMarkdown';
+import { generateWwsid } from './sessionPipeline/utils';
 
 interface ConversionResult {
   file: string;
@@ -318,6 +319,7 @@ class BatchChatConverter {
           try {
             const staged = {
               exportedAt,
+              wwsid: generateWwsid('ccx', sourceSessionId),
               github_userid,
               user_timezone_offset,
               totalPrompts,
@@ -448,6 +450,7 @@ class BatchChatConverter {
 
           const staged = {
             exportedAt: new Date().toISOString(),
+            wwsid: generateWwsid('cld', claudeSessionId),
             provider: 'claude-code',
             github_userid: gitUsername || 'unknown',
             user_timezone_offset,
@@ -522,7 +525,7 @@ class BatchChatConverter {
       // Save exports
       const rawChatPath: string | undefined = undefined;
       if (!alreadyConverted) {
-        converter.saveChatReplayJson(chatReplayPath);
+        converter.saveChatReplayJson(chatReplayPath, generateWwsid('cpt', metadata.sessionId));
       }
 
       let markdownOut: string | undefined;

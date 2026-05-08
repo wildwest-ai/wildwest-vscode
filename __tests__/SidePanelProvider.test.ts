@@ -21,6 +21,7 @@ jest.mock('vscode', () => ({
     dispose = jest.fn();
   },
   Uri: { file: (p: string) => ({ fsPath: p, scheme: 'file' }) },
+  ThemeIcon: class ThemeIcon { constructor(public id: string) {} },
   workspace: {
     workspaceFolders: [] as Array<{ uri: { fsPath: string } }>,
     getConfiguration: jest.fn(() => ({
@@ -74,12 +75,12 @@ describe('SidePanelProvider', () => {
     jest.clearAllMocks();
   });
 
-  it('returns 7 root sections with correct sectionIds', () => {
+  it('returns 9 root sections with correct sectionIds', () => {
     const provider = new SidePanelProvider(mockMonitor);
     const roots = provider.getChildren();
-    expect(roots).toHaveLength(7);
+    expect(roots).toHaveLength(9);
     expect(roots.map((r) => r.sectionId)).toEqual([
-      'inbox', 'outbox', 'history', 'board', 'receipts', 'heartbeat', 'actor',
+      'heartbeat', 'actor', 'sessions', 'utilities', 'inbox', 'outbox', 'history', 'board', 'receipts',
     ]);
     provider.dispose();
   });
@@ -175,23 +176,19 @@ describe('SidePanelProvider', () => {
     provider.dispose();
   });
 
-  it('heartbeat section shows state, scope, and last beat timestamp', () => {
+  it('heartbeat section shows state, scope, town alias, and last beat timestamp', () => {
     const provider = new SidePanelProvider(mockMonitor);
     const hbSection = provider.getChildren().find((r) => r.sectionId === 'heartbeat')!;
     const children = provider.getChildren(hbSection);
-    expect(children).toHaveLength(3);
+    expect(children).toHaveLength(4);
     expect((children[0] as SidePanelItem).label).toContain('alive');
     expect((children[1] as SidePanelItem).label).toContain('town');
-    expect((children[2] as SidePanelItem).label).toContain('2026-05-08T12:00:00.000Z');
+    expect((children[2] as SidePanelItem).label).toContain('Town:');
+    expect((children[3] as SidePanelItem).label).toContain('2026-05-08T12:00:00.000Z');
     provider.dispose();
   });
 
-  it('actor section shows alias from registry and role from config', () => {
-    fs.mkdirSync(path.join(townRoot, '.wildwest'), { recursive: true });
-    fs.writeFileSync(
-      path.join(townRoot, '.wildwest', 'registry.json'),
-      JSON.stringify({ alias: 'wildwest-vscode', scope: 'town' }),
-    );
+  it('actor section shows parsed role and devPair from config', () => {
     const vscode = require('vscode');
     (vscode.workspace.getConfiguration as jest.Mock).mockReturnValue({
       get: (_key: string, def: unknown) =>
@@ -201,9 +198,10 @@ describe('SidePanelProvider', () => {
     const provider = new SidePanelProvider(mockMonitor);
     const actorSection = provider.getChildren().find((r) => r.sectionId === 'actor')!;
     const children = provider.getChildren(actorSection);
-    expect(children).toHaveLength(2);
-    expect((children[0] as SidePanelItem).label).toContain('wildwest-vscode');
-    expect((children[1] as SidePanelItem).label).toContain('TM(RHk)');
+    expect(children).toHaveLength(3);
+    expect((children[0] as SidePanelItem).label).toContain('Role: TM');
+    expect((children[1] as SidePanelItem).label).toContain('devPair: RHk');
+    expect((children[2] as SidePanelItem).label).toContain('Edit actor');
     provider.dispose();
   });
 
