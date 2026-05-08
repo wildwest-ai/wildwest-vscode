@@ -142,28 +142,28 @@ export class SidePanelProvider
 
   /**
    * Read scope + alias from workspace registry and resolve the path filter.
-   * Returns { scope, label, filterPath } where filterPath is the prefix to match
-   * against session.project_path, or null for no filter (territory).
+   * Returns { scope, label, filterPath, alias } where filterPath is the prefix to match
+   * against session.project_path (for county), alias is the town/county name.
    */
-  private readRegistryScope(): { scope: string; label: string; filterPath: string | null } {
+  private readRegistryScope(): { scope: string; label: string; filterPath: string | null; alias: string } {
     const townRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
-    if (!townRoot) return { scope: 'territory', label: 'Territory', filterPath: null };
+    const fallback = { scope: 'territory', label: 'Territory', filterPath: null, alias: '' };
+    if (!townRoot) return fallback;
     try {
       const regPath = path.join(townRoot, '.wildwest', 'registry.json');
-      if (!fs.existsSync(regPath)) return { scope: 'territory', label: 'Territory', filterPath: null };
+      if (!fs.existsSync(regPath)) return fallback;
       const reg = JSON.parse(fs.readFileSync(regPath, 'utf8')) as Record<string, unknown>;
       const scope = (reg['scope'] as string) || 'territory';
       const alias = (reg['alias'] as string) || path.basename(townRoot);
       if (scope === 'town') {
-        return { scope, label: alias, filterPath: townRoot };
+        return { scope, label: alias, filterPath: townRoot, alias };
       }
       if (scope === 'county') {
-        // This workspace IS the county root
-        return { scope, label: alias, filterPath: townRoot };
+        return { scope, label: alias, filterPath: townRoot, alias };
       }
-      return { scope: 'territory', label: alias, filterPath: null };
+      return { scope: 'territory', label: alias, filterPath: null, alias };
     } catch {
-      return { scope: 'territory', label: 'Territory', filterPath: null };
+      return fallback;
     }
   }
 
@@ -206,14 +206,17 @@ export class SidePanelProvider
 
       // ── Scope filter ──────────────────────────────────────────────────────
       const townRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
-      const { scope, filterPath } = this.readRegistryScope();
+      const { scope, filterPath, alias } = this.readRegistryScope();
       let countyRoot: string | null = null;
       if (scope === 'town') {
         countyRoot = this.findCountyRoot(townRoot);
       }
       const scopeFilter = (session: S): boolean => {
         const pp = (session['project_path'] as string) || '';
-        if (scope === 'town') return pp === filterPath;
+        if (scope === 'town') {
+          // Match by alias (basename) to handle reorganized/moved paths
+          return path.basename(pp) === alias;
+        }
         if (scope === 'county') {
           const root = filterPath ?? countyRoot;
           return root !== null && (pp === root || pp.startsWith(root + path.sep));

@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.26
+**Current version:** 0.31.27
 
 ---
 
 ## What's New
+
+**v0.31.27** — Town scope filter now matches by `alias` (`path.basename`) instead of full `project_path`. Fixes sessions missing when workspace was reorganized/moved (e.g. `counties/wildwest-ai/wildwest-framework` → `wildwest/counties/wildwest-ai/wildwest-framework`). Convention: `alias === basename(project_path)` is stable across moves.
 
 **v0.31.26** — Sessions scope filter is now driven by `.wildwest/registry.json` (`scope` field), not a toggle. Town: exact workspace match. County: workspace IS county root — matches all towns within it. Territory (default): no filter. Displays as read-only `Scope: town  [wildwest-vscode]` row. `toggleSessionScope` command removed.
 
