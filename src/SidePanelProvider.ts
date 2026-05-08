@@ -37,6 +37,7 @@ export class SidePanelProvider
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
 
   private isWatching: boolean = false;
+  private exportPath: string = '';
 
   constructor(private readonly heartbeatMonitor: HeartbeatMonitor) {
     this.refreshInterval = setInterval(() => this.refresh(), REFRESH_INTERVAL_MS);
@@ -46,6 +47,11 @@ export class SidePanelProvider
   setWatching(value: boolean): void {
     this.isWatching = value;
     this.refresh();
+  }
+
+  /** Called by extension.ts to provide the export path for Sessions section. */
+  setExportPath(p: string): void {
+    this.exportPath = p;
   }
 
   refresh(): void {
@@ -82,10 +88,13 @@ export class SidePanelProvider
     const historyFiles = this.collectTelegraphFiles('history');
     const boardFiles = this.collectBoardFiles();
     const receipts = this.collectAllReceipts();
+    const sessionCounts = this.countStagedSessions();
+    const sessionTotal = sessionCounts.today + sessionCounts.yesterday + sessionCounts.last7d + sessionCounts.older;
     return [
       new SidePanelItem('Heartbeat', vscode.TreeItemCollapsibleState.Collapsed, 'heartbeat'),
       new SidePanelItem('Actor', vscode.TreeItemCollapsibleState.Collapsed, 'actor'),
-      new SidePanelItem('Sessions', vscode.TreeItemCollapsibleState.Collapsed, 'sessions'),
+      this.sectionItem('Sessions', 'sessions', sessionTotal),
+      new SidePanelItem('Utilities', vscode.TreeItemCollapsibleState.Collapsed, 'utilities'),
       this.sectionItem('Inbox', 'inbox', inboxFiles.length),
       this.sectionItem('Outbox', 'outbox', outboxFiles.length),
       this.sectionItem('History', 'history', historyFiles.length),
@@ -104,6 +113,7 @@ export class SidePanelProvider
       case 'heartbeat': return this.heartbeatChildren();
       case 'actor':     return this.actorChildren();
       case 'sessions':  return this.sessionsChildren();
+      case 'utilities': return this.utilitiesChildren();
       case 'inbox':     return this.memoItems(this.collectTelegraphFiles('inbox'));
       case 'outbox':    return this.memoItems(this.collectTelegraphFiles('outbox'));
       case 'history':   return this.memoItems(this.collectTelegraphFiles('history'));
@@ -115,6 +125,30 @@ export class SidePanelProvider
 
   // ── Sessions ───────────────────────────────────────────────────────────────
 
+  private countStagedSessions(): { today: number; yesterday: number; last7d: number; older: number } {
+    const counts = { today: 0, yesterday: 0, last7d: 0, older: 0 };
+    if (!this.exportPath) return counts;
+    const stagedDir = path.join(this.exportPath, 'staged');
+    try {
+      const files = fs.readdirSync(stagedDir).filter((f) => f.endsWith('.json') && !f.startsWith('.'));
+      const now = Date.now();
+      const dayMs = 86_400_000;
+      const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+      const todayMs = todayStart.getTime();
+      for (const f of files) {
+        try {
+          const mtime = fs.statSync(path.join(stagedDir, f)).mtimeMs;
+          const age = now - mtime;
+          if (mtime >= todayMs) counts.today++;
+          else if (age < 2 * dayMs) counts.yesterday++;
+          else if (age < 7 * dayMs) counts.last7d++;
+          else counts.older++;
+        } catch { /* skip */ }
+      }
+    } catch { /* staged dir not ready */ }
+    return counts;
+  }
+
   private sessionsChildren(): SidePanelItem[] {
     const watcherLabel = this.isWatching ? '● Watcher: Running' : '○ Watcher: Stopped';
     const watcherCmd = this.isWatching ? 'wildwest.stopWatcher' : 'wildwest.startWatcher';
@@ -122,20 +156,39 @@ export class SidePanelProvider
     watcherItem.iconPath = new vscode.ThemeIcon(this.isWatching ? 'eye' : 'eye-closed');
     watcherItem.command = { command: watcherCmd, title: this.isWatching ? 'Stop Watcher' : 'Start Watcher' };
 
+    const counts = this.countStagedSessions();
+    const bucket = (label: string, count: number): SidePanelItem => {
+      const item = new SidePanelItem(`${label}   ${count}`, vscode.TreeItemCollapsibleState.None);
+      item.iconPath = new vscode.ThemeIcon('history');
+      return item;
+    };
+
+    return [
+      watcherItem,
+      bucket('Today', counts.today),
+      bucket('Yesterday', counts.yesterday),
+      bucket('Last 7 days', counts.last7d),
+      bucket('Older', counts.older),
+    ];
+  }
+
+  // ── Utilities ─────────────────────────────────────────────────────────────
+
+  private utilitiesChildren(): SidePanelItem[] {
     const action = (label: string, cmd: string, icon: string): SidePanelItem => {
       const item = new SidePanelItem(label, vscode.TreeItemCollapsibleState.None);
       item.iconPath = new vscode.ThemeIcon(icon);
       item.command = { command: cmd, title: label };
       return item;
     };
-
     return [
-      watcherItem,
       action('Export Now', 'wildwest.exportNow', 'sync'),
-      action('Batch Convert', 'wildwest.batchConvert', 'package'),
-      action('Convert to Markdown', 'wildwest.convertToMarkdown', 'file-text'),
-      action('Generate Index', 'wildwest.generateIndex', 'list-unordered'),
       action('Open Export Folder', 'wildwest.openExportFolder', 'folder-opened'),
+      action('Doctor', 'wildwest.doctor', 'heart'),
+      action('Validate Registry', 'wildwest.validateRegistry', 'shield'),
+      action('Reset Session Consent', 'wildwest.resetSessionConsent', 'refresh'),
+      action('View Output Log', 'wildwest.viewOutputLog', 'output'),
+      action('Settings', 'wildwest.openSettings', 'gear'),
     ];
   }
 
@@ -216,9 +269,23 @@ export class SidePanelProvider
     const scope = this.heartbeatMonitor.detectScope() ?? '—';
     const lastBeat = this.readSentinelTimestamp();
     const stateIcon = state === 'alive' ? '●' : state === 'flagged' ? '⚑' : '○';
+
+    // Read town alias from registry
+    const wwRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    let townAlias = '—';
+    if (wwRoot) {
+      try {
+        const reg = JSON.parse(
+          fs.readFileSync(path.join(wwRoot, '.wildwest', 'registry.json'), 'utf8'),
+        ) as Record<string, unknown>;
+        townAlias = (reg['alias'] as string) ?? '—';
+      } catch { /* registry unreadable */ }
+    }
+
     return [
-      new SidePanelItem(`State: ${stateIcon} ${state}`, vscode.TreeItemCollapsibleState.None),
+      new SidePanelItem(`${stateIcon} ${state}`, vscode.TreeItemCollapsibleState.None),
       new SidePanelItem(`Scope: ${scope}`, vscode.TreeItemCollapsibleState.None),
+      new SidePanelItem(`Town: ${townAlias}`, vscode.TreeItemCollapsibleState.None),
       new SidePanelItem(`Last beat: ${lastBeat}`, vscode.TreeItemCollapsibleState.None),
     ];
   }
@@ -242,23 +309,25 @@ export class SidePanelProvider
   // ── Actor ─────────────────────────────────────────────────────────────────
 
   private actorChildren(): SidePanelItem[] {
-    const wwRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    let alias = '—';
-    if (wwRoot) {
-      try {
-        const reg = JSON.parse(
-          fs.readFileSync(path.join(wwRoot, '.wildwest', 'registry.json'), 'utf8'),
-        ) as Record<string, unknown>;
-        alias = (reg['alias'] as string) ?? '—';
-      } catch {
-        // registry missing or unreadable
-      }
+    const actorSetting = vscode.workspace.getConfiguration('wildwest').get<string>('actor', '') || '';
+
+    // Parse "TM(RHk)" → role="TM", devPair="RHk"
+    let role = actorSetting || '—';
+    let devPair = '—';
+    const match = actorSetting.match(/^([^(]+)\(([^)]+)\)$/);
+    if (match) {
+      role = match[1].trim();
+      devPair = match[2].trim();
     }
-    const role =
-      vscode.workspace.getConfiguration('wildwest').get<string>('actor', '') || '—';
+
+    const editItem = new SidePanelItem('Edit actor…', vscode.TreeItemCollapsibleState.None);
+    editItem.iconPath = new vscode.ThemeIcon('edit');
+    editItem.command = { command: 'wildwest.setActor', title: 'Set Actor' };
+
     return [
-      new SidePanelItem(`Alias: ${alias}`, vscode.TreeItemCollapsibleState.None),
       new SidePanelItem(`Role: ${role}`, vscode.TreeItemCollapsibleState.None),
+      new SidePanelItem(`devPair: ${devPair}`, vscode.TreeItemCollapsibleState.None),
+      editItem,
     ];
   }
 

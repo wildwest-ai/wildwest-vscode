@@ -87,6 +87,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // ── Side panel (TreeView) ─────────────────────────────────────────────────
   sidePanelProvider = new SidePanelProvider(heartbeatMonitor);
+  sidePanelProvider.setExportPath(exporter.getExportPath());
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider('wildwest.sidepanel', sidePanelProvider),
     vscode.commands.registerCommand('wildwest.refreshSidePanel', () =>
@@ -115,6 +116,19 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('wildwest.viewOutputLog', () => outputChannel.show()),
     vscode.commands.registerCommand('wildwest.openSettings', () => {
       vscode.commands.executeCommand('workbench.action.openSettings', 'wildwest');
+    }),
+    vscode.commands.registerCommand('wildwest.setActor', async () => {
+      const current = vscode.workspace.getConfiguration('wildwest').get<string>('actor', '');
+      const value = await vscode.window.showInputBox({
+        title: 'Set Wild West Actor',
+        prompt: 'Format: Role(devPair)  e.g. TM(RHk)  or  CD(RSn)',
+        value: current,
+        placeHolder: 'TM(RHk)',
+      });
+      if (value !== undefined) {
+        await vscode.workspace.getConfiguration('wildwest').update('actor', value, vscode.ConfigurationTarget.Global);
+        sidePanelProvider?.refresh();
+      }
     }),
   );
 

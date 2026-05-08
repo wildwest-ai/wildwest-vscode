@@ -2,13 +2,22 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.32.0
+**Current version:** 0.31.2
 
 ---
 
 ## What's New
 
-**v0.32.0** — Sessions section in side panel + tooltip redesign: the Wild West side panel now has a **Sessions** section (watcher state toggle, Export Now, Batch Convert, Convert to Markdown, Generate Index, Open Export Folder — all clickable). Sections reordered: Heartbeat and Actor first, then Sessions, then telegraph sections. Status bar tooltip redesigned: live header (actor · scope), heartbeat state + relative last-beat time, compact watcher toggle, telegraph quick-actions (Send · Ack · Inbox · Solo), compact footer (Log · Settings). Session action links removed from tooltip (moved to side panel).
+**v0.31.2** — Side panel overhaul: Heartbeat, Actor, Sessions, and Utilities sections redesigned.
+- **Heartbeat** now shows state icon, scope, town alias (from registry), and last beat timestamp
+- **Actor** correctly parses `Role(devPair)` notation — shows `Role: TM` and `devPair: RHk` separately; `Edit actor…` item opens an input box to update the setting in place (`wildwest.setActor` command)
+- **Sessions** shows watcher toggle + bucketed session counts (Today / Yesterday / Last 7 days / Older) read from `staged/`
+- **Utilities** (new) consolidates maintenance actions: Export Now, Open Export Folder, Doctor, Validate Registry, Reset Session Consent, View Output Log, Settings
+- Sections reordered: Heartbeat · Actor · Sessions · Utilities · Inbox · Outbox · History · Board · Receipts
+
+**v0.31.1** — Sessions section in side panel + tooltip redesign: the Wild West side panel now has a **Sessions** section (watcher state toggle, Export Now, Batch Convert, Convert to Markdown, Generate Index, Open Export Folder — all clickable). Sections reordered: Heartbeat and Actor first, then Sessions, then telegraph sections. Status bar tooltip redesigned: live header (actor · scope), heartbeat state + relative last-beat time, compact watcher toggle, telegraph quick-actions (Send · Ack · Inbox · Solo), compact footer (Log · Settings). Session action links removed from tooltip (moved to side panel).
+
+**v0.31.0** — Unified status bar item: the two status bar items (session watcher eye + heartbeat/actor dot) are merged into a single `$(eye) ● Actor · Scope` item. Click focuses the Wild West side panel. Rich tooltip covers all session + governance actions.** — Sessions section in side panel + tooltip redesign: the Wild West side panel now has a **Sessions** section (watcher state toggle, Export Now, Batch Convert, Convert to Markdown, Generate Index, Open Export Folder — all clickable). Sections reordered: Heartbeat and Actor first, then Sessions, then telegraph sections. Status bar tooltip redesigned: live header (actor · scope), heartbeat state + relative last-beat time, compact watcher toggle, telegraph quick-actions (Send · Ack · Inbox · Solo), compact footer (Log · Settings). Session action links removed from tooltip (moved to side panel).
 
 **v0.31.0** — Unified status bar item: the two status bar items (session watcher eye + heartbeat/actor dot) are merged into a single `$(eye) ● Actor · Scope` item. Click focuses the Wild West side panel. Rich tooltip covers all session + governance actions.** — Cascading init commands: `wildwest.initCounty` and `wildwest.initTerritory` scaffold the same `.wildwest/` structure at county and territory scope — registry.json (correct scope field), telegraph dirs (inbox/outbox/history), `.claude/settings.json` (Claude Code hooks), CLAUDE.md template, and `.gitignore` update. County and territory windows now register the `ClaudeCodeAdapter` too; EADDRINUSE is handled silently via auto-retry (no toast). Shared helpers `generateHookConfig`, `writeClaudeSettings`, `updateGitignore`, `createTelegraphDirs` eliminate duplication. 15 new tests; 15 suites, 205 total.
 
@@ -116,9 +125,19 @@ The **Wild West** status bar item (bottom right) shows watcher state, heartbeat,
 - Telegraph quick-actions: Send · Ack · View Inbox · Solo Report
 - Footer: Output Log · Settings
 
-**Side panel (Sessions section) provides:**
-- Watcher toggle button
-- Export Now, Batch Convert, Convert to Markdown, Generate Index, Open Export Folder
+**Side panel sections:**
+
+| Section | Contents |
+|---|---|
+| Heartbeat | State, scope, town alias, last beat |
+| Actor | Role, devPair, Edit actor… |
+| Sessions | Watcher toggle, Today/Yesterday/Last 7d/Older counts |
+| Utilities | Export Now, Open Export Folder, Doctor, Validate Registry, Reset Consent, Log, Settings |
+| Inbox | Incoming telegraph memos |
+| Outbox | Queued outbound memos |
+| History | Delivered/archived memos |
+| Board | Branch lifecycle docs |
+| Receipts | Delivery receipt status |
 
 ---
 
