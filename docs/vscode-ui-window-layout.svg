@@ -3,7 +3,9 @@
     <style>
       .bg { fill: #1e1e1e; }
       .panel { fill: #252526; stroke: #3c3c3c; stroke-width: 2; }
+      .outline { fill: none; stroke: #007acc; stroke-width: 2; stroke-dasharray: 4, 4; }
       .label { fill: #d4d4d4; font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; font-weight: 500; }
+      .fieldLabel { fill: #007acc; font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; font-weight: 600; text-anchor: middle; }
       .smallLabel { fill: #a0a0a0; font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; }
       .title { fill: #d4d4d4; font-family: 'Segoe UI', Arial, sans-serif; font-size: 16px; font-weight: bold; }
     </style>
@@ -14,80 +16,60 @@
 
   <!-- Title Bar -->
   <rect x="0" y="0" width="1200" height="32" class="panel"/>
-  <text x="20" y="22" class="label">Title Bar / Menu Bar</text>
+  <text x="600" y="22" class="fieldLabel">&lt; Title Bar / Menu Bar &gt;</text>
 
   <!-- Activity Bar (far left) -->
   <rect x="0" y="32" width="50" height="736" class="panel"/>
-  <text x="8" y="52" class="smallLabel">Activity</text>
-  <text x="8" y="65" class="smallLabel">Bar</text>
-  <rect x="10" y="50" width="30" height="30" fill="#007acc" rx="4"/>
-  <rect x="10" y="90" width="30" height="30" fill="#404040" rx="4"/>
-  <rect x="10" y="130" width="30" height="30" fill="#404040" rx="4"/>
-  <rect x="10" y="170" width="30" height="30" fill="#404040" rx="4"/>
-  <rect x="10" y="210" width="30" height="30" fill="#404040" rx="4"/>
+  <text x="25" y="52" class="fieldLabel" transform="rotate(-90 25 52)" text-anchor="middle">&lt; Activity Bar &gt;</text>
+  <circle cx="25" cy="65" r="12" fill="#007acc"/>
+  <circle cx="25" cy="105" r="12" fill="#404040"/>
+  <circle cx="25" cy="145" r="12" fill="#404040"/>
+  <circle cx="25" cy="185" r="12" fill="#404040"/>
+  <circle cx="25" cy="225" r="12" fill="#404040"/>
 
   <!-- Side Bar -->
   <rect x="50" y="32" width="250" height="736" class="panel"/>
-  <text x="70" y="55" class="label">Explorer</text>
-  <rect x="60" y="65" width="230" height="120" fill="#1e1e1e" stroke="#3c3c3c" stroke-width="1" rx="3"/>
-  <text x="75" y="85" class="smallLabel">src/</text>
-  <text x="75" y="105" class="smallLabel">package.json</text>
-  <text x="75" y="125" class="smallLabel">README.md</text>
-  <text x="75" y="145" class="smallLabel">...</text>
+  <text x="175" y="55" class="label">&lt; Side Bar View &gt;</text>
+  <rect x="60" y="65" width="230" height="680" class="outline" rx="3"/>
+  <text x="175" y="400" class="fieldLabel" text-anchor="middle">&lt; Explorer / Search / SCM / Debug / Extensions &gt;</text>
 
   <!-- Editor Area -->
   <rect x="300" y="32" width="900" height="736" class="panel"/>
 
   <!-- Breadcrumbs -->
   <rect x="300" y="32" width="900" height="30" fill="#2d2d30" stroke="#3c3c3c" stroke-width="1"/>
-  <text x="315" y="52" class="smallLabel">src / extension.ts / HeartbeatMonitor</text>
+  <text x="750" y="52" class="fieldLabel">&lt; Breadcrumbs &gt;</text>
 
   <!-- Editor Tabs -->
   <rect x="300" y="62" width="900" height="35" fill="#1e1e1e" stroke="#3c3c3c" stroke-width="1"/>
-  <rect x="310" y="70" width="140" height="20" fill="#252526" stroke="#007acc" stroke-width="1" rx="2"/>
-  <text x="320" y="83" class="label">extension.ts</text>
-  <rect x="460" y="70" width="120" height="20" fill="#2d2d30" stroke="#3c3c3c" stroke-width="1" rx="2"/>
-  <text x="470" y="83" class="label">package.json</text>
+  <text x="750" y="86" class="fieldLabel">&lt; Editor Tabs &gt;</text>
 
-  <!-- Main Editor -->
-  <rect x="300" y="97" width="870" height="570" fill="#1e1e1e" stroke="#3c3c3c" stroke-width="1"/>
-  <text x="320" y="120" class="smallLabel">import { window, workspace } from 'vscode';</text>
-  <text x="320" y="140" class="smallLabel">import { HeartbeatMonitor } from './HeartbeatMonitor';</text>
-  <text x="320" y="180" class="smallLabel">export async function activate(context: ExtensionContext) {</text>
-  <text x="340" y="200" class="smallLabel">  const monitor = new HeartbeatMonitor();</text>
-  <text x="340" y="220" class="smallLabel">  await monitor.start();</text>
-  <text x="320" y="240" class="smallLabel">}</text>
+  <!-- Main Editor with outline -->
+  <rect x="300" y="97" width="870" height="570" class="outline" rx="3"/>
+  <text x="735" y="400" class="fieldLabel" text-anchor="middle">&lt; Editor Area &gt;</text>
 
   <!-- Minimap on right edge -->
   <rect x="1170" y="97" width="30" height="570" fill="#252526" stroke="#3c3c3c" stroke-width="1"/>
-  <text x="1175" y="400" class="smallLabel" text-anchor="middle">M</text>
-  <text x="1175" y="415" class="smallLabel" text-anchor="middle">i</text>
-  <text x="1175" y="430" class="smallLabel" text-anchor="middle">n</text>
+  <text x="1185" y="400" class="fieldLabel" text-anchor="middle" transform="rotate(-90 1185 400)">&lt; Minimap &gt;</text>
 
-  <!-- Panel (bottom) -->
-  <rect x="300" y="667" width="900" height="101" class="panel"/>
-  <rect x="300" y="667" width="900" height="28" fill="#2d2d30" stroke="#3c3c3c" stroke-width="1"/>
+  <!-- Panel (bottom) with outline -->
+  <rect x="300" y="667" width="900" height="101" class="outline" rx="3"/>
   
-  <!-- Panel tabs -->
-  <rect x="310" y="675" width="80" height="20" fill="#007acc" rx="2"/>
-  <text x="318" y="688" class="smallLabel">Terminal</text>
-  <rect x="400" y="675" width="70" height="20" fill="#404040" rx="2"/>
-  <text x="408" y="688" class="smallLabel">Output</text>
-  <rect x="480" y="675" width="100" height="20" fill="#404040" rx="2"/>
-  <text x="488" y="688" class="smallLabel">Debug Console</text>
+  <!-- Panel tabs header -->
+  <rect x="300" y="667" width="900" height="28" fill="#2d2d30" stroke="#3c3c3c" stroke-width="1"/>
+  <text x="750" y="686" class="fieldLabel">&lt; Terminal / Output / Debug Console / Problems &gt;</text>
 
   <!-- Panel content area -->
-  <rect x="310" y="705" width="880" height="55" fill="#1e1e1e" stroke="#3c3c3c" stroke-width="1"/>
-  <text x="320" y="725" class="smallLabel">~/project $ npm start</text>
-  <text x="320" y="745" class="smallLabel">Compiled successfully!</text>
+  <rect x="310" y="705" width="880" height="55" fill="#1e1e1e" stroke="#3c3c3c" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="750" y="740" class="fieldLabel" text-anchor="middle">&lt; Panel Output / Content &gt;</text>
 
   <!-- Status Bar -->
   <rect x="0" y="768" width="1200" height="32" class="panel"/>
-  <text x="20" y="788" class="smallLabel">Branch: main</text>
-  <text x="150" y="788" class="smallLabel">Ln 5, Col 23</text>
-  <text x="280" y="788" class="smallLabel">UTF-8</text>
-  <text x="370" y="788" class="smallLabel">LF</text>
-  <text x="440" y="788" class="smallLabel">TypeScript</text>
-  <text x="600" y="788" class="smallLabel">5 Problems</text>
-  <text x="1050" y="788" class="smallLabel">SSH: remote</text>
+  <text x="100" y="788" class="fieldLabel">&lt; Branch &gt;</text>
+  <text x="250" y="788" class="fieldLabel">&lt; Ln/Col &gt;</text>
+  <text x="400" y="788" class="fieldLabel">&lt; Encoding &gt;</text>
+  <text x="550" y="788" class="fieldLabel">&lt; EOL &gt;</text>
+  <text x="700" y="788" class="fieldLabel">&lt; Language &gt;</text>
+  <text x="900" y="788" class="fieldLabel">&lt; Problems &gt;</text>
+  <text x="1050" y="788" class="fieldLabel">&lt; Remote &gt;</text>
 </svg>
