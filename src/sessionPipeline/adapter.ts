@@ -189,11 +189,14 @@ export class PipelineAdapter {
 
   /**
    * Rebuild index.json by scanning staged/storage/sessions/*.json.
-   * Also patches project_path for ccx sessions from raw session_meta.payload.cwd.
+   * - Patches cld project_path to the registry-backed workspace root (Claude Code
+   *   records its .claude/ root, not the town directory).
+   * - Patches ccx project_path from raw session_meta.payload.cwd.
    * Returns number of sessions indexed.
    */
   rebuildIndexFromRecords(): number {
     const stagedDir = this.pipeline.getStagedDir();
+    const workspaceRoot = this.pipeline.getProjectPath();
     const sessionsDir = path.join(stagedDir, 'storage', 'sessions');
     const indexPath = path.join(stagedDir, 'storage', 'index.json');
     const rawDir = path.join(stagedDir, '..', 'raw');
@@ -206,8 +209,9 @@ export class PipelineAdapter {
     for (const file of files) {
       try {
         const record = JSON.parse(fs.readFileSync(path.join(sessionsDir, file), 'utf8')) as Record<string, unknown>;
+        let dirty = false;
 
-        // For ccx sessions, patch project_path from raw session_meta.payload.cwd
+        // ccx: patch project_path from raw session_meta.payload.cwd
         if (record['tool'] === 'ccx') {
           // tool_sid may already include extension (legacy records) or may be bare
           const sid = record['tool_sid'] as string;
@@ -222,10 +226,13 @@ export class PipelineAdapter {
             if (metaLine) {
               const meta = JSON.parse(metaLine) as Record<string, unknown>;
               const cwd = ((meta['payload'] as Record<string, unknown> | undefined)?.['cwd'] as string | undefined);
-              if (cwd) record['project_path'] = cwd;
+              if (cwd) { record['project_path'] = cwd; dirty = true; }
             }
           }
-          // Also update the session record on disk with patched project_path
+        }
+
+        // Persist any patches back to disk
+        if (dirty) {
           fs.writeFileSync(path.join(sessionsDir, file), JSON.stringify(record, null, 2), 'utf8');
         }
 

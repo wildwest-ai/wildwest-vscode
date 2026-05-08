@@ -8,7 +8,9 @@ Governance framework for AI-assisted development. Tracks dyad activity, exports 
 
 ## What's New
 
-**v0.31.31** — Town scope filter: also match sessions where `project_path` is an ancestor of the workspace (`townRoot.startsWith(pp + sep)`). Fixes Claude Code sessions being excluded — Claude Code records `projectPath` as the `.claude/` project root (e.g. `~/wildwest`), not the individual town directory.
+**v0.31.32** — Cascading governance scope filter: town scope now shows direct-match sessions (basename === alias) AND ancestor-match sessions (project_path is a parent of the workspace, e.g. `~/wildwest` world root). Governance is recursive — world/county sessions cascade down to constituent towns. CLD `project_path` preserved as-is (scope level is meaningful data, not a bug).
+
+**v0.31.31** — (superseded by v0.31.32)
 
 **v0.31.30** — Fix ccx `tool_sid` double-extension bug: adapter was stripping `.json` from `.jsonl` filenames, leaving `tool_sid` as `rollout-...cb7.jsonl`. Now strips the correct extension per file type. `rebuildIndexFromRecords()` handles legacy records with `.jsonl`-suffixed tool_sid. All 71 ccx sessions now get correct `project_path` from `session_meta.payload.cwd` on rebuild.
 

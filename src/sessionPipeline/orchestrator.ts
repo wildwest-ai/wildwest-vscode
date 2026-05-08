@@ -145,6 +145,8 @@ export class SessionExportPipeline {
       };
       await this.packetWriter.applyPacketToStorage(
         packet,
+        // Preserve raw project_path — governance is cascading so scope level is meaningful.
+        // e.g. cld projectPath=~/wildwest is world-scope and cascades to all towns.
         metadata.project_path || this.projectPath,
         metadata.session_type,
         {
@@ -203,5 +205,12 @@ export class SessionExportPipeline {
    */
   getAuthor(): string {
     return this.author;
+  }
+
+  /**
+   * Get projectPath (workspace root, registry-backed)
+   */
+  getProjectPath(): string {
+    return this.projectPath;
   }
 }

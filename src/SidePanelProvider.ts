@@ -214,10 +214,9 @@ export class SidePanelProvider
       const scopeFilter = (session: S): boolean => {
         const pp = (session['project_path'] as string) || '';
         if (scope === 'town') {
-          // Match by alias (basename) to handle reorganized/moved paths
+          // Direct match by alias (basename) — handles reorganized/moved paths
           if (path.basename(pp) === alias) return true;
-          // Also match when pp is an ancestor of townRoot — Claude Code records
-          // the .claude/ project root (e.g. ~/wildwest) not the town directory.
+          // Ancestor match — governance is cascading: county/world sessions govern this town too
           if (pp && townRoot.startsWith(pp + path.sep)) return true;
           return false;
         }
