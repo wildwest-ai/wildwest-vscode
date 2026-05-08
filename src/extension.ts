@@ -67,8 +67,21 @@ export function activate(context: vscode.ExtensionContext) {
   telegraphCommands.register(context);
 
   // ── AI Tool Bridge ────────────────────────────────────────────────────────
+  // ClaudeCodeAdapter binds a local HTTP port for Claude Code hooks.
+  // Only register it for town-scope workspaces — county/territory windows do
+  // not have .claude/settings.json pointing to this port and should not compete
+  // for it or show port-conflict errors.
   aiToolBridge = new AIToolBridge(outputChannel);
-  aiToolBridge.registerAdapter(new ClaudeCodeAdapter(outputChannel));
+  const workspaceScope = heartbeatMonitor.detectScope();
+  if (workspaceScope === 'town' || workspaceScope === null) {
+    // null = unrecognised workspace; still register so Claude Code hooks work
+    // in plain (non-governed) repos opened via this extension.
+    aiToolBridge.registerAdapter(new ClaudeCodeAdapter(outputChannel));
+  } else {
+    outputChannel.appendLine(
+      `[wildwest] skipping ClaudeCodeAdapter — workspace scope is '${workspaceScope}' (town only)`,
+    );
+  }
   aiToolBridge.onEvent((event) => {
     // turn-end and file-changed → trigger outbox delivery immediately
     if (event.type === 'turn-end' || event.type === 'file-changed') {

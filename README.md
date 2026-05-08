@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.29.2
+**Current version:** 0.29.3
 
 ---
 
 ## What's New
+
+**v0.29.3** — Scope-gate adapter + territory liveness: `ClaudeCodeAdapter` is now only registered in town-scope workspaces — county/territory windows no longer try to bind port 7379 or show port-conflict errors. `checkLiveness()` now falls through town → county → territory so territory-level windows show a real heartbeat state instead of always `stopped`.
 
 **v0.29.2** — Side panel heartbeat fix: `readSentinelTimestamp()` now reads the correct sentinel path per scope — `.wildwest/telegraph/.last-beat` for town, `.wildwest/.last-beat` for county/territory. County-level windows were showing a stale town sentinel (or `—`) instead of the current county beat.
 

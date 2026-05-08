@@ -950,10 +950,11 @@ export class HeartbeatMonitor {
   }
 
   checkLiveness(): HeartbeatState {
-    // Report town liveness for status bar (primary concern for the user).
-    // Fall back to county if this workspace has no town scope (e.g. county-level window).
+    // Report liveness for the highest-priority scope present in this workspace.
+    // Town > county > territory — fall through until we find one.
     const primary = this.scopes.find((s) => s.scope === 'town')
-      ?? this.scopes.find((s) => s.scope === 'county');
+      ?? this.scopes.find((s) => s.scope === 'county')
+      ?? this.scopes.find((s) => s.scope === 'territory');
     if (!primary) return 'stopped';
     const sentinel = sentinelPath(primary.rootPath, primary.scope);
     try {
