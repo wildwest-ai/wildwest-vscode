@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.26.0
+**Current version:** 0.27.0
 
 ---
 
 ## What's New
+
+**v0.27.0** — Memo action UX: `processInbox` now parses frontmatter to show `From: <actor> → <subject>` in the picker title instead of raw filename, previews first body line as picker detail, and adds a **Reply** action — compose and queue a full response memo to outbox (with correct frontmatter + `Ref:`) and archive the original in one step. Cancel on input box aborts without archiving. 9 new tests; 13 suites, 160 total.
 
 **v0.26.0** — CLAUDE.md template: `wildwest.initTown` now generates a `CLAUDE.md` at the repo root (skips if already exists). Template includes identity block (alias, wwuid, remote, scope), cold-start checklist, key paths, telegraph rules, and quick commands — pre-filled from registry data. 9 new tests; 13 suites, 153 total.
 

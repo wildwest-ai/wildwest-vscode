@@ -13,7 +13,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { telegraphTimestamp, archiveMemo, getTelegraphDirs as wwGetTelegraphDirs } from './TelegraphService';
+import { telegraphTimestamp, archiveMemo, getTelegraphDirs as wwGetTelegraphDirs, parseFrontmatter } from './TelegraphService';
 
 const SKIP_RE = /^\.last-beat$|^\.gitkeep$|--heartbeat--|^ack-|--ack-/;
 const TIMESTAMPED_MEMO_RE = /^\d{8}-\d{4}Z-to-.+-from-.+--.+\.md$/;
@@ -103,6 +103,16 @@ export class TelegraphInbox {
   private async processMemo(dir: string, filename: string): Promise<boolean> {
     const filePath = path.join(dir, filename);
 
+    // Parse frontmatter for rich display — fall back to filename parsing
+    const frontmatter = parseFrontmatter(filePath);
+    const match = filename.match(PARSE_MEMO_RE);
+    const fromActor = frontmatter['from'] ?? (match ? match[3] : '?');
+    const toActor   = frontmatter['to']   ?? (match ? match[2] : '?');
+    const subject   = frontmatter['subject'] ?? (match ? match[4].replace(/-/g, ' ') : filename);
+
+    // First line of body as context snippet (skip frontmatter block)
+    const bodySnippet = this.readBodySnippet(filePath);
+
     // Open memo in editor — actor reads before responding
     try {
       const doc = await vscode.workspace.openTextDocument(filePath);
@@ -112,23 +122,30 @@ export class TelegraphInbox {
     }
 
     const townLabel = this.deriveTownLabel(dir);
+    const pickerTitle = `📬 [${townLabel}] From: ${fromActor} → ${subject}`;
 
     const action = await vscode.window.showQuickPick<ActionItem>(
       [
         {
           label: '$(check) Ack Done',
-          description: 'memo consumed — task complete',
+          description: 'consumed — task complete',
+          detail: bodySnippet,
           value: 'done',
         },
         {
           label: '$(warning) Ack Blocked',
-          description: 'memo consumed — blocked, add detail',
+          description: 'consumed — blocked, add detail',
           value: 'blocked',
         },
         {
           label: '$(question) Ack Question',
-          description: 'memo consumed — need clarification',
+          description: 'consumed — need clarification',
           value: 'question',
+        },
+        {
+          label: '$(reply) Reply',
+          description: 'send a full response memo to outbox, then archive',
+          value: 'reply',
         },
         {
           label: '$(debug-step-over) Defer',
@@ -142,9 +159,9 @@ export class TelegraphInbox {
         },
       ],
       {
-        title: `📬 [${townLabel}] ${filename}`,
-        placeHolder: 'How do you respond to this memo?',
-        ignoreFocusOut: true, // stays visible while actor reads the open doc
+        title: pickerTitle,
+        placeHolder: `How do you respond? (To: ${toActor})`,
+        ignoreFocusOut: true,
       },
     );
 
@@ -156,6 +173,10 @@ export class TelegraphInbox {
       return true;
     }
 
+    if (action.value === 'reply') {
+      return await this.handleReply(dir, filename, match, fromActor, toActor, subject);
+    }
+
     const status = action.value as AckStatus;
     let comment: string | undefined;
 
@@ -165,12 +186,92 @@ export class TelegraphInbox {
         placeHolder: 'One clear sentence...',
         ignoreFocusOut: true,
       });
-      // undefined = user escaped — treat as empty string, still write the ack
       comment = comment ?? '';
     }
 
     await this.writeAckAndArchive(dir, filename, status, comment);
     return true;
+  }
+
+  /**
+   * Handle the Reply action: compose a full memo to the original sender
+   * and archive the original.
+   */
+  private async handleReply(
+    dir: string,
+    filename: string,
+    match: RegExpMatchArray | null,
+    fromActor: string,
+    toActor: string,
+    subject: string,
+  ): Promise<boolean> {
+    const body = await vscode.window.showInputBox({
+      title: `Reply to ${fromActor} — re: ${subject}`,
+      placeHolder: 'Enter your reply (one or more sentences)…',
+      ignoreFocusOut: true,
+    });
+    // undefined = user cancelled the input box — abort reply, don't archive
+    if (body === undefined) {
+      this.outputChannel.appendLine(`[TelegraphInbox] reply cancelled for ${filename}`);
+      return true; // continue inbox, don't stop
+    }
+
+    const ts = telegraphTimestamp();
+    const reSubject = match ? `re-${match[4]}` : `re-${subject.replace(/\s+/g, '-')}`;
+    const replyFilename = `${ts}-to-${fromActor}-from-${toActor}--${reSubject}.md`;
+
+    const isoNow = new Date().toISOString();
+    const replyBody = [
+      `---`,
+      `from: ${toActor}`,
+      `to: ${fromActor}`,
+      `type: reply`,
+      `date: ${isoNow}`,
+      `subject: ${reSubject}`,
+      `---`,
+      ``,
+      `Ref: ${filename}`,
+      ``,
+      body,
+      ``,
+    ].join('\n');
+
+    // Determine outbox path relative to telegraph dir
+    const telegraphDir = path.basename(dir) === 'inbox' ? path.dirname(dir) : dir;
+    const outboxDir = path.join(telegraphDir, 'outbox');
+    fs.mkdirSync(outboxDir, { recursive: true });
+    fs.writeFileSync(path.join(outboxDir, replyFilename), replyBody, 'utf-8');
+
+    // Archive original
+    archiveMemo(path.join(dir, filename), path.join(dir, 'history'));
+
+    this.outputChannel.appendLine(`[TelegraphInbox] reply queued in outbox: ${replyFilename}`);
+    vscode.window.showInformationMessage(`Wild West: reply queued — ${replyFilename}`);
+    return true;
+  }
+
+  /**
+   * Read the first meaningful body line after frontmatter for picker detail display.
+   */
+  private readBodySnippet(filePath: string): string {
+    try {
+      const lines = fs.readFileSync(filePath, 'utf8').split('\n');
+      let inFrontmatter = false;
+      let passedFrontmatter = false;
+      for (const line of lines) {
+        if (line.trim() === '---') {
+          if (!inFrontmatter) { inFrontmatter = true; continue; }
+          passedFrontmatter = true; inFrontmatter = false; continue;
+        }
+        if (inFrontmatter) continue;
+        if (!passedFrontmatter && lines[0].trim() !== '---') passedFrontmatter = true;
+        const trimmed = line.trim();
+        if (trimmed.length > 0) {
+          return trimmed.length > 80 ? trimmed.slice(0, 77) + '…' : trimmed;
+        }
+      }
+    } catch { /* ignore */ }
+    return '';
   }
 
   private async writeAckAndArchive(
