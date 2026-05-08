@@ -102,7 +102,7 @@ export function activate(context: vscode.ExtensionContext) {
   // ── wwMCP server (P6) — stdio, opt-in via wildwest.mcp.enabled ───────────
   registerMCPServer(context, outputChannel, heartbeatMonitor);
 
-  // ── Commands — devPair log (existing) ─────────────────────────────────────
+  // ── Commands — dyad log (existing) ─────────────────────────────────────
   context.subscriptions.push(
     vscode.commands.registerCommand('wildwest.startWatcher', () => exporter.start()),
     vscode.commands.registerCommand('wildwest.stopWatcher', () => exporter.stop()),
@@ -117,16 +117,16 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('wildwest.openSettings', () => {
       vscode.commands.executeCommand('workbench.action.openSettings', 'wildwest');
     }),
-    vscode.commands.registerCommand('wildwest.setActor', async () => {
-      const current = vscode.workspace.getConfiguration('wildwest').get<string>('actor', '');
+    vscode.commands.registerCommand('wildwest.setIdentity', async () => {
+      const current = vscode.workspace.getConfiguration('wildwest').get<string>('identity', '');
       const value = await vscode.window.showInputBox({
-        title: 'Set Wild West Actor',
-        prompt: 'Format: Role(devPair)  e.g. TM(RHk)  or  CD(RSn)',
+        title: 'Set Wild West Identity',
+        prompt: 'Format: Role(dyad)  e.g. TM(RHk)  or  CD(RSn)',
         value: current,
         placeHolder: 'TM(RHk)',
       });
       if (value !== undefined) {
-        await vscode.workspace.getConfiguration('wildwest').update('actor', value, vscode.ConfigurationTarget.Global);
+        await vscode.workspace.getConfiguration('wildwest').update('identity', value, vscode.ConfigurationTarget.Global);
         sidePanelProvider?.refresh();
       }
     }),
@@ -140,7 +140,7 @@ export function activate(context: vscode.ExtensionContext) {
         { label: 'Sessions', kind: vscode.QuickPickItemKind.Separator },
         { label: 'Start Watcher',             command: 'wildwest.startWatcher' },
         { label: 'Stop Watcher',              command: 'wildwest.stopWatcher' },
-        { label: 'Export devPair Log Now',    command: 'wildwest.exportNow' },
+        { label: 'Export Dyad Log Now',       command: 'wildwest.exportNow' },
         { label: 'Batch Convert All Sessions',command: 'wildwest.batchConvert' },
         { label: 'Convert Exports to Markdown', command: 'wildwest.convertToMarkdown' },
         { label: 'Generate Index',            command: 'wildwest.generateIndex' },
@@ -217,8 +217,8 @@ export function activate(context: vscode.ExtensionContext) {
     }),
     vscode.commands.registerCommand('wildwest.showStatus', () => {
       const scope = heartbeatMonitor.detectScope();
-      const actor = vscode.workspace.getConfiguration('wildwest').get<string>('actor', '');
-      const info = scope ? `Scope: ${scope}\nActor: ${actor || '(not declared)'}` : 'No Wild West scope detected';
+      const identity = vscode.workspace.getConfiguration('wildwest').get<string>('identity', '');
+      const info = scope ? `Scope: ${scope}\nIdentity: ${identity || '(not declared)'}` : 'No Wild West scope detected';
       vscode.window.showInformationMessage(`Wild West Status\n${info}`);
     }),
     vscode.commands.registerCommand('wildwest.resetSessionConsent', () => {

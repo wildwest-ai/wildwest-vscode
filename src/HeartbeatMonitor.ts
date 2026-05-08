@@ -802,10 +802,10 @@ function beatTown(
   // Validate declared actor role against scope
   const scopeCheck = scopeOf(rootPath);
   if (scopeCheck === 'town') {
-    const actorSetting = vscode.workspace.getConfiguration('wildwest').get<string>('actor', '');
-    if (actorSetting) {
+    const identitySetting = vscode.workspace.getConfiguration('wildwest').get<string>('identity', '');
+    if (identitySetting) {
       // Extract just the role part (before any parentheses, e.g. "TM" from "TM(RHk)")
-      const roleMatch = actorSetting.match(/^([A-Za-z]+)/);
+      const roleMatch = identitySetting.match(/^([A-Za-z]+)/);
       if (roleMatch) {
         const role = roleMatch[1];
         if (!isValidRoleForScope(role, 'town')) {

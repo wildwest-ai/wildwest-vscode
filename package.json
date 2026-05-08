@@ -1,12 +1,12 @@
 {
   "name": "wildwest-vscode",
   "displayName": "Wild West",
-  "description": "Wild West governance framework for VSCode — heartbeat, telegraph, devPair activity log",
+  "description": "Wild West governance framework for VSCode — heartbeat, telegraph, dyad session activity log",
   "repository": {
     "type": "git",
     "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
   },
-  "version": "0.31.3",
+  "version": "0.31.4",
   "publisher": "wildwest-ai",
   "engines": {
     "vscode": "^1.90.0"
@@ -32,7 +32,7 @@
       },
       {
         "command": "wildwest.exportNow",
-        "title": "Export devPair Log Now",
+        "title": "Export Dyad Log Now",
         "category": "Wild West"
       },
       {
@@ -136,8 +136,8 @@
         "category": "Wild West"
       },
       {
-        "command": "wildwest.setActor",
-        "title": "Set Actor",
+        "command": "wildwest.setIdentity",
+        "title": "Set Identity",
         "category": "Wild West"
       },
       {
@@ -208,7 +208,7 @@
         "wildwest.exportPath": {
           "type": "string",
           "default": "",
-          "description": "Path where devPair logs should be saved. Leave empty to use default: ~/wildwest-logs/{git-username}/. Supports ${userHome} and ~ expansion."
+          "description": "Path where dyad session logs should be saved. Leave empty to use default: ~/wildwest-logs/{git-username}/. Supports ${userHome} and ~ expansion."
         },
         "wildwest.watchInterval": {
           "type": "number",
@@ -218,7 +218,7 @@
         "wildwest.autoExportOnChange": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically export devPair log when chat data changes"
+          "description": "Automatically export dyad session log when chat data changes"
         },
         "wildwest.heartbeat.town.intervalMs": {
           "type": "number",
@@ -280,10 +280,10 @@
           "default": "sessions",
           "description": "Directory name for session exports, relative to worldRoot. Default: sessions."
         },
-        "wildwest.actor": {
+        "wildwest.identity": {
           "type": "string",
           "default": "",
-          "description": "Declare this window's actor role (e.g., RA(RSn), TM(RHk), CD(RSn)). Scope determines valid roles. Leave empty for no actor."
+          "description": "Declare this window's identity (e.g., TM(RHk), CD(RSn)). Format: Role(dyad). Scope determines valid roles. Leave empty for no identity."
         }
       }
     }

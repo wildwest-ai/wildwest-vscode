@@ -92,7 +92,7 @@ export class SidePanelProvider
     const sessionTotal = sessionCounts.today + sessionCounts.yesterday + sessionCounts.last7d + sessionCounts.older;
     return [
       new SidePanelItem('Heartbeat', vscode.TreeItemCollapsibleState.Collapsed, 'heartbeat'),
-      new SidePanelItem('Actor', vscode.TreeItemCollapsibleState.Collapsed, 'actor'),
+      new SidePanelItem('Identity', vscode.TreeItemCollapsibleState.Collapsed, 'identity'),
       this.sectionItem('Sessions', 'sessions', sessionTotal),
       new SidePanelItem('Utilities', vscode.TreeItemCollapsibleState.Collapsed, 'utilities'),
       this.sectionItem('Inbox', 'inbox', inboxFiles.length),
@@ -111,7 +111,7 @@ export class SidePanelProvider
   private getSectionChildren(sectionId: string): SidePanelItem[] {
     switch (sectionId) {
       case 'heartbeat': return this.heartbeatChildren();
-      case 'actor':     return this.actorChildren();
+      case 'identity':  return this.identityChildren();
       case 'sessions':  return this.sessionsChildren();
       case 'utilities': return this.utilitiesChildren();
       case 'inbox':     return this.memoItems(this.collectTelegraphFiles('inbox'));
@@ -308,25 +308,25 @@ export class SidePanelProvider
 
   // ── Actor ─────────────────────────────────────────────────────────────────
 
-  private actorChildren(): SidePanelItem[] {
-    const actorSetting = vscode.workspace.getConfiguration('wildwest').get<string>('actor', '') || '';
+  private identityChildren(): SidePanelItem[] {
+    const identitySetting = vscode.workspace.getConfiguration('wildwest').get<string>('identity', '') || '';
 
-    // Parse "TM(RHk)" → role="TM", devPair="RHk"
-    let role = actorSetting || '—';
-    let devPair = '—';
-    const match = actorSetting.match(/^([^(]+)\(([^)]+)\)$/);
+    // Parse "TM(RHk)" → role="TM", dyad="RHk"
+    let role = identitySetting || '—';
+    let dyad = '—';
+    const match = identitySetting.match(/^([^(]+)\(([^)]+)\)$/);
     if (match) {
       role = match[1].trim();
-      devPair = match[2].trim();
+      dyad = match[2].trim();
     }
 
-    const editItem = new SidePanelItem('Edit actor…', vscode.TreeItemCollapsibleState.None);
+    const editItem = new SidePanelItem('Edit identity…', vscode.TreeItemCollapsibleState.None);
     editItem.iconPath = new vscode.ThemeIcon('edit');
-    editItem.command = { command: 'wildwest.setActor', title: 'Set Actor' };
+    editItem.command = { command: 'wildwest.setIdentity', title: 'Set Identity' };
 
     return [
       new SidePanelItem(`Role: ${role}`, vscode.TreeItemCollapsibleState.None),
-      new SidePanelItem(`devPair: ${devPair}`, vscode.TreeItemCollapsibleState.None),
+      new SidePanelItem(`dyad: ${dyad}`, vscode.TreeItemCollapsibleState.None),
       editItem,
     ];
   }

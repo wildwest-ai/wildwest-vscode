@@ -180,20 +180,20 @@ function checkInbox(wwDir: string): CheckResult {
   };
 }
 
-function checkActorRole(wwDir: string, monitor: HeartbeatMonitor): CheckResult {
-  const actor = vscode.workspace.getConfiguration('wildwest').get<string>('actor', '');
-  if (!actor) {
-    return { label: 'Actor role', status: 'info', detail: 'not declared (wildwest.actor)' };
+function checkIdentityRole(wwDir: string, monitor: HeartbeatMonitor): CheckResult {
+  const identity = vscode.workspace.getConfiguration('wildwest').get<string>('identity', '');
+  if (!identity) {
+    return { label: 'Identity', status: 'info', detail: 'not declared (wildwest.identity)' };
   }
   const scope = monitor.detectScope();
   if (!scope) {
-    return { label: 'Actor role', status: 'info', detail: `${actor} — scope not detected` };
+    return { label: 'Identity', status: 'info', detail: `${identity} — scope not detected` };
   }
-  const valid = monitor.validateActorForScope(actor, scope);
+  const valid = monitor.validateActorForScope(identity, scope);
   return {
-    label: 'Actor role',
+    label: 'Identity',
     status: valid ? 'ok' : 'warn',
-    detail: valid ? `${actor} valid for ${scope}` : `${actor} is not a known role for ${scope}`,
+    detail: valid ? `${identity} valid for ${scope}` : `${identity} is not a known role for ${scope}`,
   };
 }
 
@@ -230,7 +230,7 @@ export async function runDoctor(
     checkMCP(),
     checkConsent(context),
     checkInbox(wwDir),
-    checkActorRole(wwDir, monitor),
+    checkIdentityRole(wwDir, monitor),
   ];
 
   const hookCheck = await checkHookPort();

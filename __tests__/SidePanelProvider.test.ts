@@ -80,7 +80,7 @@ describe('SidePanelProvider', () => {
     const roots = provider.getChildren();
     expect(roots).toHaveLength(9);
     expect(roots.map((r) => r.sectionId)).toEqual([
-      'heartbeat', 'actor', 'sessions', 'utilities', 'inbox', 'outbox', 'history', 'board', 'receipts',
+      'heartbeat', 'identity', 'sessions', 'utilities', 'inbox', 'outbox', 'history', 'board', 'receipts',
     ]);
     provider.dispose();
   });
@@ -188,20 +188,20 @@ describe('SidePanelProvider', () => {
     provider.dispose();
   });
 
-  it('actor section shows parsed role and devPair from config', () => {
+  it('identity section shows parsed role and dyad from config', () => {
     const vscode = require('vscode');
     (vscode.workspace.getConfiguration as jest.Mock).mockReturnValue({
       get: (_key: string, def: unknown) =>
-        _key === 'actor' ? 'TM(RHk)' : def,
+        _key === 'identity' ? 'TM(RHk)' : def,
     });
 
     const provider = new SidePanelProvider(mockMonitor);
-    const actorSection = provider.getChildren().find((r) => r.sectionId === 'actor')!;
-    const children = provider.getChildren(actorSection);
+    const identitySection = provider.getChildren().find((r) => r.sectionId === 'identity')!;
+    const children = provider.getChildren(identitySection);
     expect(children).toHaveLength(3);
     expect((children[0] as SidePanelItem).label).toContain('Role: TM');
-    expect((children[1] as SidePanelItem).label).toContain('devPair: RHk');
-    expect((children[2] as SidePanelItem).label).toContain('Edit actor');
+    expect((children[1] as SidePanelItem).label).toContain('dyad: RHk');
+    expect((children[2] as SidePanelItem).label).toContain('Edit identity');
     provider.dispose();
   });
 

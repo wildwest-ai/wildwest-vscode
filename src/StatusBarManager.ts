@@ -44,14 +44,14 @@ export class StatusBarManager {
       return;
     }
 
-    const actorSetting = vscode.workspace.getConfiguration('wildwest').get<string>('actor', '');
+    const identitySetting = vscode.workspace.getConfiguration('wildwest').get<string>('identity', '');
     const scopeLabel = scope.charAt(0).toUpperCase() + scope.slice(1);
     const liveness = this.heartbeatMonitor.checkLiveness();
     const eyeIcon = this.isWatching ? '$(eye)' : '$(eye-closed)';
     const heartDot = liveness === 'alive' ? '●' : liveness === 'flagged' ? '⚑' : '○';
 
-    if (actorSetting) {
-      this.statusBarItem.text = `${eyeIcon} ${heartDot} ${actorSetting} · ${scopeLabel}`;
+    if (identitySetting) {
+      this.statusBarItem.text = `${eyeIcon} ${heartDot} ${identitySetting} · ${scopeLabel}`;
       this.statusBarItem.color = new vscode.ThemeColor('statusBar.foreground');
     } else {
       this.statusBarItem.text = `${eyeIcon} ${heartDot} ${scopeLabel}`;
@@ -70,9 +70,9 @@ export class StatusBarManager {
     // Header: identity + scope
     const scope = this.heartbeatMonitor.detectScope();
     const scopeLabel = scope ? scope.charAt(0).toUpperCase() + scope.slice(1) : '—';
-    const actorSetting = vscode.workspace.getConfiguration('wildwest').get<string>('actor', '');
-    const header = actorSetting
-      ? `**Wild West** · ${actorSetting} · ${scopeLabel}`
+    const identitySetting = vscode.workspace.getConfiguration('wildwest').get<string>('identity', '');
+    const header = identitySetting
+      ? `**Wild West** · ${identitySetting} · ${scopeLabel}`
       : `**Wild West** · ${scopeLabel}`;
     tooltip.appendMarkdown(`${header}\n\n`);
 
@@ -138,7 +138,7 @@ export class StatusBarManager {
   startListening(): void {
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration((e) => {
-        if (e.affectsConfiguration('wildwest.actor')) {
+        if (e.affectsConfiguration('wildwest.identity')) {
           this.updateDisplay();
         }
       }),
