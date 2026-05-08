@@ -177,6 +177,9 @@ export class PacketWriter {
       `${packet.wwuid}.json`
     );
 
+    const lastTurnTimestamp = packet.turns[packet.turns.length - 1].timestamp;
+    const firstTurnTimestamp = packet.turns[0].timestamp;
+
     let record = this.loadSessionRecord(packet.wwuid);
 
     if (!record) {
@@ -190,9 +193,9 @@ export class PacketWriter {
         device_id: packet.device_id,
         session_type: sessionType,
         project_path: projectPath,
-        created_at: packet.created_at,
-        last_turn_at: packet.created_at,
-        closed_at: packet.closed ? packet.created_at : null,
+        created_at: firstTurnTimestamp,
+        last_turn_at: lastTurnTimestamp,
+        closed_at: packet.closed ? lastTurnTimestamp : null,
         cursor: {
           type: this.getCursorType(packet.tool),
           value: this.extractCursorValue(packet.turns[packet.turns.length - 1]),
@@ -216,7 +219,7 @@ export class PacketWriter {
       record.turns.sort((a, b) => a.turn_index - b.turn_index);
 
       // Update metadata
-      record.last_turn_at = packet.created_at;
+      record.last_turn_at = lastTurnTimestamp;
       record.turn_count = record.turns.length;
       record.cursor = (toolCursor as Cursor | undefined) || {
         type: this.getCursorType(packet.tool),
@@ -225,7 +228,7 @@ export class PacketWriter {
 
       // Mark as closed if this packet is the close
       if (packet.closed) {
-        record.closed_at = packet.created_at;
+        record.closed_at = lastTurnTimestamp;
       }
     }
 
