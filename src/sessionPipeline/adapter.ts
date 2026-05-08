@@ -18,6 +18,8 @@ export interface PipelineAdapterOptions {
   sessionsDir: string;
   actor: string;
   projectPath?: string;
+  privacyMode?: boolean;
+  homeDir?: string;
 }
 
 /**
@@ -38,6 +40,8 @@ export class PipelineAdapter {
       sessionsDir: options.sessionsDir,
       actor: options.actor,
       projectPath: options.projectPath,
+      privacyMode: options.privacyMode ?? false,
+      homeDir: options.homeDir,
     });
   }
 

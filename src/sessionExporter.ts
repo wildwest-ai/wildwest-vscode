@@ -63,10 +63,13 @@ export class SessionExporter {
     // Initialize pipeline adapter
     try {
       const gitUsername = this.getGitUsername();
+      const privacyMode = vscode.workspace.getConfiguration('wildwest').get<boolean>('privacy.enabled', false);
       this.pipelineAdapter = new PipelineAdapter({
         sessionsDir: this.exportPath,
         actor: gitUsername,
         projectPath: vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath,
+        privacyMode,
+        homeDir: this.userHome,
       });
     } catch (error) {
       this.log(`${this.getTimestamp('warn')} Failed to initialize pipeline adapter: ${error}`);

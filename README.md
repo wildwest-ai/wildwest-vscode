@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.25.12
+**Current version:** 0.25.13
 
 ---
 
 ## What's New
+
+**v0.25.13** — Privacy mode: new `wildwest.privacy.enabled` setting (default: off). When enabled, session export pipeline redacts secrets (GitHub tokens, AWS keys, Bearer tokens, sk- keys, env assignments), absolute paths, and home directory references from turn content before writing staged packets. 27 new tests; 12 suites, 144 total.
 
 **v0.25.12** — Registry validator: new `wildwest.validateRegistry` command lints `.wildwest/registry.json` against the Wild West schema (required fields, UUID format, valid scope enum, actor shape, role-scope alignment). Output channel + notification summary. 26 new tests; 11 suites, 117 total.
 

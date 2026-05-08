@@ -14,6 +14,7 @@ import { getTransformer } from './transformers';
 import { PacketWriter } from './packetWriter';
 import { SessionPacket, NormalizedTurn } from './types';
 import { generateWwsid, generateDeviceId, getCursorType } from './utils';
+import { redactTurns } from '../PrivacyFilter';
 
 export interface PipelineOptions {
   /**
@@ -28,6 +29,15 @@ export interface PipelineOptions {
    * Optional project path (used for SessionRecord metadata)
    */
   projectPath?: string;
+  /**
+   * When true, redact secrets, tokens, and absolute paths from turn
+   * content before writing packets (default: false).
+   */
+  privacyMode?: boolean;
+  /**
+   * User home directory used for path redaction (default: process.env.HOME)
+   */
+  homeDir?: string;
 }
 
 export interface ExportSession {
@@ -46,6 +56,8 @@ export class SessionExportPipeline {
   private stagedDir: string;
   private packetWriter: PacketWriter;
   private device_id: string;
+  private privacyMode: boolean;
+  private homeDir: string;
 
   constructor(options: PipelineOptions) {
     this.sessionsDir = options.sessionsDir;
@@ -53,6 +65,8 @@ export class SessionExportPipeline {
     this.projectPath = options.projectPath || '';
     this.stagedDir = path.join(this.sessionsDir, 'staged');
     this.device_id = generateDeviceId();
+    this.privacyMode = options.privacyMode ?? false;
+    this.homeDir = options.homeDir ?? process.env['HOME'] ?? '';
 
     this.packetWriter = new PacketWriter({
       stagedDir: this.stagedDir,
@@ -88,11 +102,16 @@ export class SessionExportPipeline {
       return;
     }
 
+    // 3. Apply privacy filter (if enabled)
+    const filteredTurns = this.privacyMode
+      ? redactTurns(allTurns, this.homeDir)
+      : allTurns;
+
     // 3. Generate wwsid
     const wwsid = generateWwsid(tool, tool_sid);
 
     // 4. Check cursor to determine delta
-    const newTurns = this.filterNewTurns(wwsid, allTurns);
+    const newTurns = this.filterNewTurns(wwsid, filteredTurns);
 
     if (newTurns.length === 0 && !closed) {
       // No new turns and not closed — skip packet
@@ -100,7 +119,7 @@ export class SessionExportPipeline {
     }
 
     // 5. Write packet
-    const turnsForPacket = newTurns.length > 0 ? newTurns : allTurns;
+    const turnsForPacket = newTurns.length > 0 ? newTurns : filteredTurns;
     try {
       await this.packetWriter.writePacket(wwsid, tool, tool_sid, turnsForPacket, closed);
     } catch (error) {
