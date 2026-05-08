@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.27
+**Current version:** 0.31.28
 
 ---
 
 ## What's New
+
+**v0.31.28** — Fix `CodexTransformer.getSessionMetadata()`: was returning `project_path: ''` for all sessions. Now extracts `session_meta.payload.cwd` in `parseRaw()` and surfaces it via `getSessionMetadata()`. All ccx sessions will now have correct project paths after rebuild.
 
 **v0.31.27** — Town scope filter now matches by `alias` (`path.basename`) instead of full `project_path`. Fixes sessions missing when workspace was reorganized/moved (e.g. `counties/wildwest-ai/wildwest-framework` → `wildwest/counties/wildwest-ai/wildwest-framework`). Convention: `alias === basename(project_path)` is stable across moves.
 

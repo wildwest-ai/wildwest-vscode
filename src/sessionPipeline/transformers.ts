@@ -315,13 +315,16 @@ export class CodexTransformer implements ISessionTransformer {
     const lines = rawContent.split('\n').filter((l) => l.trim());
     const parsed = lines.map((line) => JSON.parse(line) as Record<string, unknown>);
 
-    // Extract session_meta timestamp as session start time
+    // Extract session_meta fields
     const metaLine = parsed.find((m) => m['type'] === 'session_meta');
+    const metaPayload = metaLine?.['payload'] as Record<string, unknown> | undefined;
     const sessionStart: string | undefined =
       (metaLine?.['timestamp'] as string | undefined) ||
-      ((metaLine?.['payload'] as Record<string, unknown> | undefined)?.['timestamp'] as string | undefined);
+      (metaPayload?.['timestamp'] as string | undefined);
+    const projectPath: string =
+      (metaPayload?.['cwd'] as string | undefined) || '';
 
-    return { messages: parsed, line_count: lines.length, session_start: sessionStart };
+    return { messages: parsed, line_count: lines.length, session_start: sessionStart, project_path: projectPath };
   }
 
   getCurrentCursor(rawSession: unknown): Cursor {
@@ -376,9 +379,10 @@ export class CodexTransformer implements ISessionTransformer {
     return turns;
   }
 
-  getSessionMetadata(_rawSession: unknown) {
+  getSessionMetadata(rawSession: unknown) {
+    const session = rawSession as Record<string, unknown>;
     return {
-      project_path: '',
+      project_path: (session['project_path'] as string) || '',
       session_type: 'chat' as const,
     };
   }
