@@ -1,6 +1,6 @@
 # TODO — wildwest-vscode
 
-> **Last updated:** 2026-05-08T00:57Z
+> **Last updated:** 2026-05-08T12:56Z
 > **Review source:** `docs/20260507-2253Z-repo-review-findings.md`
 
 ---
@@ -23,13 +23,13 @@
 
 ## P2 — Nice-to-Have
 
-- [ ] **TelegraphService abstraction** — centralize address parsing, filename generation, inbox/outbox paths, ack generation, archiving, and delivery status
-- [ ] **Production-code telegraph tests** — replace copied/simplified test implementations with tests that import and exercise production delivery/inbox code; v0.25.6 added the first production delivery regression for self-addressed mail
-- [ ] **Wild West Doctor command** — validate registry, worktree, outbox/inbox dirs, actor role, export path, MCP status, hook port, and stale heartbeat state
-- [ ] **Side panel** — show Inbox, Outbox, History, Board, Heartbeat, and Actor state in one VS Code view
-- [ ] **Memo action UX** — Ack Done, Blocked, Question, Defer, Archive, Open Source Memo, Retry Delivery
-- [ ] **Delivery receipts** — track pending, delivered, failed, acknowledged, and blocked per memo
-- [ ] **Privacy mode** — redact paths, environment-looking strings, and known secret patterns before staged export
-- [ ] **CLAUDE.md template** — Framework gap; auto-scaffold on `initTown`
-- [ ] **Registry validator** — Lint `.wildwest/registry.json` for schema compliance
-- [ ] **Release artifact hygiene** — move tracked historical VSIX files out of git and keep releases in GitHub Releases or CI artifacts
+- [x] **TelegraphService abstraction** — centralize address parsing, filename generation, inbox/outbox paths, ack generation, archiving, delivery status (v0.25.10)
+- [x] **Production-code telegraph tests** — exercise production delivery/inbox code paths (v0.25.10)
+- [x] **Wild West Doctor command** — validate registry, worktree, outbox/inbox dirs, actor role, export path, MCP status, hook port, stale heartbeat state (v0.25.9)
+- [x] **Side panel** — Inbox, Outbox, History, Board, Receipts, Heartbeat, Actor in one VS Code view (v0.28.0)
+- [x] **Memo action UX** — rich header, body preview, Reply action (v0.27.0)
+- [x] **Delivery receipts** — track pending, delivered, failed, acknowledged, blocked per memo (v0.29.0)
+- [x] **Privacy mode** — redact paths, env strings, secret patterns before staged export (v0.25.13)
+- [x] **CLAUDE.md template** — auto-scaffold on `initTown` (v0.26.0)
+- [x] **Registry validator** — lint `.wildwest/registry.json` for schema compliance (v0.25.12)
+- [x] **Release artifact hygiene** — VSIX files excluded from git; use GitHub Releases or CI artifacts (v0.25.11)

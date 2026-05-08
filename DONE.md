@@ -1,10 +1,63 @@
 # DONE — wildwest-vscode
 
-> **Last updated:** 2026-05-08T00:57Z UTC
+> **Last updated:** 2026-05-08T12:56Z UTC
 
 ---
 
+## v0.29.0 — Delivery receipts ✓ 2026-05-08
+
+- [x] **`DeliveryReceipts` module** — `getDeliveryReceipts(telegraphDir)` scans outbox (pending), outbox/!* (failed), outbox/history (delivered/acknowledged/blocked); `extractSubject()`, `statusIcon()` helpers
+- [x] **Side panel Receipts section** — 7th root section shows all sent memos with status icon (○ ✓ ✓✓ ✗ ⚠) and subject
+- [x] **`wildwest.showReceipts` command** — QuickPick with status + deliveredAt; selecting opens memo in editor; added to menu under Governance
+- [x] **19 new tests** — `DeliveryReceipts.test.ts` (17), `SidePanelProvider.test.ts` updated (+2); 15 suites, 190 total
+
+## v0.28.0 — Side panel ✓ 2026-05-08
+
+- [x] **`SidePanelProvider`** — `TreeDataProvider` registered as `wildwest.sidepanel` in `wildwest-panel` activity bar container (star icon)
+- [x] **6 sections** — Inbox, Outbox, History, Board, Heartbeat, Actor; file entries open on click; count badges in section labels
+- [x] **Auto-refresh** — 10 s interval; `wildwest.refreshSidePanel` command with `$(refresh)` icon in view title bar
+- [x] **`dispose()`** — clears interval, registered in `deactivate()`
+- [x] **11 new tests** — `SidePanelProvider.test.ts`; 14 suites, 171 total
+
+## v0.27.0 — Memo action UX ✓ 2026-05-08
+
+- [x] **Rich picker header** — `processInbox` now parses frontmatter; shows `From: <actor> → <subject>` instead of raw filename
+- [x] **Body preview** — first non-empty body line (after frontmatter) shown as picker `detail`; truncated at 80 chars
+- [x] **Reply action** — composes full reply memo to outbox (frontmatter + `Ref:` + body), archives original; cancel aborts without archiving
+- [x] **`readBodySnippet()`** — private helper, skips frontmatter block
+- [x] **`handleReply()`** — private method, extracted for testability
+- [x] **9 new tests** — `TelegraphInbox.test.ts`; 13 suites, 160 total
+
+## v0.26.0 — CLAUDE.md template on initTown ✓ 2026-05-08
+
+- [x] **`generateClaudeMd()`** — exported pure function generates ~100-line CLAUDE.md with identity block, cold-start checklist, key paths, telegraph rules, quick commands
+- [x] **Step 7 in `initTown()`** — writes `CLAUDE.md` at repo root if not exists
+- [x] **9 new tests** — `TownInit.test.ts`; 13 suites, 153 total
+
+## v0.25.13 — Privacy mode ✓ 2026-05-08
+
+- [x] **`PrivacyFilter` module** — `redactSecrets()`, `redactPaths()`, `redactContent()`, `redactTurn()`, `redactTurns()`; patterns: GitHub tokens, AWS AKIA, Bearer headers, env assignments, sk-/sk-ant- tokens
+- [x] **`wildwest.privacy.enabled` setting** — boolean, default false; wired through `PipelineAdapter` → `SessionExportPipeline` → applied after `transformTurns()`
+- [x] **27 new tests** — `PrivacyFilter.test.ts`; 12 suites, 144 total
+
+## v0.25.12 — Registry validator ✓ 2026-05-08
+
+- [x] **`RegistryValidator` module** — `validateRegistryData()`, `validateRegistryFile()`, `runValidateRegistry()`; validates `wwuid` (UUID), `alias`, `scope` (enum), `remote`/`mcp` types, `actors` array shape, role–scope alignment
+- [x] **`wildwest.validateRegistry` command** — output channel + notification summary; added to menu under Settings
+- [x] **26 new tests** — `RegistryValidator.test.ts`; 11 suites, 117 total
+
+## v0.25.11 — Release artifact hygiene ✓ 2026-05-08
+
+- [x] **`.vscodeignore`** — removed `!build/*.vsix` negation; all `.vsix` files now excluded globally
+- [x] **55 VSIX files untracked** — ~8 MB removed from git history scope; GitHub Releases workflow documented in `scripts/RELEASE.md`
+
 ## v0.25.6 — Self-addressed delivery fix ✓ 2026-05-08
+
+- [x] **Same-scope delivery** — `resolveScopePath()` now returns the current town path when `currentScope === destScope`, so self-addressed mail goes through the normal delivery operator instead of being treated as local/no-op
+- [x] **Unresolvable recipient handling** — unresolved destinations are marked failed instead of silently archiving without delivery
+- [x] **Production regression test** — added `HeartbeatDelivery.test.ts` to exercise production `deliverPendingOutbox()` for outbox → local inbox + outbox history behavior
+- [x] **Release docs/artifact** — bumped to `0.25.6`, updated README current version + What's New, rebuilt and installed `build/wildwest-vscode-0.25.6.vsix`
+- [x] **Dogfood verification** — a self-addressed memo delivered through the real outbox path into local `inbox/` and `outbox/history/`; history copy stamped `delivered_at: 2026-05-08T00:52:27.671Z`
 
 - [x] **Same-scope delivery** — `resolveScopePath()` now returns the current town path when `currentScope === destScope`, so self-addressed mail goes through the normal delivery operator instead of being treated as local/no-op
 - [x] **Unresolvable recipient handling** — unresolved destinations are marked failed instead of silently archiving without delivery
