@@ -88,6 +88,23 @@ export class CopilotTransformer implements ISessionTransformer {
     const turns: NormalizedTurn[] = [];
     let turn_index = 0;
 
+    // Session-level time bounds as fallback when per-request timestamps are absent
+    const rawCreationDate = session['creationDate'];
+    const rawLastMessageDate = session['lastMessageDate'];
+    const sessionStart = rawCreationDate
+      ? new Date(rawCreationDate as number).toISOString()
+      : new Date().toISOString();
+    const sessionEnd = rawLastMessageDate
+      ? new Date(rawLastMessageDate as number).toISOString()
+      : sessionStart;
+
+    const resolveTimestamp = (raw: unknown, fallback: string): string => {
+      if (raw === undefined || raw === null) return fallback;
+      if (typeof raw === 'number') return new Date(raw).toISOString();
+      if (typeof raw === 'string' && raw.length > 0) return raw;
+      return fallback;
+    };
+
     for (const request of requests) {
       // User message
       if (request['message']) {
@@ -100,7 +117,7 @@ export class CopilotTransformer implements ISessionTransformer {
             tool_cursor_value: (request['requestId'] as string | number | undefined) ?? requests.indexOf(request),
             ...(request['meta'] as TurnMeta | undefined),
           },
-          timestamp: (request['timestamp'] as string | undefined) || new Date().toISOString(),
+          timestamp: resolveTimestamp(request['timestamp'], sessionStart),
         });
       }
 
@@ -121,7 +138,7 @@ export class CopilotTransformer implements ISessionTransformer {
                 tool_cursor_value: (request['requestId'] as string | number | undefined) ?? requests.indexOf(request),
                 ...(request['meta'] as TurnMeta | undefined),
               },
-              timestamp: (request['responseTimestamp'] as string | undefined) || new Date().toISOString(),
+              timestamp: resolveTimestamp(request['responseTimestamp'], sessionEnd),
             });
           }
         } else {
@@ -135,7 +152,7 @@ export class CopilotTransformer implements ISessionTransformer {
               tool_cursor_value: (request['requestId'] as string | number | undefined) ?? requests.indexOf(request),
               ...(request['meta'] as TurnMeta | undefined),
             },
-            timestamp: (request['responseTimestamp'] as string | undefined) || new Date().toISOString(),
+            timestamp: resolveTimestamp(request['responseTimestamp'], sessionEnd),
           });
         }
       }

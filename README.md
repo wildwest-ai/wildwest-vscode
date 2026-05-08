@@ -2,11 +2,15 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.10
+**Current version:** 0.31.12
 
 ---
 
 ## What's New
+
+**v0.31.12** — Copilot transformer: turn timestamps now fall back to `session.creationDate` / `session.lastMessageDate` (numeric epoch ms → ISO) when per-request timestamps are absent. Fixes all sessions showing today's date in the side panel. `resolveTimestamp()` helper handles number, string, or undefined.
+
+**v0.31.11** — `packetWriter.applyPacketToStorage()` uses `packet.turns[last].timestamp` for `last_turn_at` / `created_at` instead of `packet.created_at` (export time).
 
 **v0.31.10** — `SidePanelProvider.countStagedSessions()` migrated from `staged/*.json` mtime scan to `staged/storage/index.json` (`last_turn_at`). Legacy `batchConvertSessions()` calls in `exportNow()` and Batch Convert menu disabled. `staged/*.json` flat files have no active readers.
 
