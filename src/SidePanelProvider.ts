@@ -125,44 +125,76 @@ export class SidePanelProvider
       case 'outbox':    return this.memoItems(this.collectTelegraphFiles('outbox'));
       case 'history':   return this.memoItems(this.collectTelegraphFiles('history'));
       case 'board':     return this.boardChildren();
-      case 'receipts':  return this.receiptsChildren();
-      default:          return [];
+      case 'receipts':       return this.receiptsChildren();
+      case 'sessions:today':    return this.sessionBucketChildren('today');
+      case 'sessions:yesterday': return this.sessionBucketChildren('yesterday');
+      case 'sessions:last7d':   return this.sessionBucketChildren('last7d');
+      case 'sessions:older':    return this.sessionBucketChildren('older');
+      default:                  return [];
     }
   }
 
   // ── Sessions ───────────────────────────────────────────────────────────────
 
-  private countStagedSessions(sortBy: 'created' | 'updated'): {
-    today: number; yesterday: number; last7d: number; older: number;
+  private loadAndBucketSessions(sortBy: 'created' | 'updated'): {
+    today: Record<string, unknown>[];
+    yesterday: Record<string, unknown>[];
+    last7d: Record<string, unknown>[];
+    older: Record<string, unknown>[];
     byTool: Record<string, number>;
   } {
-    const counts = { today: 0, yesterday: 0, last7d: 0, older: 0, byTool: {} as Record<string, number> };
-    if (!this.exportPath) return counts;
+    type S = Record<string, unknown>;
+    const empty = { today: [] as S[], yesterday: [] as S[], last7d: [] as S[], older: [] as S[], byTool: {} as Record<string, number> };
+    if (!this.exportPath) return empty;
     const indexPath = path.join(this.exportPath, 'staged', 'storage', 'index.json');
     try {
-      if (!fs.existsSync(indexPath)) return counts;
+      if (!fs.existsSync(indexPath)) return empty;
       const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
       const dayMs = 86_400_000;
-      const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
       const todayMs = todayStart.getTime();
       const yesterdayMs = todayMs - dayMs;
       const last7dMs = todayMs - 7 * dayMs;
+      const result = { today: [] as S[], yesterday: [] as S[], last7d: [] as S[], older: [] as S[], byTool: {} as Record<string, number> };
       for (const session of (index.sessions ?? [])) {
         try {
           const ts = sortBy === 'updated'
             ? (session.last_turn_at ?? session.created_at)
             : (session.created_at ?? session.last_turn_at);
           const mtime = new Date(ts).getTime();
-          if (mtime >= todayMs) counts.today++;
-          else if (mtime >= yesterdayMs) counts.yesterday++;
-          else if (mtime >= last7dMs) counts.last7d++;
-          else counts.older++;
+          if (mtime >= todayMs) result.today.push(session);
+          else if (mtime >= yesterdayMs) result.yesterday.push(session);
+          else if (mtime >= last7dMs) result.last7d.push(session);
+          else result.older.push(session);
           const tool = (session.tool as string) || 'unknown';
-          counts.byTool[tool] = (counts.byTool[tool] ?? 0) + 1;
+          result.byTool[tool] = (result.byTool[tool] ?? 0) + 1;
         } catch { /* skip */ }
       }
-    } catch { /* index not ready */ }
-    return counts;
+      const byTs = (a: S, b: S) => {
+        const ta = sortBy === 'updated' ? (a['last_turn_at'] ?? a['created_at']) : (a['created_at'] ?? a['last_turn_at']);
+        const tb = sortBy === 'updated' ? (b['last_turn_at'] ?? b['created_at']) : (b['created_at'] ?? b['last_turn_at']);
+        return new Date(tb as string).getTime() - new Date(ta as string).getTime();
+      };
+      result.today.sort(byTs);
+      result.yesterday.sort(byTs);
+      result.last7d.sort(byTs);
+      result.older.sort(byTs);
+      return result;
+    } catch { return empty; }
+  }
+
+  private countStagedSessions(sortBy: 'created' | 'updated'): {
+    today: number; yesterday: number; last7d: number; older: number;
+    byTool: Record<string, number>;
+  } {
+    const data = this.loadAndBucketSessions(sortBy);
+    return {
+      today: data.today.length,
+      yesterday: data.yesterday.length,
+      last7d: data.last7d.length,
+      older: data.older.length,
+      byTool: data.byTool,
+    };
   }
 
   private sessionsChildren(): SidePanelItem[] {
@@ -179,9 +211,17 @@ export class SidePanelProvider
     sortItem.command = { command: 'wildwest.toggleSessionSortBy', title: 'Toggle Session Sort' };
 
     const counts = this.countStagedSessions(this.sessionSortBy);
-    const bucket = (label: string, count: number, icon = 'history'): SidePanelItem => {
+    const makeBucket = (label: string, sectionId: string, count: number): SidePanelItem => {
+      const state = count > 0
+        ? vscode.TreeItemCollapsibleState.Collapsed
+        : vscode.TreeItemCollapsibleState.None;
+      const item = new SidePanelItem(`${label}   ${count}`, state, sectionId);
+      item.iconPath = new vscode.ThemeIcon('history');
+      return item;
+    };
+    const toolBadge = (label: string, count: number): SidePanelItem => {
       const item = new SidePanelItem(`${label}   ${count}`, vscode.TreeItemCollapsibleState.None);
-      item.iconPath = new vscode.ThemeIcon(icon);
+      item.iconPath = new vscode.ThemeIcon('robot');
       return item;
     };
 
@@ -192,17 +232,45 @@ export class SidePanelProvider
     };
     const toolRows = Object.entries(counts.byTool)
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([tool, count]) => bucket(`  ${TOOL_LABELS[tool] ?? tool}`, count, 'robot'));
+      .map(([tool, count]) => toolBadge(`  ${TOOL_LABELS[tool] ?? tool}`, count));
 
     return [
       watcherItem,
       sortItem,
-      bucket('Today', counts.today),
-      bucket('Yesterday', counts.yesterday),
-      bucket('Last 7 days', counts.last7d),
-      bucket('Older', counts.older),
+      makeBucket('Today', 'sessions:today', counts.today),
+      makeBucket('Yesterday', 'sessions:yesterday', counts.yesterday),
+      makeBucket('Last 7 days', 'sessions:last7d', counts.last7d),
+      makeBucket('Older', 'sessions:older', counts.older),
       ...toolRows,
     ];
+  }
+
+  private sessionBucketChildren(bucket: 'today' | 'yesterday' | 'last7d' | 'older'): SidePanelItem[] {
+    const data = this.loadAndBucketSessions(this.sessionSortBy);
+    const sessions = data[bucket];
+    if (sessions.length === 0) {
+      return [new SidePanelItem('(none)', vscode.TreeItemCollapsibleState.None)];
+    }
+    return sessions.map((s) => this.sessionRow(s));
+  }
+
+  private sessionRow(s: Record<string, unknown>): SidePanelItem {
+    const tool = (s['tool'] as string) || '???';
+    const projectPath = (s['project_path'] as string) || '';
+    const projectName = projectPath ? path.basename(projectPath) : '(unknown)';
+    const createdAt = (s['created_at'] as string) || '';
+    const lastTurnAt = (s['last_turn_at'] as string) || '';
+    const turnCount = (s['turn_count'] as number) ?? 0;
+    const ts = this.sessionSortBy === 'updated' ? (lastTurnAt || createdAt) : (createdAt || lastTurnAt);
+    const timeStr = ts ? new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    const TOOL_ICONS: Record<string, string> = { cpt: 'github', cld: 'comment-discussion', ccx: 'circuit-board' };
+    const label = `[${tool}] ${projectName}  ${timeStr}  ${turnCount}↕`;
+    const item = new SidePanelItem(label, vscode.TreeItemCollapsibleState.None);
+    item.iconPath = new vscode.ThemeIcon(TOOL_ICONS[tool] ?? 'symbol-misc');
+    item.tooltip = new vscode.MarkdownString(
+      `**${projectName}**\n\n\`${projectPath}\`\n\nCreated: \`${createdAt}\`  \nLast turn: \`${lastTurnAt}\`  \nTurns: ${turnCount}  \nTool: ${tool}`
+    );
+    return item;
   }
 
   // ── Utilities ─────────────────────────────────────────────────────────────

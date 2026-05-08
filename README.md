@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.22
+**Current version:** 0.31.23
 
 ---
 
 ## What's New
+
+**v0.31.23** — Sessions date buckets (Today/Yesterday/Last 7 days/Older) are now expandable: each shows individual session rows with `[tool] project  HH:MM  N↕` label, tool icon, and tooltip with full path + timestamps. `loadAndBucketSessions()` replaces inline loop; bucket items use `sectionId` dispatch.
 
 **v0.31.22** — Fix `ClaudeCodeTransformer`: was parsing JSON as JSONL (file split by newlines), numeric timestamps not converted to ISO strings. Now: `parseRaw` does `JSON.parse(rawContent)` directly; `resolveTimestamp()` converts epoch ms; `creationDate`/`lastMessageDate` used as session-level fallbacks (same pattern as Copilot). Claude Code sessions now appear in index.
 
