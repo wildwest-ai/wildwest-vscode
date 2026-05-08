@@ -318,36 +318,43 @@ export class CodexTransformer implements ISessionTransformer {
     const messages = (session['messages'] as Record<string, unknown>[]) || [];
     const sessionStart = (session['session_start'] as string | undefined) || new Date().toISOString();
     const turns: NormalizedTurn[] = [];
+    let turn_index = 0;
 
-    for (let i = 0; i < messages.length; i++) {
-      const msg = messages[i];
-      const role = (msg['role'] as string) || 'user';
+    for (const msg of messages) {
+      const type = msg['type'] as string | undefined;
+      const timestamp = (msg['timestamp'] as string | undefined) || sessionStart;
+      const payload = msg['payload'] as Record<string, unknown> | undefined;
 
-      // Skip metadata/system lines that have no role content
-      if (msg['type'] && msg['type'] !== 'message') continue;
-
-      const rawTs = msg['timestamp'] ?? msg['create_time'];
-      let timestamp: string;
-      if (typeof rawTs === 'string' && rawTs.length > 0) {
-        timestamp = rawTs;
-      } else if (typeof rawTs === 'number') {
-        // create_time is seconds epoch
-        timestamp = new Date(rawTs * 1000).toISOString();
-      } else {
-        timestamp = sessionStart;
+      if (type === 'event_msg' && payload) {
+        // User message
+        const payloadType = payload['type'] as string | undefined;
+        if (payloadType === 'user_message') {
+          const content = (payload['message'] as string) || '';
+          turns.push({
+            turn_index: turn_index++,
+            role: 'user',
+            content,
+            parts: [{ kind: 'text', content }],
+            meta: { tool_cursor_value: turn_index - 1 },
+            timestamp,
+          });
+        }
+      } else if (type === 'response_item' && payload) {
+        // Assistant (or developer system) message
+        const role = payload['role'] as string | undefined;
+        if (role === 'assistant') {
+          const content = this.extractTextContent(payload['content']);
+          turns.push({
+            turn_index: turn_index++,
+            role: 'assistant',
+            content,
+            parts: this.extractParts(payload['content']),
+            meta: { tool_cursor_value: turn_index - 1 },
+            timestamp,
+          });
+        }
       }
-
-      turns.push({
-        turn_index: i,
-        role: role as 'user' | 'assistant',
-        content: this.extractTextContent(msg['content']),
-        parts: this.extractParts(msg['content']),
-        meta: {
-          tool_cursor_value: i, // Line offset in JSONL
-          ...(msg['meta'] as TurnMeta | undefined),
-        },
-        timestamp,
-      });
+      // Skip: session_meta, turn_context, response_item(developer/user/system)
     }
 
     return turns;
@@ -367,8 +374,9 @@ export class CodexTransformer implements ISessionTransformer {
 
     if (Array.isArray(content)) {
       return (content as Record<string, unknown>[]).map((part) => ({
-        kind: ((part['type'] as PartKind | undefined) ?? 'text') as PartKind,
-        content: (part['content'] as string) || '',
+        kind: 'text' as const,
+        // Codex uses `text` field; fallback to `content`
+        content: (part['text'] as string) || (part['content'] as string) || '',
       }));
     }
 
@@ -378,7 +386,9 @@ export class CodexTransformer implements ISessionTransformer {
   private extractTextContent(content: unknown): string {
     if (typeof content === 'string') return content;
     if (Array.isArray(content)) {
-      return (content as Record<string, unknown>[]).map((p) => (p['content'] as string) || '').join('');
+      return (content as Record<string, unknown>[])
+        .map((p) => (p['text'] as string) || (p['content'] as string) || '')
+        .join('');
     }
     return '';
   }

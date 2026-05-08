@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.19
+**Current version:** 0.31.20
 
 ---
 
 ## What's New
+
+**v0.31.20** — Codex transformer rewritten for actual JSONL schema: `event_msg` (type=`user_message`) → user turns; `response_item` (role=`assistant`) → assistant turns. Timestamp from top-level `timestamp` ISO field, falling back to `session_start`. Content extracted from `payload.message` (user) or `payload.content[].text` (assistant). `extractTextContent`/`extractParts` handle Codex `text` field instead of `content`.
 
 **v0.31.19** — `raw/` is the SSOT. `PipelineAdapter.processRawSessions()` clears `lastProcessedMtime` cache when `staged/storage/index.json` is missing, forcing full reprocess of all raw files. Deleting `staged/storage/` is now a safe reset — next Export Now or poll tick fully rebuilds from raw.
 
