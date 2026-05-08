@@ -1,0 +1,118 @@
+<svg width="400" height="800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .bg { fill: #1e1e1e; }
+      .panel { fill: #252526; stroke: #3c3c3c; stroke-width: 1; }
+      .outline { fill: none; stroke: #007acc; stroke-width: 2; stroke-dasharray: 4, 4; }
+      .header { fill: #2d2d30; stroke: #3c3c3c; stroke-width: 1; }
+      .label { fill: #d4d4d4; font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; font-weight: 500; }
+      .fieldLabel { fill: #007acc; font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; font-weight: 600; }
+      .smallLabel { fill: #a0a0a0; font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; }
+      .icon { fill: none; stroke: #007acc; stroke-width: 2; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="400" height="800" class="bg"/>
+
+  <!-- Right Panel Header -->
+  <rect x="0" y="0" width="400" height="40" class="header"/>
+  <text x="200" y="24" class="fieldLabel" text-anchor="middle">&lt; Right Panel / Sidebar &gt;</text>
+
+  <!-- Tab Bar -->
+  <rect x="0" y="40" width="400" height="35" class="header"/>
+  
+  <!-- Copilot Chat Tab (active) -->
+  <rect x="10" y="48" width="100" height="25" fill="#007acc" rx="3"/>
+  <circle cx="25" cy="61" r="6" class="icon" stroke-width="1.5"/>
+  <text x="45" y="64" class="label">Copilot</text>
+
+  <!-- GitHub Tab -->
+  <rect x="120" y="48" width="90" height="25" fill="#2d2d30" stroke="#3c3c3c" stroke-width="1" rx="3"/>
+  <circle cx="135" cy="61" r="6" class="icon" stroke="#a0a0a0" stroke-width="1.5"/>
+  <text x="150" y="64" class="smallLabel">GitHub</text>
+
+  <!-- Extensions Tab -->
+  <rect x="220" y="48" width="100" height="25" fill="#2d2d30" stroke="#3c3c3c" stroke-width="1" rx="3"/>
+  <circle cx="235" cy="61" r="6" class="icon" stroke="#a0a0a0" stroke-width="1.5"/>
+  <text x="250" y="64" class="smallLabel">Extensions</text>
+
+  <!-- Copilot Chat Panel -->
+  <g id="copilot-panel">
+    <!-- Search/Input area -->
+    <rect x="10" y="90" width="380" height="35" class="panel" rx="3" stroke="#3c3c3c" stroke-width="1"/>
+    <rect x="15" y="95" width="370" height="25" fill="#1e1e1e" stroke="#007acc" stroke-width="1" rx="2"/>
+    <text x="25" y="114" class="smallLabel">Ask Copilot...</text>
+    
+    <!-- Chat Messages Area -->
+    <rect x="10" y="135" width="380" height="450" class="outline" rx="3"/>
+    <text x="200" y="370" class="fieldLabel" text-anchor="middle">&lt; Chat History &gt;</text>
+    
+    <!-- Sample Chat Bubble (AI) -->
+    <rect x="20" y="150" width="280" height="50" fill="#1e1e1e" stroke="#007acc" stroke-width="1" rx="4"/>
+    <text x="30" y="170" class="smallLabel">How can I help you?</text>
+    <text x="30" y="185" class="smallLabel">I can assist with code</text>
+    <text x="30" y="200" class="smallLabel">generation and debugging.</text>
+    
+    <!-- Sample Chat Bubble (User) -->
+    <rect x="100" y="220" width="270" height="40" fill="#007acc" opacity="0.2" stroke="#007acc" stroke-width="1" rx="4"/>
+    <text x="110" y="240" class="smallLabel">Explain this function</text>
+    <text x="110" y="255" class="smallLabel">in simple terms.</text>
+
+    <!-- AI Response -->
+    <rect x="20" y="280" width="280" height="60" fill="#1e1e1e" stroke="#007acc" stroke-width="1" rx="4"/>
+    <text x="30" y="300" class="smallLabel">This function initializes</text>
+    <text x="30" y="315" class="smallLabel">a HeartbeatMonitor and</text>
+    <text x="30" y="330" class="smallLabel">starts monitoring activity.</text>
+    <text x="30" y="345" class="smallLabel">It's called on extension load.</text>
+
+    <!-- Action Buttons -->
+    <rect x="20" y="360" width="350" height="45" fill="#2d2d30" stroke="#3c3c3c" stroke-width="1" rx="3"/>
+    <text x="200" y="380" class="fieldLabel" text-anchor="middle">&lt; Copy / Insert / Run / More &gt;</text>
+
+    <!-- Quick Actions -->
+    <rect x="10" y="420" width="380" height="130" class="panel" rx="3" stroke="#3c3c3c" stroke-width="1"/>
+    <text x="20" y="445" class="label">&lt; Quick Actions &gt;</text>
+    
+    <rect x="20" y="460" width="360" height="30" fill="#1e1e1e" stroke="#3c3c3c" stroke-width="1" rx="2"/>
+    <text x="30" y="480" class="smallLabel">📋 Explain Selection</text>
+    
+    <rect x="20" y="500" width="360" height="30" fill="#1e1e1e" stroke="#3c3c3c" stroke-width="1" rx="2"/>
+    <text x="30" y="520" class="smallLabel">✏️ Generate Code</text>
+    
+    <rect x="20" y="540" width="360" height="30" fill="#1e1e1e" stroke="#3c3c3c" stroke-width="1" rx="2"/>
+    <text x="30" y="560" class="smallLabel">🐛 Debug Issue</text>
+  </g>
+
+  <!-- GitHub Tab Content (hidden) -->
+  <g id="github-panel" opacity="0.3">
+    <rect x="10" y="90" width="380" height="500" class="outline" rx="3"/>
+    <text x="200" y="350" class="fieldLabel" text-anchor="middle">&lt; PR Review / Issues &gt;</text>
+  </g>
+
+  <!-- Extensions Tab Content (hidden) -->
+  <g id="extensions-panel" opacity="0.3">
+    <rect x="10" y="90" width="380" height="500" class="outline" rx="3"/>
+    <text x="200" y="350" class="fieldLabel" text-anchor="middle">&lt; AI Extensions Marketplace &gt;</text>
+  </g>
+
+  <!-- Bottom Control Bar -->
+  <rect x="0" y="600" width="400" height="200" class="panel" stroke="#3c3c3c" stroke-width="1"/>
+  
+  <!-- Settings -->
+  <rect x="10" y="610" width="380" height="35" fill="#1e1e1e" stroke="#3c3c3c" stroke-width="1" rx="2"/>
+  <text x="20" y="635" class="label">⚙️ &lt; Settings &gt;</text>
+
+  <!-- Model Selector -->
+  <rect x="10" y="655" width="380" height="35" fill="#1e1e1e" stroke="#3c3c3c" stroke-width="1" rx="2"/>
+  <text x="20" y="680" class="label">🤖 &lt; Model: GPT-4 / Claude / Custom &gt;</text>
+
+  <!-- Clear History -->
+  <rect x="10" y="700" width="380" height="30" fill="#1e1e1e" stroke="#3c3c3c" stroke-width="1" rx="2"/>
+  <text x="20" y="722" class="label">🗑️ &lt; Clear History &gt;</text>
+
+  <!-- Context/Reference Info -->
+  <rect x="10" y="740" width="380" height="50" fill="#1e1e1e" stroke="#3c3c3c" stroke-width="1" rx="2"/>
+  <text x="20" y="760" class="smallLabel"># &lt; Context: Files / Selection &gt;</text>
+  <text x="20" y="778" class="smallLabel">Selected: extension.ts (Line 42-68)</text>
+</svg>
