@@ -59,6 +59,13 @@ export class PipelineAdapter {
       return false;
     }
 
+    // If storage index is gone, raw/ is the SSOT — reset mtime cache so all
+    // raw files are reprocessed from scratch to rebuild storage.
+    const indexPath = path.join(this.pipeline.getStagedDir(), 'storage', 'index.json');
+    if (!fs.existsSync(indexPath)) {
+      this.lastProcessedMtime.clear();
+    }
+
     for (const toolRawName of Object.values(TOOL_RAW_DIRS)) {
       const toolDir = path.join(rawDir, toolRawName);
       if (!fs.existsSync(toolDir)) {
