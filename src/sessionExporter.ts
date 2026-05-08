@@ -12,7 +12,7 @@ export class SessionExporter {
   private watcher: chokidar.FSWatcher | null = null;
   private vscodeStoragePath: string;
   private exportPath: string;
-  private statusBar: vscode.StatusBarItem;
+  private onWatchingChanged: ((isWatching: boolean) => void) | null = null;
   private isWatching: boolean = false;
   private outputChannel: vscode.OutputChannel;
   private exportedFiles: Set<string> = new Set();
@@ -36,8 +36,6 @@ export class SessionExporter {
     const seconds = String(timestamp.getSeconds()).padStart(2, '0');
     const ms = String(timestamp.getMilliseconds()).padStart(3, '0');
     this.log(`${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${ms} [info] SessionExporter constructor called`);
-    
-    this.statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
     
     // Determine VS Code storage path based on platform
     this.userHome = process.env.HOME || process.env.USERPROFILE || '';
@@ -825,7 +823,7 @@ export class SessionExporter {
 
       // Start polling after any initial scan
       this.isWatching = true;
-      this.updateStatusBar();
+      this.onWatchingChanged?.(true);
       this.log(`${this.getTimestamp()} Wild West watcher started, polling every 5s`);
       this.startDatabasePolling();
 
@@ -849,7 +847,7 @@ export class SessionExporter {
     this.isWatching = false;
     this.exportedFiles.clear();
     this.lastDbStats.clear();
-    this.updateStatusBar();
+    this.onWatchingChanged?.(false);
     if (!silent) {
       vscode.window.showInformationMessage('Wild West watcher stopped');
     }
@@ -1356,51 +1354,9 @@ export class SessionExporter {
     return num.toString().padStart(2, '0');
   }
 
-  private updateStatusBar(): void {
-    if (this.isWatching) {
-      this.statusBar.text = '$(eye) Wild West';
-      this.statusBar.tooltip = this.createTooltip();
-      this.statusBar.show();
-    } else {
-      this.statusBar.text = '$(eye-closed) Wild West';
-      this.statusBar.tooltip = this.createTooltip();
-      this.statusBar.show();
-    }
-  }
-
-  private createTooltip(): vscode.MarkdownString {
-    const tooltip = new vscode.MarkdownString('', true);
-    tooltip.isTrusted = true;
-    tooltip.supportHtml = true;
-
-    tooltip.appendMarkdown('**Wild West**\n\n');
-
-    if (this.isWatching) {
-      tooltip.appendMarkdown('Status: $(check) Watching\n\n');
-      tooltip.appendMarkdown('[$(debug-pause) Stop Watcher](command:wildwest.stopWatcher)\n\n');
-    } else {
-      tooltip.appendMarkdown('Status: $(circle-slash) Stopped\n\n');
-      tooltip.appendMarkdown('[$(play) Start Watcher](command:wildwest.startWatcher)\n\n');
-    }
-
-    tooltip.appendMarkdown('---\n\n');
-    tooltip.appendMarkdown('**Sessions**\n\n');
-    tooltip.appendMarkdown('[$(sync) Export Now](command:wildwest.exportNow)\n\n');
-    tooltip.appendMarkdown('[$(package) Batch Convert to JSON](command:wildwest.batchConvert)\n\n');
-    tooltip.appendMarkdown('[$(file-text) Convert to Markdown](command:wildwest.convertToMarkdown)\n\n');
-    tooltip.appendMarkdown('[$(list-unordered) Generate Index](command:wildwest.generateIndex)\n\n');
-
-    tooltip.appendMarkdown('---\n\n');
-    tooltip.appendMarkdown('**Governance**\n\n');
-    tooltip.appendMarkdown('[$(radio-tower) View Telegraph](command:wildwest.viewTelegraph)\n\n');
-    tooltip.appendMarkdown('[$(pulse) Solo Mode Report](command:wildwest.soloModeReport)\n\n');
-
-    tooltip.appendMarkdown('---\n\n');
-    tooltip.appendMarkdown('[$(folder-opened) Open Export Folder](command:wildwest.openExportFolder)\n\n');
-    tooltip.appendMarkdown('[$(output) View Output Log](command:wildwest.viewOutputLog)\n\n');
-    tooltip.appendMarkdown('[$(gear) Settings](command:wildwest.openSettings)\n\n');
-
-    return tooltip;
+  /** Register a callback to be notified when the watcher starts or stops. */
+  setWatchingCallback(cb: (isWatching: boolean) => void): void {
+    this.onWatchingChanged = cb;
   }
 
   async showMenu(): Promise<void> {
@@ -1605,7 +1561,6 @@ export class SessionExporter {
       });
     }
     this.saveState();
-    this.statusBar.dispose();
     if (this.watcher) {
       this.watcher.close().catch(() => {});
       this.watcher = null;
