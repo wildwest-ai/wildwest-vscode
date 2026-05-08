@@ -132,14 +132,16 @@ export class SidePanelProvider
 
   // ── Sessions ───────────────────────────────────────────────────────────────
 
-  private countStagedSessions(sortBy: 'created' | 'updated'): { today: number; yesterday: number; last7d: number; older: number } {
-    const counts = { today: 0, yesterday: 0, last7d: 0, older: 0 };
+  private countStagedSessions(sortBy: 'created' | 'updated'): {
+    today: number; yesterday: number; last7d: number; older: number;
+    byTool: Record<string, number>;
+  } {
+    const counts = { today: 0, yesterday: 0, last7d: 0, older: 0, byTool: {} as Record<string, number> };
     if (!this.exportPath) return counts;
     const indexPath = path.join(this.exportPath, 'staged', 'storage', 'index.json');
     try {
       if (!fs.existsSync(indexPath)) return counts;
       const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
-      const now = Date.now();
       const dayMs = 86_400_000;
       const todayStart = new Date(); todayStart.setHours(0,0,0,0);
       const todayMs = todayStart.getTime();
@@ -155,6 +157,8 @@ export class SidePanelProvider
           else if (mtime >= yesterdayMs) counts.yesterday++;
           else if (mtime >= last7dMs) counts.last7d++;
           else counts.older++;
+          const tool = (session.tool as string) || 'unknown';
+          counts.byTool[tool] = (counts.byTool[tool] ?? 0) + 1;
         } catch { /* skip */ }
       }
     } catch { /* index not ready */ }
@@ -175,11 +179,20 @@ export class SidePanelProvider
     sortItem.command = { command: 'wildwest.toggleSessionSortBy', title: 'Toggle Session Sort' };
 
     const counts = this.countStagedSessions(this.sessionSortBy);
-    const bucket = (label: string, count: number): SidePanelItem => {
+    const bucket = (label: string, count: number, icon = 'history'): SidePanelItem => {
       const item = new SidePanelItem(`${label}   ${count}`, vscode.TreeItemCollapsibleState.None);
-      item.iconPath = new vscode.ThemeIcon('history');
+      item.iconPath = new vscode.ThemeIcon(icon);
       return item;
     };
+
+    const TOOL_LABELS: Record<string, string> = {
+      cpt: 'Copilot',
+      cld: 'Claude',
+      ccx: 'Codex',
+    };
+    const toolRows = Object.entries(counts.byTool)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([tool, count]) => bucket(`  ${TOOL_LABELS[tool] ?? tool}`, count, 'robot'));
 
     return [
       watcherItem,
@@ -188,6 +201,7 @@ export class SidePanelProvider
       bucket('Yesterday', counts.yesterday),
       bucket('Last 7 days', counts.last7d),
       bucket('Older', counts.older),
+      ...toolRows,
     ];
   }
 

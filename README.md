@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.20
+**Current version:** 0.31.21
 
 ---
 
 ## What's New
+
+**v0.31.21** — Sessions section now shows per-tool breakdown (Copilot / Claude / Codex) below the date buckets. `countStagedSessions()` returns `byTool` counts; `sessionsChildren()` renders them as indented rows with robot icon.
 
 **v0.31.20** — Codex transformer rewritten for actual JSONL schema: `event_msg` (type=`user_message`) → user turns; `response_item` (role=`assistant`) → assistant turns. Timestamp from top-level `timestamp` ISO field, falling back to `session_start`. Content extracted from `payload.message` (user) or `payload.content[].text` (assistant). `extractTextContent`/`extractParts` handle Codex `text` field instead of `content`.
 
