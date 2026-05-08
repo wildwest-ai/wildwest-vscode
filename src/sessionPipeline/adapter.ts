@@ -86,7 +86,9 @@ export class PipelineAdapter {
           try {
             // Determine tool from directory name
             const tool = this.getTool(toolRawName);
-            const tool_sid = path.basename(file, '.json');
+            // Strip the appropriate extension per tool (.jsonl for ccx/cld, .json for cpt)
+            const ext = file.endsWith('.jsonl') ? '.jsonl' : '.json';
+            const tool_sid = path.basename(file, ext);
 
             // Export to pipeline
             await this.pipeline.exportSession(
@@ -207,8 +209,10 @@ export class PipelineAdapter {
 
         // For ccx sessions, patch project_path from raw session_meta.payload.cwd
         if (record['tool'] === 'ccx') {
-          const rawPath = path.join(rawDir, 'chatgpt-codex', `${record['tool_sid']}.jsonl`);
-          const rawPathJson = path.join(rawDir, 'chatgpt-codex', `${record['tool_sid']}.json`);
+          // tool_sid may already include extension (legacy records) or may be bare
+          const sid = record['tool_sid'] as string;
+          const rawPath = path.join(rawDir, 'chatgpt-codex', sid.endsWith('.jsonl') ? sid : `${sid}.jsonl`);
+          const rawPathJson = path.join(rawDir, 'chatgpt-codex', sid.endsWith('.json') ? sid : `${sid}.json`);
           const rp = fs.existsSync(rawPath) ? rawPath : fs.existsSync(rawPathJson) ? rawPathJson : null;
           if (rp) {
             const content = fs.readFileSync(rp, 'utf8');

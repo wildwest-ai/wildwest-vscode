@@ -8,6 +8,10 @@ Governance framework for AI-assisted development. Tracks dyad activity, exports 
 
 ## What's New
 
+**v0.31.30** — Fix ccx `tool_sid` double-extension bug: adapter was stripping `.json` from `.jsonl` filenames, leaving `tool_sid` as `rollout-...cb7.jsonl`. Now strips the correct extension per file type. `rebuildIndexFromRecords()` handles legacy records with `.jsonl`-suffixed tool_sid. All 71 ccx sessions now get correct `project_path` from `session_meta.payload.cwd` on rebuild.
+
+**v0.31.29** — Add `wildwest.rebuildIndex` command + Utilities button. Scans `staged/storage/sessions/*.json`, patches ccx `project_path` from raw `session_meta.payload.cwd`, writes fresh `index.json`. Also runs automatically when `index.json` is missing on next Export Now / poll tick.
+
 **v0.31.28** — Fix `CodexTransformer.getSessionMetadata()`: was returning `project_path: ''` for all sessions. Now extracts `session_meta.payload.cwd` in `parseRaw()` and surfaces it via `getSessionMetadata()`. All ccx sessions will now have correct project paths after rebuild.
 
 **v0.31.27** — Town scope filter now matches by `alias` (`path.basename`) instead of full `project_path`. Fixes sessions missing when workspace was reorganized/moved (e.g. `counties/wildwest-ai/wildwest-framework` → `wildwest/counties/wildwest-ai/wildwest-framework`). Convention: `alias === basename(project_path)` is stable across moves.
