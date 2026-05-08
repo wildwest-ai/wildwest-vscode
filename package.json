@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
   },
-  "version": "0.29.3",
+  "version": "0.30.0",
   "publisher": "wildwest-ai",
   "engines": {
     "vscode": "^1.90.0"
@@ -78,6 +78,16 @@
       {
         "command": "wildwest.initTown",
         "title": "Init Town",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.initCounty",
+        "title": "Init County",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.initTerritory",
+        "title": "Init Territory",
         "category": "Wild West"
       },
       {

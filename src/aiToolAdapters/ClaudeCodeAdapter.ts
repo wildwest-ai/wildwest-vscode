@@ -120,15 +120,12 @@ export class ClaudeCodeAdapter implements AIToolAdapter {
 
         if (err.code === 'EADDRINUSE') {
           if (isInitial) {
-            // Show warning once — not on every retry
+            // Log only — another wildwest window holds the port. Auto-retry handles recovery silently.
             const msg =
-              `ClaudeCodeAdapter failed to start: port ${this.port} already in use ` +
-              `(another VS Code window may be holding it). ` +
-              `Telegraph delivery will use heartbeat polling. ` +
-              `Will auto-retry every 30 s. ` +
-              `To use a different port set wildwest.claudeCode.hookPort.`;
-            this.outputChannel.appendLine(`[ClaudeCodeAdapter] WARNING: ${msg}`);
-            vscode.window.showWarningMessage(`Wild West: ${msg}`);
+              `ClaudeCodeAdapter: port ${this.port} in use (another Wild West window may hold it). ` +
+              `Will auto-retry every ${RETRY_INTERVAL_MS / 1000}s. ` +
+              `Telegraph delivery falls back to heartbeat polling in the meantime.`;
+            this.outputChannel.appendLine(`[ClaudeCodeAdapter] INFO: ${msg}`);
             onError(new Error(msg));
           } else {
             this.outputChannel.appendLine(

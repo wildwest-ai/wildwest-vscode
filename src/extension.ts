@@ -6,7 +6,7 @@ import { StatusBarManager } from './StatusBarManager';
 import { SoloModeController } from './SoloModeController';
 import { TelegraphWatcher } from './TelegraphWatcher';
 import { WorktreeManager } from './WorktreeManager';
-import { initTown } from './TownInit';
+import { initTown, initCounty, initTerritory } from './TownInit';
 import { TelegraphInbox } from './TelegraphInbox';
 import { TelegraphCommands } from './TelegraphCommands';
 import { AIToolBridge } from './AIToolBridge';
@@ -67,21 +67,11 @@ export function activate(context: vscode.ExtensionContext) {
   telegraphCommands.register(context);
 
   // ── AI Tool Bridge ────────────────────────────────────────────────────────
-  // ClaudeCodeAdapter binds a local HTTP port for Claude Code hooks.
-  // Only register it for town-scope workspaces — county/territory windows do
-  // not have .claude/settings.json pointing to this port and should not compete
-  // for it or show port-conflict errors.
+  // All scope levels (town, county, territory) register the adapter.
+  // Claude Code sessions can run in any scope window. Port conflicts are
+  // handled via auto-retry — only one window binds at a time.
   aiToolBridge = new AIToolBridge(outputChannel);
-  const workspaceScope = heartbeatMonitor.detectScope();
-  if (workspaceScope === 'town' || workspaceScope === null) {
-    // null = unrecognised workspace; still register so Claude Code hooks work
-    // in plain (non-governed) repos opened via this extension.
-    aiToolBridge.registerAdapter(new ClaudeCodeAdapter(outputChannel));
-  } else {
-    outputChannel.appendLine(
-      `[wildwest] skipping ClaudeCodeAdapter — workspace scope is '${workspaceScope}' (town only)`,
-    );
-  }
+  aiToolBridge.registerAdapter(new ClaudeCodeAdapter(outputChannel));
   aiToolBridge.onEvent((event) => {
     // turn-end and file-changed → trigger outbox delivery immediately
     if (event.type === 'turn-end' || event.type === 'file-changed') {
@@ -137,6 +127,8 @@ export function activate(context: vscode.ExtensionContext) {
         { label: 'Generate Index',            command: 'wildwest.generateIndex' },
         { label: 'Governance', kind: vscode.QuickPickItemKind.Separator },
         { label: 'Init Town',                 command: 'wildwest.initTown' },
+        { label: 'Init County',               command: 'wildwest.initCounty' },
+        { label: 'Init Territory',            command: 'wildwest.initTerritory' },
         { label: 'Process Inbox',             command: 'wildwest.processInbox' },
         { label: 'View Telegraph',            command: 'wildwest.viewTelegraph' },
         { label: 'Delivery Receipts',         command: 'wildwest.showReceipts' },
@@ -160,9 +152,11 @@ export function activate(context: vscode.ExtensionContext) {
     }),
   );
 
-  // ── Command — town init ───────────────────────────────────────────────────
+  // ── Command — town/county/territory init ──────────────────────────────────
   context.subscriptions.push(
     vscode.commands.registerCommand('wildwest.initTown', () => initTown(outputChannel)),
+    vscode.commands.registerCommand('wildwest.initCounty', () => initCounty(outputChannel)),
+    vscode.commands.registerCommand('wildwest.initTerritory', () => initTerritory(outputChannel)),
   );
 
   // ── Command — telegraph inbox (rule 23 enforcement) ───────────────────────

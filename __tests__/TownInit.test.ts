@@ -9,7 +9,17 @@ jest.mock('vscode', () => ({
   ProgressLocation: { Notification: 15 },
 }), { virtual: true });
 
-import { generateClaudeMd } from '../src/TownInit';
+import { generateClaudeMd, generateCountyClaudeMd, generateTerritoryClaudeMd } from '../src/TownInit';
+
+const COMMON_SECTIONS = [
+  '## 1. Identity',
+  '## 2. Active Roles',
+  '## 3. Cold-Start Checklist',
+  '## 4. Key Paths',
+  '## 5. Telegraph Rules',
+  '## 6. Open Work',
+  '## 7. Quick Commands',
+];
 
 describe('generateClaudeMd', () => {
   const vars = {
@@ -47,15 +57,7 @@ describe('generateClaudeMd', () => {
 
   it('includes required sections', () => {
     const md = generateClaudeMd(vars);
-    for (const section of [
-      '## 1. Identity',
-      '## 2. Active Roles',
-      '## 3. Cold-Start Checklist',
-      '## 4. Key Paths',
-      '## 5. Telegraph Rules',
-      '## 6. Open Work',
-      '## 7. Quick Commands',
-    ]) {
+    for (const section of COMMON_SECTIONS) {
       expect(md).toContain(section);
     }
   });
@@ -74,5 +76,102 @@ describe('generateClaudeMd', () => {
     const md = generateClaudeMd(vars);
     expect(typeof md).toBe('string');
     expect(md.length).toBeGreaterThan(200);
+  });
+});
+
+describe('generateCountyClaudeMd', () => {
+  const vars = {
+    alias: 'wildwest-ai',
+    wwuid: 'county-abc-123',
+    remote: 'https://github.com/wildwest-ai/wildwest-county',
+  };
+
+  it('includes County heading', () => {
+    const md = generateCountyClaudeMd(vars);
+    expect(md).toContain('# CLAUDE.md — wildwest-ai County');
+  });
+
+  it('includes scope: county', () => {
+    const md = generateCountyClaudeMd(vars);
+    expect(md).toContain('**Scope:** county');
+  });
+
+  it('includes wwuid and remote', () => {
+    const md = generateCountyClaudeMd(vars);
+    expect(md).toContain('`county-abc-123`');
+    expect(md).toContain('https://github.com/wildwest-ai/wildwest-county');
+  });
+
+  it('falls back to (not set) when remote is null', () => {
+    const md = generateCountyClaudeMd({ ...vars, remote: null });
+    expect(md).toContain('(not set)');
+  });
+
+  it('includes required sections', () => {
+    const md = generateCountyClaudeMd(vars);
+    for (const section of COMMON_SECTIONS) {
+      expect(md).toContain(section);
+    }
+  });
+
+  it('includes generation attribution', () => {
+    const md = generateCountyClaudeMd(vars);
+    expect(md).toContain('wildwest-vscode initCounty');
+  });
+
+  it('includes Last Updated date', () => {
+    const md = generateCountyClaudeMd(vars);
+    expect(md).toMatch(/\*\*Last Updated:\*\* \d{4}-\d{2}-\d{2}/);
+  });
+});
+
+describe('generateTerritoryClaudeMd', () => {
+  const vars = {
+    alias: 'wildwest',
+    wwuid: 'territory-xyz-456',
+    remote: null,
+  };
+
+  it('includes Territory heading', () => {
+    const md = generateTerritoryClaudeMd(vars);
+    expect(md).toContain('# CLAUDE.md — wildwest Territory');
+  });
+
+  it('includes scope: territory', () => {
+    const md = generateTerritoryClaudeMd(vars);
+    expect(md).toContain('**Scope:** territory');
+  });
+
+  it('includes wwuid', () => {
+    const md = generateTerritoryClaudeMd(vars);
+    expect(md).toContain('`territory-xyz-456`');
+  });
+
+  it('falls back to (not set) when remote is null', () => {
+    const md = generateTerritoryClaudeMd(vars);
+    expect(md).toContain('(not set)');
+  });
+
+  it('includes required sections', () => {
+    const md = generateTerritoryClaudeMd(vars);
+    for (const section of COMMON_SECTIONS) {
+      expect(md).toContain(section);
+    }
+  });
+
+  it('includes generation attribution', () => {
+    const md = generateTerritoryClaudeMd(vars);
+    expect(md).toContain('wildwest-vscode initTerritory');
+  });
+
+  it('has no County Law reference (territory has no parent)', () => {
+    const md = generateTerritoryClaudeMd(vars);
+    expect(md).not.toContain('Territory Law');
+    expect(md).not.toContain('County Law');
+  });
+
+  it('includes Last Updated date', () => {
+    const md = generateTerritoryClaudeMd(vars);
+    expect(md).toMatch(/\*\*Last Updated:\*\* \d{4}-\d{2}-\d{2}/);
   });
 });

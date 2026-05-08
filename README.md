@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.29.3
+**Current version:** 0.30.0
 
 ---
 
 ## What's New
+
+**v0.30.0** — Cascading init commands: `wildwest.initCounty` and `wildwest.initTerritory` scaffold the same `.wildwest/` structure at county and territory scope — registry.json (correct scope field), telegraph dirs (inbox/outbox/history), `.claude/settings.json` (Claude Code hooks), CLAUDE.md template, and `.gitignore` update. County and territory windows now register the `ClaudeCodeAdapter` too; EADDRINUSE is handled silently via auto-retry (no toast). Shared helpers `generateHookConfig`, `writeClaudeSettings`, `updateGitignore`, `createTelegraphDirs` eliminate duplication. 15 new tests; 15 suites, 205 total.
 
 **v0.29.3** — Scope-gate adapter + territory liveness: `ClaudeCodeAdapter` is now only registered in town-scope workspaces — county/territory windows no longer try to bind port 7379 or show port-conflict errors. `checkLiveness()` now falls through town → county → territory so territory-level windows show a real heartbeat state instead of always `stopped`.
 
