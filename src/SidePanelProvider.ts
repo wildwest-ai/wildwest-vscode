@@ -138,7 +138,7 @@ export class SidePanelProvider
       const todayMs = todayStart.getTime();
       for (const session of (index.sessions ?? [])) {
         try {
-          const mtime = new Date(session.last_turn_at).getTime();
+          const mtime = new Date(session.created_at ?? session.last_turn_at).getTime();
           const age = now - mtime;
           if (mtime >= todayMs) counts.today++;
           else if (age < 2 * dayMs) counts.yesterday++;

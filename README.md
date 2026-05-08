@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.12
+**Current version:** 0.31.13
 
 ---
 
 ## What's New
+
+**v0.31.13** — Side panel session buckets now use `created_at` (session creation date) instead of `last_turn_at` for date grouping (today/yesterday/7d/older). Matches ChatGPT "sort by created" default. Falls back to `last_turn_at` if `created_at` absent.
 
 **v0.31.12** — Copilot transformer: turn timestamps now fall back to `session.creationDate` / `session.lastMessageDate` (numeric epoch ms → ISO) when per-request timestamps are absent. Fixes all sessions showing today's date in the side panel. `resolveTimestamp()` helper handles number, string, or undefined.
 
