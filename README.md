@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.23
+**Current version:** 0.31.24
 
 ---
 
 ## What's New
+
+**v0.31.24** — Last 7 days bucket groups sessions by local calendar date (Thu May 7, Wed May 6 …). Each day is a collapsible node; expand to see sessions. Dispatch via `sessions:last7d:YYYY-MM-DD` sectionId. All timestamps are local timezone (`toLocaleTimeString`/`toLocaleDateString`).
 
 **v0.31.23** — Sessions date buckets (Today/Yesterday/Last 7 days/Older) are now expandable: each shows individual session rows with `[tool] project  HH:MM  N↕` label, tool icon, and tooltip with full path + timestamps. `loadAndBucketSessions()` replaces inline loop; bucket items use `sectionId` dispatch.
 

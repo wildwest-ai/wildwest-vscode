@@ -128,9 +128,13 @@ export class SidePanelProvider
       case 'receipts':       return this.receiptsChildren();
       case 'sessions:today':    return this.sessionBucketChildren('today');
       case 'sessions:yesterday': return this.sessionBucketChildren('yesterday');
-      case 'sessions:last7d':   return this.sessionBucketChildren('last7d');
+      case 'sessions:last7d':   return this.sessionLast7dChildren();
       case 'sessions:older':    return this.sessionBucketChildren('older');
-      default:                  return [];
+      default:
+        if (sectionId.startsWith('sessions:last7d:')) {
+          return this.sessionDateChildren(sectionId.slice('sessions:last7d:'.length));
+        }
+        return [];
     }
   }
 
@@ -245,9 +249,56 @@ export class SidePanelProvider
     ];
   }
 
-  private sessionBucketChildren(bucket: 'today' | 'yesterday' | 'last7d' | 'older'): SidePanelItem[] {
+  /** Local-timezone YYYY-MM-DD for a timestamp string. */
+  private localDateStr(ts: string): string {
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  private sessionBucketChildren(bucket: 'today' | 'yesterday' | 'older'): SidePanelItem[] {
     const data = this.loadAndBucketSessions(this.sessionSortBy);
     const sessions = data[bucket];
+    if (sessions.length === 0) {
+      return [new SidePanelItem('(none)', vscode.TreeItemCollapsibleState.None)];
+    }
+    return sessions.map((s) => this.sessionRow(s));
+  }
+
+  private sessionLast7dChildren(): SidePanelItem[] {
+    const data = this.loadAndBucketSessions(this.sessionSortBy);
+    const sessions = data.last7d;
+    if (sessions.length === 0) {
+      return [new SidePanelItem('(none)', vscode.TreeItemCollapsibleState.None)];
+    }
+    // Group by local date, newest date first
+    const byDate = new Map<string, Record<string, unknown>[]>();
+    for (const s of sessions) {
+      const ts = this.sessionSortBy === 'updated'
+        ? ((s['last_turn_at'] ?? s['created_at']) as string)
+        : ((s['created_at'] ?? s['last_turn_at']) as string);
+      const dateStr = this.localDateStr(ts);
+      if (!byDate.has(dateStr)) byDate.set(dateStr, []);
+      byDate.get(dateStr)!.push(s);
+    }
+    const sortedDates = [...byDate.keys()].sort((a, b) => b.localeCompare(a));
+    return sortedDates.map((dateStr) => {
+      const daySessions = byDate.get(dateStr)!;
+      const d = new Date(`${dateStr}T12:00:00`);
+      const dayLabel = d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+      const item = new SidePanelItem(`${dayLabel}   ${daySessions.length}`, vscode.TreeItemCollapsibleState.Collapsed, `sessions:last7d:${dateStr}`);
+      item.iconPath = new vscode.ThemeIcon('calendar');
+      return item;
+    });
+  }
+
+  private sessionDateChildren(dateStr: string): SidePanelItem[] {
+    const data = this.loadAndBucketSessions(this.sessionSortBy);
+    const sessions = data.last7d.filter((s) => {
+      const ts = this.sessionSortBy === 'updated'
+        ? ((s['last_turn_at'] ?? s['created_at']) as string)
+        : ((s['created_at'] ?? s['last_turn_at']) as string);
+      return this.localDateStr(ts) === dateStr;
+    });
     if (sessions.length === 0) {
       return [new SidePanelItem('(none)', vscode.TreeItemCollapsibleState.None)];
     }
