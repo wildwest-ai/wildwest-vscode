@@ -23,7 +23,7 @@ describe('validateRegistryData', () => {
     scope: 'town',
     remote: 'https://github.com/wildwest-ai/wildwest-vscode',
     mcp: null,
-    actors: [{ role: 'TM', actor: 'RHk', channel: 'main' }],
+    actors: [{ role: 'TM', identity: 'RHk', channel: 'main' }],
   };
 
   it('passes a fully valid registry', () => {
@@ -139,24 +139,24 @@ describe('validateRegistryData', () => {
     expect(result.issues).toContainEqual(expect.objectContaining({ field: 'actors', severity: 'error' }));
   });
 
-  it('errors when actor entry is missing required fields', () => {
+  it('errors when identity entry is missing required fields', () => {
     const result = validateRegistryData({ ...valid, actors: [{ role: 'TM' }] });
     expect(result.valid).toBe(false);
     expect(result.issues.some((i) => i.field.startsWith('actors[0]') && i.severity === 'error')).toBe(true);
   });
 
-  it('warns when actor role is invalid for scope', () => {
+  it('warns when identity role is invalid for scope', () => {
     // scope=town, valid roles: Mayor, TM, HG — "CD" is county-only
-    const result = validateRegistryData({ ...valid, scope: 'town', actors: [{ role: 'CD', actor: 'RSn', channel: 'main' }] });
+    const result = validateRegistryData({ ...valid, scope: 'town', actors: [{ role: 'CD', identity: 'RSn', channel: 'main' }] });
     expect(result.valid).toBe(true); // warn, not error
     expect(result.issues).toContainEqual(
       expect.objectContaining({ field: 'actors[0].role', severity: 'warn' }),
     );
   });
 
-  it('does not warn on unknown scope when checking actor roles', () => {
+  it('does not warn on unknown scope when checking identity roles', () => {
     // scope is invalid (already errored), but should not double-warn on role
-    const result = validateRegistryData({ ...valid, scope: 'unknown', actors: [{ role: 'X', actor: 'Y', channel: 'main' }] });
+    const result = validateRegistryData({ ...valid, scope: 'unknown', actors: [{ role: 'X', identity: 'Y', channel: 'main' }] });
     const roleWarn = result.issues.find((i) => i.field === 'actors[0].role' && i.severity === 'warn');
     expect(roleWarn).toBeUndefined();
   });

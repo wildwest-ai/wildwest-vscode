@@ -64,7 +64,7 @@ export class SessionExporter {
       const privacyMode = vscode.workspace.getConfiguration('wildwest').get<boolean>('privacy.enabled', false);
       this.pipelineAdapter = new PipelineAdapter({
         sessionsDir: this.exportPath,
-        actor: gitUsername,
+        author: gitUsername,
         projectPath: vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath,
         privacyMode,
         homeDir: this.userHome,

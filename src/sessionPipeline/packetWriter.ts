@@ -22,8 +22,8 @@ import { generatePacketFilename } from './utils';
 export interface PacketWriterOptions {
   /** Base directory for staged/ output (e.g., ~/wildwest/sessions/raw/../staged) */
   stagedDir: string;
-  /** Actor name (e.g., 'reneyap') */
-  actor: string;
+  /** Git username of session author (e.g., 'reneyap') */
+  author: string;
   /** Device ID (pre-computed UUIDv5) */
   device_id: string;
 }
@@ -33,12 +33,12 @@ export interface PacketWriterOptions {
  */
 export class PacketWriter {
   private stagedDir: string;
-  private actor: string;
+  private author: string;
   private device_id: string;
 
   constructor(options: PacketWriterOptions) {
     this.stagedDir = options.stagedDir;
-    this.actor = options.actor;
+    this.author = options.author;
     this.device_id = options.device_id;
 
     // Ensure directories exist
@@ -143,7 +143,7 @@ export class PacketWriter {
       wwsid,
       tool,
       tool_sid,
-      actor: this.actor,
+      author: this.author,
       device_id: this.device_id,
       seq_from,
       seq_to,
@@ -190,7 +190,7 @@ export class PacketWriter {
         wwsid: packet.wwsid,
         tool: packet.tool,
         tool_sid: packet.tool_sid,
-        actor: packet.actor,
+        author: packet.author,
         device_id: packet.device_id,
         session_type: sessionType,
         project_path: projectPath,
@@ -254,7 +254,7 @@ export class PacketWriter {
       wwsid: record.wwsid,
       tool: record.tool,
       tool_sid: record.tool_sid,
-      actor: record.actor,
+      author: record.author,
       device_id: record.device_id,
       session_type: record.session_type,
       project_path: record.project_path,

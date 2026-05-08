@@ -6,10 +6,10 @@ import { HeartbeatMonitor } from './HeartbeatMonitor';
 /**
  * StatusBarManager — single unified Wild West status bar item.
  *
- * Text format:  $(eye) ● Actor · Scope   (watching + actor declared + heartbeat alive)
- *               $(eye) ○ Scope            (watching + no actor + heartbeat stopped)
- *               $(eye-closed) ● Actor · Scope  (not watching + actor + alive)
- *               $(eye-closed) ○ Scope           (not watching + no actor)
+ * Text format:  $(eye) ● Identity · Scope   (watching + identity declared + heartbeat alive)
+ *               $(eye) ○ Scope            (watching + no identity + heartbeat stopped)
+ *               $(eye-closed) ● Identity · Scope  (not watching + identity + alive)
+ *               $(eye-closed) ○ Scope           (not watching + no identity)
  *
  * Click: focuses the Wild West side panel.
  * Tooltip: rich MarkdownString with all session + governance action links.

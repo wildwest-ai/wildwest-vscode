@@ -63,7 +63,7 @@ export class wwMCPServer {
         },
         {
           name: TOOL_INBOX,
-          description: 'List unprocessed memos from the actor inbox (scope-filtered).',
+          description: 'List unprocessed memos from the identity inbox (scope-filtered).',
           inputSchema: {
             type: 'object',
             properties: {

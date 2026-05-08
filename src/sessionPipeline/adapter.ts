@@ -16,7 +16,7 @@ import { SessionExportPipeline } from './orchestrator';
 
 export interface PipelineAdapterOptions {
   sessionsDir: string;
-  actor: string;
+  author: string;
   projectPath?: string;
   privacyMode?: boolean;
   homeDir?: string;
@@ -38,7 +38,7 @@ export class PipelineAdapter {
   constructor(options: PipelineAdapterOptions) {
     this.pipeline = new SessionExportPipeline({
       sessionsDir: options.sessionsDir,
-      actor: options.actor,
+      author: options.author,
       projectPath: options.projectPath,
       privacyMode: options.privacyMode ?? false,
       homeDir: options.homeDir,
@@ -164,10 +164,10 @@ export class PipelineAdapter {
   }
 
   /**
-   * Get actor
+   * Get author
    */
-  getActor(): string {
-    return this.pipeline.getActor();
+  getAuthor(): string {
+    return this.pipeline.getAuthor();
   }
 
   /**

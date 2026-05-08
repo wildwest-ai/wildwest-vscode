@@ -129,7 +129,7 @@ export class TelegraphWatcher {
       return;
     }
 
-    // New memo in inbox = alert actor to process
+    // New memo in inbox = alert identity to process
     this.heartbeatMonitor.setFlagged(true);
     const msg = `Wild West: 📬 new memo in inbox — ${basename}`;
     this.outputChannel.appendLine(`[TelegraphWatcher] new inbox memo: ${basename}`);

@@ -286,8 +286,8 @@ async function handleBoard(wwRoot: string, stream: vscode.ChatResponseStream): P
       const data = JSON.parse(fs.readFileSync(path.join(boardDir, file), 'utf8'));
       const state  = data.state  ?? '?';
       const branch = data.branch ?? file.replace('.json', '');
-      const actor  = data.actor  ?? '';
-      stream.markdown(`- **${branch}** — \`${state}\`${actor ? `  (${actor})` : ''}\n`);
+      const identity = data.identity ?? data.actor ?? '';
+      stream.markdown(`- **${branch}** — \`${state}\`${identity ? `  (${identity})` : ''}\n`);
     } catch {
       stream.markdown(`- \`${file}\` (unreadable)\n`);
     }

@@ -1,12 +1,14 @@
 # Wild West — VSCode Extension
 
-Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
+Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.4
+**Current version:** 0.31.6
 
 ---
 
 ## What's New
+
+**v0.31.6** — Deep rename: `actor`→`identity` and `devPair`→`dyad` completed across all pipeline types, session records, staged JSON schema (`actors[i].identity`), MCP board output, test fixtures, and all comments. `getActor()`→`getAuthor()` in SessionExportPipeline (git username stored as `author`). `validateActorForScope()`→`validateIdentityForScope()` in HeartbeatMonitor. Zero `actor`/`devPair` symbol references remaining.
 
 **v0.31.4** — Terminology aligned with AI dev community: `actor` → `identity`, `devPair` → `dyad`. Setting renamed to `wildwest.identity`. Format unchanged: `TM(RHk)` = Role(dyad).
 

@@ -83,7 +83,7 @@ export function toolBoard(ctx: MCPScopeContext, input: BoardInput): BoardOutput 
       branches.push({
         branch: data.branch ?? file.replace('.json', ''),
         state: branchState,
-        actor: data.actor ?? '',
+        identity: data.identity ?? data.actor ?? '',
       });
     } catch { /* skip unreadable */ }
   }

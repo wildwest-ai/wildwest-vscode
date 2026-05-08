@@ -50,7 +50,7 @@ export interface BoardInput {
 export interface BranchSummary {
   branch: string;
   state: string;
-  actor: string;
+  identity: string;
 }
 
 export interface BoardOutput {

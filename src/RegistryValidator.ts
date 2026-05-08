@@ -101,7 +101,7 @@ export function validateRegistryData(data: Record<string, unknown>): RegistryVal
           return;
         }
         const a = entry as Record<string, unknown>;
-        for (const f of ['role', 'actor', 'channel'] as const) {
+        for (const f of ['role', 'identity', 'channel'] as const) {
           if (typeof a[f] !== 'string' || (a[f] as string).trim() === '') {
             issues.push({
               severity: 'error',

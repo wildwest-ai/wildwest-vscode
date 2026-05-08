@@ -130,7 +130,7 @@ function findCountyRoot(townRoot: string): string | null {
 }
 
 /**
- * Validate if an actor role is valid for a given scope.
+ * Validate if an identity role is valid for a given scope.
  * Returns true if role is in SCOPE_ROLES mapping for that scope.
  */
 function isValidRoleForScope(role: string, scope: WildWestScope): boolean {
@@ -608,7 +608,7 @@ function deliverPendingOutbox(
         }
 
         // Detect and normalize old format: "CD(RSn).Cpt" or "CD(RSn)" → "CD"
-        // Old format: parenthetical suffix that does NOT start with * (actor suffix, not town pattern)
+        // Old format: parenthetical suffix that does NOT start with * (identity suffix, not town pattern)
         const isOldFormat = /\([^*][^)]*\)/.test(toField);
         const normalizedToField = isOldFormat
           ? toField.replace(/\([^*][^)]*\)(\.\w+)?/g, '').trim()
@@ -799,7 +799,7 @@ function beatTown(
     );
   }
 
-  // Validate declared actor role against scope
+  // Validate declared identity role against scope
   const scopeCheck = scopeOf(rootPath);
   if (scopeCheck === 'town') {
     const identitySetting = vscode.workspace.getConfiguration('wildwest').get<string>('identity', '');
@@ -809,7 +809,7 @@ function beatTown(
       if (roleMatch) {
         const role = roleMatch[1];
         if (!isValidRoleForScope(role, 'town')) {
-          outputChannel.appendLine(`[HeartbeatMonitor] WARNING: Actor role "${role}" is not valid for scope "town". Valid roles: ${SCOPE_ROLES['town'].join(', ')}`);
+          outputChannel.appendLine(`[HeartbeatMonitor] WARNING: Identity role "${role}" is not valid for scope "town". Valid roles: ${SCOPE_ROLES['town'].join(', ')}`);
         }
       }
     }
@@ -1024,14 +1024,14 @@ export class HeartbeatMonitor {
   }
 
   /**
-   * Validate that the declared actor role is valid for the given scope.
-   * Extracts role from actor setting (e.g. "TM" from "TM(RHk)").
-   * Returns true if valid or no actor declared; false if invalid role for scope.
+   * Validate that the declared identity role is valid for the given scope.
+   * Extracts role from identity setting (e.g. "TM" from "TM(RHk)").
+   * Returns true if valid or no identity declared; false if invalid role for scope.
    */
-  validateActorForScope(actor: string, scope: WildWestScope): boolean {
-    if (!actor) return true; // Empty actor is valid (no declaration)
-    const roleMatch = actor.match(/^([A-Za-z]+)/);
-    if (!roleMatch) return false; // Malformed actor
+  validateIdentityForScope(identity: string, scope: WildWestScope): boolean {
+    if (!identity) return true; // Empty identity is valid (no declaration)
+    const roleMatch = identity.match(/^([A-Za-z]+)/);
+    if (!roleMatch) return false; // Malformed identity
     const role = roleMatch[1];
     return isValidRoleForScope(role, scope);
   }

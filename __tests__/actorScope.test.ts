@@ -1,8 +1,8 @@
-// Test for actor scope validation logic
+// Test for identity scope validation logic
 // Note: HeartbeatMonitor requires vscode context, so we test the validation
 // logic independently of the full extension environment
 
-describe('Actor Scope Validation Logic', () => {
+describe('Identity Scope Validation Logic', () => {
   // Scope → valid roles mapping (same as HeartbeatMonitor.SCOPE_ROLES)
   const SCOPE_ROLES: Record<string, string[]> = {
     'territory': ['G', 'RA'],
@@ -16,88 +16,88 @@ describe('Actor Scope Validation Logic', () => {
     return validRoles.includes(role);
   }
 
-  // Actor validation helper (mirrors HeartbeatMonitor.validateActorForScope)
-  function validateActorForScope(actor: string, scope: string): boolean {
-    if (!actor) return true; // Empty actor is valid
-    const roleMatch = actor.match(/^([A-Za-z]+)/);
-    if (!roleMatch) return false; // Malformed actor
+  // Identity validation helper (mirrors HeartbeatMonitor.validateIdentityForScope)
+  function validateIdentityForScope(identity: string, scope: string): boolean {
+    if (!identity) return true; // Empty identity is valid
+    const roleMatch = identity.match(/^([A-Za-z]+)/);
+    if (!roleMatch) return false; // Malformed identity
     const role = roleMatch[1];
     return isValidRoleForScope(role, scope);
   }
 
-  describe('validateActorForScope()', () => {
-    it('should accept empty actor (no declaration)', () => {
-      expect(validateActorForScope('', 'town')).toBe(true);
+  describe('validateIdentityForScope()', () => {
+    it('should accept empty identity (no declaration)', () => {
+      expect(validateIdentityForScope('', 'town')).toBe(true);
     });
 
     it('should accept valid town role: Mayor', () => {
-      expect(validateActorForScope('Mayor(ABC)', 'town')).toBe(true);
+      expect(validateIdentityForScope('Mayor(ABC)', 'town')).toBe(true);
     });
 
     it('should accept valid town role: TM', () => {
-      expect(validateActorForScope('TM(RHk)', 'town')).toBe(true);
+      expect(validateIdentityForScope('TM(RHk)', 'town')).toBe(true);
     });
 
     it('should accept valid town role: HG', () => {
-      expect(validateActorForScope('HG(XYZ)', 'town')).toBe(true);
+      expect(validateIdentityForScope('HG(XYZ)', 'town')).toBe(true);
     });
 
     it('should reject invalid town role: RA', () => {
-      expect(validateActorForScope('RA(RSn)', 'town')).toBe(false);
+      expect(validateIdentityForScope('RA(RSn)', 'town')).toBe(false);
     });
 
     it('should reject invalid town role: CD', () => {
-      expect(validateActorForScope('CD(RSn)', 'town')).toBe(false);
+      expect(validateIdentityForScope('CD(RSn)', 'town')).toBe(false);
     });
 
     it('should accept valid county role: S', () => {
-      expect(validateActorForScope('S(Admin)', 'county')).toBe(true);
+      expect(validateIdentityForScope('S(Admin)', 'county')).toBe(true);
     });
 
     it('should accept valid county role: CD', () => {
-      expect(validateActorForScope('CD(RSn)', 'county')).toBe(true);
+      expect(validateIdentityForScope('CD(RSn)', 'county')).toBe(true);
     });
 
     it('should accept valid county role: TM', () => {
-      expect(validateActorForScope('TM(RHk)', 'county')).toBe(true);
+      expect(validateIdentityForScope('TM(RHk)', 'county')).toBe(true);
     });
 
     it('should reject invalid county role: Mayor', () => {
-      expect(validateActorForScope('Mayor(ABC)', 'county')).toBe(false);
+      expect(validateIdentityForScope('Mayor(ABC)', 'county')).toBe(false);
     });
 
     it('should reject invalid county role: RA', () => {
-      expect(validateActorForScope('RA(RSn)', 'county')).toBe(false);
+      expect(validateIdentityForScope('RA(RSn)', 'county')).toBe(false);
     });
 
     it('should accept valid territory role: G', () => {
-      expect(validateActorForScope('G(Global)', 'territory')).toBe(true);
+      expect(validateIdentityForScope('G(Global)', 'territory')).toBe(true);
     });
 
     it('should accept valid territory role: RA', () => {
-      expect(validateActorForScope('RA(RSn)', 'territory')).toBe(true);
+      expect(validateIdentityForScope('RA(RSn)', 'territory')).toBe(true);
     });
 
     it('should reject invalid territory role: TM', () => {
-      expect(validateActorForScope('TM(RHk)', 'territory')).toBe(false);
+      expect(validateIdentityForScope('TM(RHk)', 'territory')).toBe(false);
     });
 
     it('should reject invalid territory role: CD', () => {
-      expect(validateActorForScope('CD(RSn)', 'territory')).toBe(false);
+      expect(validateIdentityForScope('CD(RSn)', 'territory')).toBe(false);
     });
 
     it('should reject role with numbers', () => {
-      expect(validateActorForScope('123(ABC)', 'town')).toBe(false);
+      expect(validateIdentityForScope('123(ABC)', 'town')).toBe(false);
     });
 
-    it('should extract role correctly with complex actor identifier', () => {
-      // TM is valid for town; .main is part of actor identifier but doesn't affect validation
-      expect(validateActorForScope('TM(RHk).main', 'town')).toBe(true);
+    it('should extract role correctly with complex identity identifier', () => {
+      // TM is valid for town; .main is part of identity identifier but doesn't affect validation
+      expect(validateIdentityForScope('TM(RHk).main', 'town')).toBe(true);
     });
 
     it('should return false for unknown scope', () => {
       // Unknown scope should reject all roles (no entries in SCOPE_ROLES)
-      expect(validateActorForScope('TM(RHk)', 'unknown')).toBe(false);
+      expect(validateIdentityForScope('TM(RHk)', 'unknown')).toBe(false);
     });
   });
 

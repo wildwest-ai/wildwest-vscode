@@ -61,7 +61,7 @@ export interface SessionPacket {
   wwsid: string; // UUIDv5 (deterministic from tool + tool_sid)
   tool: 'cld' | 'cpt' | 'ccx';
   tool_sid: string; // Tool-native session ID
-  actor: string; // Actor name (e.g., 'reneyap')
+  author: string; // Git username of session author (e.g., 'reneyap')
   device_id: string; // UUIDv5 (deterministic from hostname)
   seq_from: number; // First turn_index in this packet
   seq_to: number; // Last turn_index in this packet
@@ -80,7 +80,7 @@ export interface SessionRecord {
   wwsid: string;
   tool: 'cld' | 'cpt' | 'ccx';
   tool_sid: string;
-  actor: string;
+  author: string;
   device_id: string;
   session_type: 'chat' | 'edit'; // 'edit' reserved for copilot-edits (future)
   project_path: string;
@@ -101,7 +101,7 @@ export interface IndexEntry {
   wwsid: string;
   tool: 'cld' | 'cpt' | 'ccx';
   tool_sid: string;
-  actor: string;
+  author: string;
   device_id: string;
   session_type: 'chat' | 'edit';
   project_path: string;

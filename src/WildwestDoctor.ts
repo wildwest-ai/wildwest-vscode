@@ -189,7 +189,7 @@ function checkIdentityRole(wwDir: string, monitor: HeartbeatMonitor): CheckResul
   if (!scope) {
     return { label: 'Identity', status: 'info', detail: `${identity} — scope not detected` };
   }
-  const valid = monitor.validateActorForScope(identity, scope);
+  const valid = monitor.validateIdentityForScope(identity, scope);
   return {
     label: 'Identity',
     status: valid ? 'ok' : 'warn',

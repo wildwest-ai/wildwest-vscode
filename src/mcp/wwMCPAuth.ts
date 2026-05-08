@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 
 /**
- * Checks whether the connecting actor is registered in the actor registry.
+ * Checks whether the connecting identity is registered in the identity registry.
  * For v0.21: permissive — if no `actors` array exists in registry.json,
  * access is allowed (with a warning) to avoid blocking all MCP use before
  * the registry schema is finalized.

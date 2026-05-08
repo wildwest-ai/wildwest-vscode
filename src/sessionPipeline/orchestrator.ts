@@ -22,9 +22,9 @@ export interface PipelineOptions {
    */
   sessionsDir: string;
   /**
-   * Actor name (e.g., 'reneyap')
+   * Git username of session author (e.g., 'reneyap')
    */
-  actor: string;
+  author: string;
   /**
    * Optional project path (used for SessionRecord metadata)
    */
@@ -51,7 +51,7 @@ export interface ExportSession {
  */
 export class SessionExportPipeline {
   private sessionsDir: string;
-  private actor: string;
+  private author: string;
   private projectPath: string;
   private stagedDir: string;
   private packetWriter: PacketWriter;
@@ -61,7 +61,7 @@ export class SessionExportPipeline {
 
   constructor(options: PipelineOptions) {
     this.sessionsDir = options.sessionsDir;
-    this.actor = options.actor;
+    this.author = options.author;
     this.projectPath = options.projectPath || '';
     this.stagedDir = path.join(this.sessionsDir, 'staged');
     this.device_id = generateDeviceId();
@@ -70,7 +70,7 @@ export class SessionExportPipeline {
 
     this.packetWriter = new PacketWriter({
       stagedDir: this.stagedDir,
-      actor: this.actor,
+      author: this.author,
       device_id: this.device_id,
     });
   }
@@ -134,7 +134,7 @@ export class SessionExportPipeline {
         wwsid,
         tool,
         tool_sid,
-        actor: this.actor,
+        author: this.author,
         device_id: this.device_id,
         seq_from: turnsForPacket[0].turn_index,
         seq_to: turnsForPacket[turnsForPacket.length - 1].turn_index,
@@ -198,9 +198,9 @@ export class SessionExportPipeline {
   }
 
   /**
-   * Get actor
+   * Get author
    */
-  getActor(): string {
-    return this.actor;
+  getAuthor(): string {
+    return this.author;
   }
 }

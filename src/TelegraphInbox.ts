@@ -7,7 +7,7 @@
  * the original to history/.
  *
  * This converts rule 23 from a discipline requirement into a system-enforced
- * workflow. devPairs run `wildwest.processInbox` — they cannot skip it silently.
+ * workflow. dyads run `wildwest.processInbox` — they cannot skip it silently.
  */
 
 import * as fs from 'fs';
@@ -19,7 +19,7 @@ const SKIP_RE = /^\.last-beat$|^\.gitkeep$|--heartbeat--|^ack-|--ack-/;
 const TIMESTAMPED_MEMO_RE = /^\d{8}-\d{4}Z-to-.+-from-.+--.+\.md$/;
 const LEGACY_TO_MEMO_RE = /^to-.+\.md$/;
 
-// Parse rule-23 filename: <ts>-to-<actor>-from-<actor>--<subject>.md
+// Parse rule-23 filename: <ts>-to-<identity>-from-<identity>--<subject>.md
 const PARSE_MEMO_RE = /^(\d{8}-\d{4}Z)-to-(.+?)-from-(.+?)--(.+)\.md$/;
 
 type AckStatus = 'done' | 'blocked' | 'question';
@@ -106,14 +106,14 @@ export class TelegraphInbox {
     // Parse frontmatter for rich display — fall back to filename parsing
     const frontmatter = parseFrontmatter(filePath);
     const match = filename.match(PARSE_MEMO_RE);
-    const fromActor = frontmatter['from'] ?? (match ? match[3] : '?');
-    const toActor   = frontmatter['to']   ?? (match ? match[2] : '?');
+    const fromIdentity = frontmatter['from'] ?? (match ? match[3] : '?');
+    const toIdentity   = frontmatter['to']   ?? (match ? match[2] : '?');
     const subject   = frontmatter['subject'] ?? (match ? match[4].replace(/-/g, ' ') : filename);
 
     // First line of body as context snippet (skip frontmatter block)
     const bodySnippet = this.readBodySnippet(filePath);
 
-    // Open memo in editor — actor reads before responding
+    // Open memo in editor — identity reads before responding
     try {
       const doc = await vscode.workspace.openTextDocument(filePath);
       await vscode.window.showTextDocument(doc, { preview: true, preserveFocus: false });
@@ -122,7 +122,7 @@ export class TelegraphInbox {
     }
 
     const townLabel = this.deriveTownLabel(dir);
-    const pickerTitle = `📬 [${townLabel}] From: ${fromActor} → ${subject}`;
+    const pickerTitle = `📬 [${townLabel}] From: ${fromIdentity} → ${subject}`;
 
     const action = await vscode.window.showQuickPick<ActionItem>(
       [
@@ -160,7 +160,7 @@ export class TelegraphInbox {
       ],
       {
         title: pickerTitle,
-        placeHolder: `How do you respond? (To: ${toActor})`,
+        placeHolder: `How do you respond? (To: ${toIdentity})`,
         ignoreFocusOut: true,
       },
     );
@@ -174,7 +174,7 @@ export class TelegraphInbox {
     }
 
     if (action.value === 'reply') {
-      return await this.handleReply(dir, filename, match, fromActor, toActor, subject);
+      return await this.handleReply(dir, filename, match, fromIdentity, toIdentity, subject);
     }
 
     const status = action.value as AckStatus;
@@ -201,12 +201,12 @@ export class TelegraphInbox {
     dir: string,
     filename: string,
     match: RegExpMatchArray | null,
-    fromActor: string,
-    toActor: string,
+    fromIdentity: string,
+    toIdentity: string,
     subject: string,
   ): Promise<boolean> {
     const body = await vscode.window.showInputBox({
-      title: `Reply to ${fromActor} — re: ${subject}`,
+      title: `Reply to ${fromIdentity} — re: ${subject}`,
       placeHolder: 'Enter your reply (one or more sentences)…',
       ignoreFocusOut: true,
     });
@@ -218,13 +218,13 @@ export class TelegraphInbox {
 
     const ts = telegraphTimestamp();
     const reSubject = match ? `re-${match[4]}` : `re-${subject.replace(/\s+/g, '-')}`;
-    const replyFilename = `${ts}-to-${fromActor}-from-${toActor}--${reSubject}.md`;
+    const replyFilename = `${ts}-to-${fromIdentity}-from-${toIdentity}--${reSubject}.md`;
 
     const isoNow = new Date().toISOString();
     const replyBody = [
       `---`,
-      `from: ${toActor}`,
-      `to: ${fromActor}`,
+      `from: ${toIdentity}`,
+      `to: ${fromIdentity}`,
       `type: reply`,
       `date: ${isoNow}`,
       `subject: ${reSubject}`,
@@ -287,15 +287,15 @@ export class TelegraphInbox {
     let ackBody: string;
 
     if (match) {
-      // match[1]=ts  match[2]=toActor  match[3]=fromActor  match[4]=subject
-      const [, , toActor, fromActor, subject] = match;
-      ackFilename = `${ts}-to-${fromActor}-from-${toActor}--ack-${status}--${subject}.md`;
+      // match[1]=ts  match[2]=toIdentity  match[3]=fromIdentity  match[4]=subject
+      const [, , toIdentity, fromIdentity, subject] = match;
+      ackFilename = `${ts}-to-${fromIdentity}-from-${toIdentity}--ack-${status}--${subject}.md`;
 
       const isoNow = new Date().toISOString();
       const lines = [
         `---`,
-        `from: ${toActor}`,
-        `to: ${fromActor}`,
+        `from: ${toIdentity}`,
+        `to: ${fromIdentity}`,
         `type: ack-${status}`,
         `branch: —`,
         `date: ${isoNow}`,
