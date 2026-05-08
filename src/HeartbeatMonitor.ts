@@ -454,7 +454,8 @@ function listCountiesInTerritory(worldRoot: string, countiesDir: string): Array<
  * Examples:
  * - From town ~/wildwest/counties/wildwest-ai/wildwest-vscode/ → county ~/wildwest/counties/wildwest-ai/
  * - From town/county → territory ~/wildwest/
- * - From town → town (with pattern) ~/wildwest/counties/wildwest-ai/wildwest-framework/ (via pattern matching)
+ * - From town → town/self → current town inbox
+ * - From county → town (with pattern) ~/wildwest/counties/wildwest-ai/wildwest-framework/ (via pattern matching)
  */
 function resolveScopePath(
   currentScope: WildWestScope,
@@ -464,9 +465,9 @@ function resolveScopePath(
   countiesDir: string,
   pattern?: string | null,
 ): string | null | 'AMBIGUOUS' {
-  // Same scope = local, no remote delivery
+  // Same scope still has an inbox. Self-addressed mail is delivered locally.
   if (currentScope === destScope) {
-    return null;
+    return currentPath;
   }
 
   if (destScope === 'territory') {
@@ -647,12 +648,11 @@ function deliverPendingOutbox(
         }
 
         if (!destPath) {
-          // Local memo (same scope) or unresolvable
-          outputChannel.appendLine(
-            `[HeartbeatMonitor] delivery: ${memoFile} → ${toField} (local, no remote delivery)`,
-          );
+          markMemoFailed(outboxDir, memoFile, memoPath, `unresolvable recipient: '${normalizedToField}'`, outputChannel);
+          failed++;
+          continue;
         } else {
-          // Remote memo — deliver to destination inbox/
+          // Deliver to destination inbox. The destination may be local for self-addressed mail.
           const destInboxDir = path.join(destPath, '.wildwest', 'telegraph', 'inbox');
           if (!fs.existsSync(destInboxDir)) {
             fs.mkdirSync(destInboxDir, { recursive: true });
@@ -1117,3 +1117,7 @@ export class HeartbeatMonitor {
   }
 
 }
+
+export const __test__ = {
+  deliverPendingOutbox,
+};

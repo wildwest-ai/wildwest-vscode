@@ -9,7 +9,7 @@ import * as os from 'os';
  * 1. Happy path — memo delivered to remote inbox
  * 2. Unknown destination role — warning logged, memo stays in outbox
  * 3. Empty outbox — no-op, returns 0 delivered
- * 4. Local destination (same scope) — no remote delivery, just archives
+ * 4. Local destination (same scope) — delivers into local inbox and archives sent copy
  * 5. Invalid role format — warning logged, skip memo
  * 6. Missing 'to:' field — warning logged, skip memo
  * 7. Invalid YAML — handled gracefully, logs error
@@ -44,7 +44,7 @@ function resolveScopePath(
   countiesDir: string,
 ): string | null {
   if (currentScope === destScope) {
-    return null;
+    return currentPath;
   }
 
   if (destScope === 'territory') {
@@ -136,10 +136,12 @@ function deliverPendingOutbox(
 
         if (!destPath) {
           logs.push(
-            `[HeartbeatMonitor] delivery: ${memoFile} → ${toField} (local, no remote delivery)`,
+            `[HeartbeatMonitor] delivery: ${memoFile} → ${toField} — unresolvable recipient`,
           );
+          failed++;
+          continue;
         } else {
-          // Remote delivery
+          // Delivery to destination inbox, including local self-addressed mail
           const destInboxDir = path.join(destPath, '.wildwest', 'telegraph', 'inbox');
           if (!fs.existsSync(destInboxDir)) {
             fs.mkdirSync(destInboxDir, { recursive: true });
@@ -283,7 +285,7 @@ Test`;
       expect(result.failed).toBe(0);
     });
 
-    test('Local destination (same scope) — no remote delivery', () => {
+    test('Local destination (same scope) — delivered to local inbox', () => {
       const worldRoot = tempDir;
       const townPath = path.join(worldRoot, 'counties', 'myc', 'mytown');
       fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
@@ -305,10 +307,10 @@ Test`;
       const result = deliverPendingOutbox(townPath, 'town', logs, worldRoot, 'counties');
 
       expect(result.delivered).toBe(1);
-      expect(logs.some((l) => l.includes('local, no remote delivery'))).toBe(true);
+      expect(logs.some((l) => l.includes('/.wildwest/telegraph/inbox/'))).toBe(true);
 
-      // No remote inbox created (delivery was local)
-      expect(fs.existsSync(path.join(townPath, '.wildwest', 'telegraph', 'inbox'))).toBe(false);
+      // Local destination still receives an inbox copy.
+      expect(fs.existsSync(path.join(townPath, '.wildwest', 'telegraph', 'inbox', 'test-memo.md'))).toBe(true);
     });
 
     test('Missing to: field — warning logged, skip memo', () => {

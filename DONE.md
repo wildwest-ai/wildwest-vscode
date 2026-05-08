@@ -1,8 +1,16 @@
 # DONE — wildwest-vscode
 
-> **Last updated:** 2026-05-07T16:31Z UTC
+> **Last updated:** 2026-05-08T00:57Z UTC
 
 ---
+
+## v0.25.6 — Self-addressed delivery fix ✓ 2026-05-08
+
+- [x] **Same-scope delivery** — `resolveScopePath()` now returns the current town path when `currentScope === destScope`, so self-addressed mail goes through the normal delivery operator instead of being treated as local/no-op
+- [x] **Unresolvable recipient handling** — unresolved destinations are marked failed instead of silently archiving without delivery
+- [x] **Production regression test** — added `HeartbeatDelivery.test.ts` to exercise production `deliverPendingOutbox()` for outbox → local inbox + outbox history behavior
+- [x] **Release docs/artifact** — bumped to `0.25.6`, updated README current version + What's New, rebuilt and installed `build/wildwest-vscode-0.25.6.vsix`
+- [x] **Dogfood verification** — a self-addressed memo delivered through the real outbox path into local `inbox/` and `outbox/history/`; history copy stamped `delivered_at: 2026-05-08T00:52:27.671Z`
 
 ## v0.25.4 — Test isolation ✓ 2026-05-07
 

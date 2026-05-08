@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.25.5
+**Current version:** 0.25.6
 
 ---
 
 ## What's New
+
+**v0.25.6** — Self-addressed telegraph delivery fix: same-scope recipients now resolve to the current town path, so outbox memos addressed to the current town are delivered into the local inbox and archived through the normal delivery path. Added regression coverage for local inbox delivery.
 
 **v0.25.5** — Telegraph and lifecycle fixes: `TelegraphInbox` now scans delivered v2 memos in `inbox/`, ack workflows queue outbound acks in `outbox/`, heartbeat no longer treats normal `inbox/`/`outbox/` directories as flags, the packet pipeline honors custom `wildwest.exportPath`, deactivation clears polling, heartbeat/status utility commands are contributed, and town/worktree git calls use argument arrays without switching the active checkout. Added production-focused `TelegraphInbox` tests.
 
