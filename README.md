@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.25.11
+**Current version:** 0.25.12
 
 ---
 
 ## What's New
+
+**v0.25.12** — Registry validator: new `wildwest.validateRegistry` command lints `.wildwest/registry.json` against the Wild West schema (required fields, UUID format, valid scope enum, actor shape, role-scope alignment). Output channel + notification summary. 26 new tests; 11 suites, 117 total.
 
 **v0.25.11** — Release artifact hygiene: `build/*.vsix` files removed from git tracking. `.gitignore` updated to exclude all VSIX files; GitHub Releases workflow documented in `scripts/RELEASE.md`. Repo size reduced by ~8 MB.
 

@@ -14,6 +14,7 @@ import { ClaudeCodeAdapter } from './aiToolAdapters/ClaudeCodeAdapter';
 import { registerChatParticipant } from './WildwestParticipant';
 import { registerMCPServer } from './mcp/wwMCPServer';
 import { runDoctor } from './WildwestDoctor';
+import { runValidateRegistry } from './RegistryValidator';
 
 // ── Configuration types & helpers ──────────────────────────────────────────
 
@@ -114,6 +115,7 @@ export function activate(context: vscode.ExtensionContext) {
         { label: 'Solo Mode Report',          command: 'wildwest.soloModeReport' },
         { label: 'Settings', kind: vscode.QuickPickItemKind.Separator },
         { label: 'Reset Session Export Consent', command: 'wildwest.resetSessionConsent' },
+        { label: 'Validate Registry',            command: 'wildwest.validateRegistry' },
         { label: 'Wild West Doctor',             command: 'wildwest.doctor' },
       ];
       const commandMap = new Map(
@@ -179,6 +181,9 @@ export function activate(context: vscode.ExtensionContext) {
       );
       outputChannel.appendLine('[wildwest] session export consent reset by user');
     }),
+    vscode.commands.registerCommand('wildwest.validateRegistry', () =>
+      runValidateRegistry(outputChannel),
+    ),
     vscode.commands.registerCommand('wildwest.doctor', () =>
       runDoctor(context, outputChannel, heartbeatMonitor),
     ),
