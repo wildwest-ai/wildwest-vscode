@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.25.10
+**Current version:** 0.25.11
 
 ---
 
 ## What's New
+
+**v0.25.11** — Release artifact hygiene: `build/*.vsix` files removed from git tracking. `.gitignore` updated to exclude all VSIX files; GitHub Releases workflow documented in `scripts/RELEASE.md`. Repo size reduced by ~8 MB.
 
 **v0.25.10** — Production telegraph tests: replaced stub-based `telegraphDelivery.test.ts` with tests that drive the real `deliverPendingOutbox()` from `HeartbeatMonitor`; added `TelegraphService.test.ts` covering all 8 shared primitives. Test suite: 10 suites, 91 tests (was 9/71).
 

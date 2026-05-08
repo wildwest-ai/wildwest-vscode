@@ -2,7 +2,6 @@ node_modules/
 dist/
 out/
 *.vsix
-!build/*.vsix
 .DS_Store
 .wildwest/worktrees/
 

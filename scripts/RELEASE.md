@@ -46,10 +46,19 @@ The script exits on first error (`set -e`). If interrupted:
 3. Fix the issue
 4. Run `npm run release` again
 
-## Future: Automated CHANGELOG
+## VSIX Artifacts
 
-Consider adding a CHANGELOG.md entry in the script before commit step.
+`build/*.vsix` files are **not tracked in git** (excluded via `.gitignore`).
+
+- They are built locally by `npm run esbuild && npx vsce package`.
+- To share a release, attach the VSIX to a **GitHub Release** manually:
+  1. Push the tag: `git push origin vX.Y.Z`
+  2. Go to GitHub → Releases → Draft a new release → select the tag
+  3. Attach `build/wildwest-vscode-X.Y.Z.vsix` as a release asset
+  4. Publish
+
+For local install only, `code --install-extension build/wildwest-vscode-X.Y.Z.vsix --force` is sufficient.
 
 ---
 
-Last updated: 2026-05-03 — Created to prevent version/build mismatches
+Last updated: 2026-05-08 — VSIX artifacts removed from git; GitHub Releases workflow documented
