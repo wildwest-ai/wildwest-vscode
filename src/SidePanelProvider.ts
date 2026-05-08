@@ -128,16 +128,17 @@ export class SidePanelProvider
   private countStagedSessions(): { today: number; yesterday: number; last7d: number; older: number } {
     const counts = { today: 0, yesterday: 0, last7d: 0, older: 0 };
     if (!this.exportPath) return counts;
-    const stagedDir = path.join(this.exportPath, 'staged');
+    const indexPath = path.join(this.exportPath, 'staged', 'storage', 'index.json');
     try {
-      const files = fs.readdirSync(stagedDir).filter((f) => f.endsWith('.json') && !f.startsWith('.'));
+      if (!fs.existsSync(indexPath)) return counts;
+      const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
       const now = Date.now();
       const dayMs = 86_400_000;
       const todayStart = new Date(); todayStart.setHours(0,0,0,0);
       const todayMs = todayStart.getTime();
-      for (const f of files) {
+      for (const session of (index.sessions ?? [])) {
         try {
-          const mtime = fs.statSync(path.join(stagedDir, f)).mtimeMs;
+          const mtime = new Date(session.last_turn_at).getTime();
           const age = now - mtime;
           if (mtime >= todayMs) counts.today++;
           else if (age < 2 * dayMs) counts.yesterday++;
@@ -145,7 +146,7 @@ export class SidePanelProvider
           else counts.older++;
         } catch { /* skip */ }
       }
-    } catch { /* staged dir not ready */ }
+    } catch { /* index not ready */ }
     return counts;
   }
 

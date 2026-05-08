@@ -2,11 +2,15 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.8
+**Current version:** 0.31.10
 
 ---
 
 ## What's New
+
+**v0.31.10** — `SidePanelProvider.countStagedSessions()` migrated from `staged/*.json` mtime scan to `staged/storage/index.json` (`last_turn_at`). Legacy `batchConvertSessions()` calls in `exportNow()` and Batch Convert menu disabled. `staged/*.json` flat files have no active readers.
+
+**v0.31.9** — `exportNow()` re-enabled: scans all providers (Copilot, Codex, Claude Code, Copilot Edits) → updates `raw/` → runs `batchConvertSessions()` to regenerate `staged/*.json` with `wwuid`. Background poll and startup batch convert remain disabled.
 
 **v0.31.8** — Legacy `batchConvertSessions` calls disabled in `sessionExporter.ts` (startup scan, poll cycle, manual trigger). Staged flat-file export replaced by `sessionPipeline`. `TODO(v0.32)` markers left for cleanup.
 

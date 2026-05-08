@@ -1320,8 +1320,9 @@ export class SessionExporter {
         });
       }
 
-      // Convert raw/ → staged/ (full re-convert; forces wwuid on all sessions)
-      await this.batchConvertSessions(false);
+      // TODO(v0.32): Legacy staged/*.json flat files removed — side panel now reads
+      // staged/storage/index.json. Batch convert disabled.
+      // await this.batchConvertSessions(false);
     } catch (error) {
       vscode.window.showErrorMessage(`Export failed: ${error}`);
     }
@@ -1419,7 +1420,8 @@ export class SessionExporter {
     } else if (selected.label.includes('Export Now')) {
       await this.exportNow();
     } else if (selected.label.includes('Batch Convert')) {
-      await this.batchConvertSessions();
+      // TODO(v0.32): Legacy batch convert disabled — staged/*.json no longer needed.
+      // await this.batchConvertSessions();
     } else if (selected.label.includes('Convert to Markdown')) {
       await this.convertExportsToMarkdown();
     } else if (selected.label.includes('Generate Markdown Index')) {
