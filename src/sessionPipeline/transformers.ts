@@ -210,9 +210,8 @@ export class ClaudeCodeTransformer implements ISessionTransformer {
   readonly tool = 'cld' as const;
 
   parseRaw(rawContent: string): unknown {
-    const lines = rawContent.split('\n').filter((l) => l.trim());
-    const messages = lines.map((line) => JSON.parse(line));
-    return { messages };
+    // Claude Code files are plain JSON, not JSONL
+    return JSON.parse(rawContent);
   }
 
   getCurrentCursor(rawSession: unknown): Cursor {
@@ -228,11 +227,28 @@ export class ClaudeCodeTransformer implements ISessionTransformer {
   transformTurns(rawSession: unknown): NormalizedTurn[] {
     const session = rawSession as Record<string, unknown>;
     const messages = (session['messages'] as Record<string, unknown>[]) || [];
-    const turns: NormalizedTurn[] = [];
 
+    const rawCreationDate = session['creationDate'];
+    const rawLastMessageDate = session['lastMessageDate'];
+    const sessionStart = rawCreationDate
+      ? new Date(rawCreationDate as number).toISOString()
+      : new Date().toISOString();
+    const sessionEnd = rawLastMessageDate
+      ? new Date(rawLastMessageDate as number).toISOString()
+      : sessionStart;
+
+    const resolveTimestamp = (raw: unknown, fallback: string): string => {
+      if (raw === undefined || raw === null) return fallback;
+      if (typeof raw === 'number') return new Date(raw).toISOString();
+      if (typeof raw === 'string' && raw.length > 0) return raw;
+      return fallback;
+    };
+
+    const turns: NormalizedTurn[] = [];
     for (let i = 0; i < messages.length; i++) {
       const msg = messages[i];
       const role = (msg['role'] as string) || 'user';
+      const fallback = role === 'assistant' ? sessionEnd : sessionStart;
 
       turns.push({
         turn_index: i,
@@ -241,9 +257,9 @@ export class ClaudeCodeTransformer implements ISessionTransformer {
         parts: this.extractParts(msg['content']),
         meta: {
           tool_cursor_value: (msg['id'] as string) || '',
-          ...(msg['meta'] as TurnMeta | undefined),
+          model: (msg['model'] as string | undefined),
         },
-        timestamp: (msg['timestamp'] as string) || new Date().toISOString(),
+        timestamp: resolveTimestamp(msg['timestamp'], fallback),
       });
     }
 
