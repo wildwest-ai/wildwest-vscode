@@ -297,8 +297,15 @@ export class CodexTransformer implements ISessionTransformer {
 
   parseRaw(rawContent: string): unknown {
     const lines = rawContent.split('\n').filter((l) => l.trim());
-    const messages = lines.map((line) => JSON.parse(line));
-    return { messages, line_count: lines.length };
+    const parsed = lines.map((line) => JSON.parse(line) as Record<string, unknown>);
+
+    // Extract session_meta timestamp as session start time
+    const metaLine = parsed.find((m) => m['type'] === 'session_meta');
+    const sessionStart: string | undefined =
+      (metaLine?.['timestamp'] as string | undefined) ||
+      ((metaLine?.['payload'] as Record<string, unknown> | undefined)?.['timestamp'] as string | undefined);
+
+    return { messages: parsed, line_count: lines.length, session_start: sessionStart };
   }
 
   getCurrentCursor(rawSession: unknown): Cursor {
@@ -309,11 +316,26 @@ export class CodexTransformer implements ISessionTransformer {
   transformTurns(rawSession: unknown): NormalizedTurn[] {
     const session = rawSession as Record<string, unknown>;
     const messages = (session['messages'] as Record<string, unknown>[]) || [];
+    const sessionStart = (session['session_start'] as string | undefined) || new Date().toISOString();
     const turns: NormalizedTurn[] = [];
 
     for (let i = 0; i < messages.length; i++) {
       const msg = messages[i];
       const role = (msg['role'] as string) || 'user';
+
+      // Skip metadata/system lines that have no role content
+      if (msg['type'] && msg['type'] !== 'message') continue;
+
+      const rawTs = msg['timestamp'] ?? msg['create_time'];
+      let timestamp: string;
+      if (typeof rawTs === 'string' && rawTs.length > 0) {
+        timestamp = rawTs;
+      } else if (typeof rawTs === 'number') {
+        // create_time is seconds epoch
+        timestamp = new Date(rawTs * 1000).toISOString();
+      } else {
+        timestamp = sessionStart;
+      }
 
       turns.push({
         turn_index: i,
@@ -324,9 +346,7 @@ export class CodexTransformer implements ISessionTransformer {
           tool_cursor_value: i, // Line offset in JSONL
           ...(msg['meta'] as TurnMeta | undefined),
         },
-        timestamp: msg['create_time']
-          ? new Date((msg['create_time'] as number) * 1000).toISOString()
-          : new Date().toISOString(),
+        timestamp,
       });
     }
 

@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.17
+**Current version:** 0.31.18
 
 ---
 
 ## What's New
+
+**v0.31.18** — Codex transformer: `parseRaw()` extracts `session_meta.timestamp` as `session_start`. `transformTurns()` uses `msg['timestamp']` (ISO string) then `msg['create_time']` (seconds epoch) then falls back to `session_start` — so `rollout-YYYY-MM-DD*` sessions get their actual creation date instead of today. Metadata/system lines (type ≠ 'message') skipped.
 
 **v0.31.17** — Poll cycle now runs `processRawSessions()` on idle ticks when `staged/storage/index.json` is missing (recovery mode). Handles the case where storage was deleted but no raw-file activity is detected, so the state-change gate doesn't block pipeline rebuild.
 
