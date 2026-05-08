@@ -1323,6 +1323,11 @@ export class SessionExporter {
       // TODO(v0.32): Legacy staged/*.json flat files removed — side panel now reads
       // staged/storage/index.json. Batch convert disabled.
       // await this.batchConvertSessions(false);
+
+      // Run pipeline to process raw/ → staged/storage/
+      if (this.pipelineAdapter) {
+        await this.pipelineAdapter.processRawSessions();
+      }
     } catch (error) {
       vscode.window.showErrorMessage(`Export failed: ${error}`);
     }

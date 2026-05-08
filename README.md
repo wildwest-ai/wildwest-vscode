@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.15
+**Current version:** 0.31.16
 
 ---
 
 ## What's New
+
+**v0.31.16** — `exportNow()` now calls `pipelineAdapter.processRawSessions()` after scanning providers. Export Now creates `staged/storage/` from scratch if deleted and fully populates the index in one shot.
 
 **v0.31.15** — Fix session date buckets: replaced rolling 48h `age < 2 * dayMs` window with calendar-date boundaries (`todayMs`, `yesterdayMs`, `last7dMs`). "Yesterday" now correctly shows all sessions whose date falls on the previous calendar day regardless of current time.
 
