@@ -215,7 +215,11 @@ export class SidePanelProvider
         const pp = (session['project_path'] as string) || '';
         if (scope === 'town') {
           // Match by alias (basename) to handle reorganized/moved paths
-          return path.basename(pp) === alias;
+          if (path.basename(pp) === alias) return true;
+          // Also match when pp is an ancestor of townRoot — Claude Code records
+          // the .claude/ project root (e.g. ~/wildwest) not the town directory.
+          if (pp && townRoot.startsWith(pp + path.sep)) return true;
+          return false;
         }
         if (scope === 'county') {
           const root = filterPath ?? countyRoot;

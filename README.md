@@ -8,6 +8,8 @@ Governance framework for AI-assisted development. Tracks dyad activity, exports 
 
 ## What's New
 
+**v0.31.31** — Town scope filter: also match sessions where `project_path` is an ancestor of the workspace (`townRoot.startsWith(pp + sep)`). Fixes Claude Code sessions being excluded — Claude Code records `projectPath` as the `.claude/` project root (e.g. `~/wildwest`), not the individual town directory.
+
 **v0.31.30** — Fix ccx `tool_sid` double-extension bug: adapter was stripping `.json` from `.jsonl` filenames, leaving `tool_sid` as `rollout-...cb7.jsonl`. Now strips the correct extension per file type. `rebuildIndexFromRecords()` handles legacy records with `.jsonl`-suffixed tool_sid. All 71 ccx sessions now get correct `project_path` from `session_meta.payload.cwd` on rebuild.
 
 **v0.31.29** — Add `wildwest.rebuildIndex` command + Utilities button. Scans `staged/storage/sessions/*.json`, patches ccx `project_path` from raw `session_meta.payload.cwd`, writes fresh `index.json`. Also runs automatically when `index.json` is missing on next Export Now / poll tick.
