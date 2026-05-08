@@ -2,6 +2,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { HeartbeatMonitor } from './HeartbeatMonitor';
+import {
+  telegraphTimestamp,
+  telegraphISOTimestamp,
+  parseFrontmatter as parseFrontmatterSvc,
+  archiveMemo,
+  readRegistryAlias,
+} from './TelegraphService';
 
 export class TelegraphCommands {
   private outputChannel: vscode.OutputChannel;
@@ -60,43 +67,21 @@ export class TelegraphCommands {
    * Parse YAML frontmatter from a memo file
    */
   private parseFrontmatter(filePath: string): Record<string, string> {
-    const content = fs.readFileSync(filePath, 'utf8');
-    const match = content.match(/^---\n([\s\S]*?)\n---/);
-    if (!match) return {};
-
-    const fm: Record<string, string> = {};
-    const lines = match[1].split('\n');
-    for (const line of lines) {
-      const [key, ...valueParts] = line.split(':');
-      if (key && valueParts.length > 0) {
-        fm[key.trim()] = valueParts.join(':').trim();
-      }
-    }
-    return fm;
+    return parseFrontmatterSvc(filePath);
   }
 
   /**
    * Get current UTC timestamp in YYYYMMDD-HHMMz format
    */
   private getTimestamp(): string {
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return (
-      now.getUTCFullYear() +
-      pad(now.getUTCMonth() + 1) +
-      pad(now.getUTCDate()) +
-      '-' +
-      pad(now.getUTCHours()) +
-      pad(now.getUTCMinutes()) +
-      'Z'
-    );
+    return telegraphTimestamp();
   }
 
   /**
    * Get current UTC timestamp in ISO 8601 format
    */
   private getISO8601Timestamp(): string {
-    return new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+    return telegraphISOTimestamp();
   }
 
   /**
@@ -210,10 +195,7 @@ original_memo: ${originalFileName}
     // Archive original to inbox/history/YYYY-MM-DD/
     const today = new Date().toISOString().split('T')[0];
     const historyDir = path.join(inboxDir, 'history', today);
-    if (!fs.existsSync(historyDir)) {
-      fs.mkdirSync(historyDir, { recursive: true });
-    }
-    fs.renameSync(originalPath, path.join(historyDir, originalFileName));
+    archiveMemo(originalPath, historyDir);
 
     this.outputChannel.appendLine(`[TelegraphCommands] Ack queued in outbox: ${ackFileName}`);
     vscode.window.showInformationMessage(`Ack queued: ${ackFileName}`);
@@ -290,7 +272,7 @@ original_memo: ${originalFileName}
   ): void {
     // Derive sender alias from registry; fall back to 'TM' if unreadable
     const wwRoot = path.dirname(path.dirname(telegraphDir)); // telegraphDir/../.. = wsPath
-    const alias = this.readAliasFromRegistry(path.join(wwRoot, '.wildwest'));
+    const alias = readRegistryAlias(path.join(wwRoot, '.wildwest'));
     const fromActor = alias ?? 'TM';
 
     // Build filename: YYYYMMDD-HHMMZ-to-<ToActor>-from-<FromActor>--<subject>.md
@@ -330,17 +312,4 @@ subject: ${subject}
     vscode.window.showInformationMessage(`Memo created in outbox: ${fileName}`);
   }
 
-  /**
-   * Read alias from .wildwest/registry.json
-   */
-  private readAliasFromRegistry(wwRoot: string): string | null {
-    try {
-      const reg = JSON.parse(
-        fs.readFileSync(path.join(wwRoot, 'registry.json'), 'utf8'),
-      ) as Record<string, unknown>;
-      return (reg['alias'] as string) || null;
-    } catch {
-      return null;
-    }
-  }
 }

@@ -13,6 +13,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { telegraphTimestamp, archiveMemo, getTelegraphDirs as wwGetTelegraphDirs } from './TelegraphService';
 
 const SKIP_RE = /^\.last-beat$|^\.gitkeep$|--heartbeat--|^ack-|--ack-/;
 const TIMESTAMPED_MEMO_RE = /^\d{8}-\d{4}Z-to-.+-from-.+--.+\.md$/;
@@ -25,15 +26,6 @@ type AckStatus = 'done' | 'blocked' | 'question';
 
 type ActionItem = vscode.QuickPickItem & { value: string };
 
-function nowTs(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return (
-    `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}` +
-    `-${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}Z`
-  );
-}
-
 export class TelegraphInbox {
   constructor(private outputChannel: vscode.OutputChannel) {}
 
@@ -42,14 +34,7 @@ export class TelegraphInbox {
    * These are the town-level telegraph buses visible in this workspace.
    */
   getTelegraphDirs(): string[] {
-    const dirs: string[] = [];
-    for (const f of vscode.workspace.workspaceFolders ?? []) {
-      const dir = path.join(f.uri.fsPath, '.wildwest', 'telegraph');
-      if (fs.existsSync(dir)) {
-        dirs.push(dir);
-      }
-    }
-    return dirs;
+    return wwGetTelegraphDirs();
   }
 
   /**
@@ -194,7 +179,7 @@ export class TelegraphInbox {
     status: AckStatus,
     comment: string | undefined,
   ): Promise<void> {
-    const ts = nowTs();
+    const ts = telegraphTimestamp();
     const match = filename.match(PARSE_MEMO_RE);
 
     let ackFilename: string;
@@ -239,9 +224,7 @@ export class TelegraphInbox {
     fs.writeFileSync(path.join(outboxDir, ackFilename), ackBody, 'utf-8');
 
     // Archive original → history/
-    const historyDir = path.join(dir, 'history');
-    fs.mkdirSync(historyDir, { recursive: true });
-    fs.renameSync(path.join(dir, filename), path.join(historyDir, filename));
+    archiveMemo(path.join(dir, filename), path.join(dir, 'history'));
 
     this.outputChannel.appendLine(`[TelegraphInbox] ack-${status} queued in outbox: ${ackFilename}`);
     vscode.window.showInformationMessage(`Wild West: ack queued — ${ackFilename}`);

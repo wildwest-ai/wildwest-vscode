@@ -1,6 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import {
+  telegraphTimestamp,
+  parseFrontmatter,
+  archiveMemo,
+  readRegistryAlias,
+} from './TelegraphService';
 
 /**
  * @wildwest Copilot Chat participant — P7 (v0.22.0)
@@ -51,10 +57,7 @@ export function registerChatParticipant(
       inboxDir: string; filename: string;
     }) => {
       try {
-        const src = path.join(args.inboxDir, args.filename);
-        const histDir = path.join(args.inboxDir, 'history');
-        fs.mkdirSync(histDir, { recursive: true });
-        fs.renameSync(src, path.join(histDir, args.filename));
+        archiveMemo(path.join(args.inboxDir, args.filename), path.join(args.inboxDir, 'history'));
         vscode.window.showInformationMessage(`Wild West: archived → ${args.filename}`);
         outputChannel.appendLine(`[WildwestParticipant] archived memo: ${args.filename}`);
       } catch (err) {
@@ -179,7 +182,7 @@ async function handleSend(wwRoot: string, rawPrompt: string, stream: vscode.Chat
   const senderAlias = readRegistryAlias(wwRoot) ?? 'TM';
   const outboxDir = path.join(wwRoot, 'telegraph', 'outbox');
   const now = new Date();
-  const ts = formatTimestamp(now);
+  const ts = telegraphTimestamp(now);
   const subject = body.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '').toLowerCase().slice(0, 40);
   const filename = `${ts}-to-${toRole}-from-${senderAlias}--${subject}.md`;
   const content =
@@ -214,7 +217,7 @@ async function handleAck(wwRoot: string, timestampArg: string, stream: vscode.Ch
   const senderAlias = readRegistryAlias(wwRoot) ?? 'TM';
   const outboxDir = path.join(wwRoot, 'telegraph', 'outbox');
   const now = new Date();
-  const ts = formatTimestamp(now);
+  const ts = telegraphTimestamp(now);
   const ackSubject = `ack-${timestampArg}-${originalSubject}`.slice(0, 60).replace(/\s+/g, '-');
   const filename = `${ts}-to-${originalFrom}-from-${senderAlias}--${ackSubject}.md`;
   const content =
@@ -364,29 +367,6 @@ function extractSubject(filePath: string, filename: string): string {
   return filename;
 }
 
-function parseFrontmatter(filePath: string): Record<string, unknown> {
-  try {
-    const content = fs.readFileSync(filePath, 'utf8');
-    const match = content.match(/^---\n([\s\S]*?)\n---/);
-    if (!match) return {};
-    const result: Record<string, unknown> = {};
-    for (const line of match[1].split('\n')) {
-      const kv = line.match(/^(\w+):\s*(.+)$/);
-      if (kv) result[kv[1]] = kv[2].trim();
-    }
-    return result;
-  } catch { return {}; }
-}
-
-function readRegistryAlias(wwRoot: string): string | null {
-  try {
-    const reg = JSON.parse(
-      fs.readFileSync(path.join(wwRoot, 'registry.json'), 'utf8'),
-    ) as Record<string, unknown>;
-    return (reg['alias'] as string) || null;
-  } catch { return null; }
-}
-
 function findCountyRootFromWwDir(wwRoot: string): string | null {
   // wwRoot = /path/to/town/.wildwest — walk from town root
   const townRoot = path.dirname(wwRoot);
@@ -405,11 +385,4 @@ function findCountyRootFromWwDir(wwRoot: string): string | null {
   return null;
 }
 
-function formatTimestamp(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return (
-    `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}` +
-    `-${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}Z`
-  );
-}
 

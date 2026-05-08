@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.25.8
+**Current version:** 0.25.9
 
 ---
 
 ## What's New
+
+**v0.25.9** — TelegraphService abstraction: extracted shared telegraph primitives (`telegraphTimestamp`, `telegraphISOTimestamp`, `inboxPath`, `outboxPath`, `parseFrontmatter`, `archiveMemo`, `readRegistryAlias`, `getTelegraphDirs`) into `src/TelegraphService.ts`. Eliminated 6 duplicate implementations across `TelegraphCommands`, `TelegraphInbox`, and `WildwestParticipant`. No user-visible change.
 
 **v0.25.8** — Wild West Doctor: new `wildwest.doctor` command validates the full local setup — registry fields, telegraph dirs, heartbeat freshness, export path, hook port 7379, MCP state, session consent, inbox memo count, and actor role. Results printed to the output channel with ✅/⚠️/❌ per check. Also available from the Wild West menu under Settings.
 
