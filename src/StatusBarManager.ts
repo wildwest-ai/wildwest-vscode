@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { HeartbeatMonitor } from './HeartbeatMonitor';
 
@@ -65,34 +67,72 @@ export class StatusBarManager {
     tooltip.isTrusted = true;
     tooltip.supportHtml = true;
 
-    tooltip.appendMarkdown('**Wild West**\n\n');
+    // Header: identity + scope
+    const scope = this.heartbeatMonitor.detectScope();
+    const scopeLabel = scope ? scope.charAt(0).toUpperCase() + scope.slice(1) : '—';
+    const actorSetting = vscode.workspace.getConfiguration('wildwest').get<string>('actor', '');
+    const header = actorSetting
+      ? `**Wild West** · ${actorSetting} · ${scopeLabel}`
+      : `**Wild West** · ${scopeLabel}`;
+    tooltip.appendMarkdown(`${header}\n\n`);
 
-    if (this.isWatching) {
-      tooltip.appendMarkdown('Session: $(eye) Watching\n\n');
-      tooltip.appendMarkdown('[$(debug-pause) Stop Watcher](command:wildwest.stopWatcher)\n\n');
-    } else {
-      tooltip.appendMarkdown('Session: $(eye-closed) Stopped\n\n');
-      tooltip.appendMarkdown('[$(play) Start Watcher](command:wildwest.startWatcher)\n\n');
-    }
+    // Heartbeat state + last beat
+    const liveness = this.heartbeatMonitor.checkLiveness();
+    const heartDot = liveness === 'alive' ? '●' : liveness === 'flagged' ? '⚑' : '○';
+    const lastBeat = this.timeSince(this.readSentinelTimestamp());
+    tooltip.appendMarkdown(`${heartDot} ${liveness} · Last beat: ${lastBeat}\n\n`);
 
+    // Watcher toggle (compact)
+    const eyeIcon = this.isWatching ? '$(eye)' : '$(eye-closed)';
+    const watcherState = this.isWatching ? 'Watching' : 'Stopped';
+    const watcherToggleCmd = this.isWatching ? 'wildwest.stopWatcher' : 'wildwest.startWatcher';
+    const watcherToggleLabel = this.isWatching ? 'Stop' : 'Start';
+    tooltip.appendMarkdown(`${eyeIcon} ${watcherState} — [${watcherToggleLabel}](command:${watcherToggleCmd})\n\n`);
+
+    // Telegraph quick-actions
     tooltip.appendMarkdown('---\n\n');
-    tooltip.appendMarkdown('**Sessions**\n\n');
-    tooltip.appendMarkdown('[$(sync) Export Now](command:wildwest.exportNow)\n\n');
-    tooltip.appendMarkdown('[$(package) Batch Convert to JSON](command:wildwest.batchConvert)\n\n');
-    tooltip.appendMarkdown('[$(file-text) Convert to Markdown](command:wildwest.convertToMarkdown)\n\n');
-    tooltip.appendMarkdown('[$(list-unordered) Generate Index](command:wildwest.generateIndex)\n\n');
+    tooltip.appendMarkdown('**Telegraph**\n\n');
+    tooltip.appendMarkdown(
+      '[$(mail) Send](command:wildwest.telegraphSend)' +
+      ' · [$(check) Ack](command:wildwest.telegraphAck)' +
+      ' · [$(radio-tower) Inbox](command:wildwest.viewTelegraph)' +
+      ' · [$(pulse) Solo](command:wildwest.soloModeReport)\n\n'
+    );
 
+    // Footer (maintenance ops)
     tooltip.appendMarkdown('---\n\n');
-    tooltip.appendMarkdown('**Governance**\n\n');
-    tooltip.appendMarkdown('[$(radio-tower) View Telegraph](command:wildwest.viewTelegraph)\n\n');
-    tooltip.appendMarkdown('[$(pulse) Solo Mode Report](command:wildwest.soloModeReport)\n\n');
-
-    tooltip.appendMarkdown('---\n\n');
-    tooltip.appendMarkdown('[$(folder-opened) Open Export Folder](command:wildwest.openExportFolder)\n\n');
-    tooltip.appendMarkdown('[$(output) View Output Log](command:wildwest.viewOutputLog)\n\n');
-    tooltip.appendMarkdown('[$(gear) Settings](command:wildwest.openSettings)\n\n');
+    tooltip.appendMarkdown(
+      '[$(output) Log](command:wildwest.viewOutputLog)' +
+      ' · [$(gear) Settings](command:wildwest.openSettings)\n\n'
+    );
 
     return tooltip;
+  }
+
+  /** Read the heartbeat sentinel file and return its raw content (ISO string). */
+  private readSentinelTimestamp(): string {
+    const wwRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!wwRoot) return '—';
+    const scope = this.heartbeatMonitor.detectScope();
+    const sentinelFile = scope === 'town'
+      ? path.join(wwRoot, '.wildwest', 'telegraph', '.last-beat')
+      : path.join(wwRoot, '.wildwest', '.last-beat');
+    try {
+      return fs.readFileSync(sentinelFile, 'utf8').trim() || '—';
+    } catch {
+      return '—';
+    }
+  }
+
+  /** Convert an ISO timestamp string to a human-readable relative time. */
+  private timeSince(isoStr: string): string {
+    if (isoStr === '—') return '—';
+    const then = new Date(isoStr).getTime();
+    if (isNaN(then)) return isoStr;
+    const diffMin = Math.floor((Date.now() - then) / 60_000);
+    if (diffMin < 1) return 'just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    return `${Math.floor(diffMin / 60)}h ago`;
   }
 
   startListening(): void {

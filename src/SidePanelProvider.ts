@@ -36,8 +36,16 @@ export class SidePanelProvider
 
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
 
+  private isWatching: boolean = false;
+
   constructor(private readonly heartbeatMonitor: HeartbeatMonitor) {
     this.refreshInterval = setInterval(() => this.refresh(), REFRESH_INTERVAL_MS);
+  }
+
+  /** Called by SessionExporter (via extension.ts) when the watcher starts or stops. */
+  setWatching(value: boolean): void {
+    this.isWatching = value;
+    this.refresh();
   }
 
   refresh(): void {
@@ -75,13 +83,14 @@ export class SidePanelProvider
     const boardFiles = this.collectBoardFiles();
     const receipts = this.collectAllReceipts();
     return [
+      new SidePanelItem('Heartbeat', vscode.TreeItemCollapsibleState.Collapsed, 'heartbeat'),
+      new SidePanelItem('Actor', vscode.TreeItemCollapsibleState.Collapsed, 'actor'),
+      new SidePanelItem('Sessions', vscode.TreeItemCollapsibleState.Collapsed, 'sessions'),
       this.sectionItem('Inbox', 'inbox', inboxFiles.length),
       this.sectionItem('Outbox', 'outbox', outboxFiles.length),
       this.sectionItem('History', 'history', historyFiles.length),
       this.sectionItem('Board', 'board', boardFiles.length),
       this.sectionItem('Receipts', 'receipts', receipts.length),
-      new SidePanelItem('Heartbeat', vscode.TreeItemCollapsibleState.Collapsed, 'heartbeat'),
-      new SidePanelItem('Actor', vscode.TreeItemCollapsibleState.Collapsed, 'actor'),
     ];
   }
 
@@ -92,15 +101,42 @@ export class SidePanelProvider
 
   private getSectionChildren(sectionId: string): SidePanelItem[] {
     switch (sectionId) {
+      case 'heartbeat': return this.heartbeatChildren();
+      case 'actor':     return this.actorChildren();
+      case 'sessions':  return this.sessionsChildren();
       case 'inbox':     return this.memoItems(this.collectTelegraphFiles('inbox'));
       case 'outbox':    return this.memoItems(this.collectTelegraphFiles('outbox'));
       case 'history':   return this.memoItems(this.collectTelegraphFiles('history'));
       case 'board':     return this.boardChildren();
       case 'receipts':  return this.receiptsChildren();
-      case 'heartbeat': return this.heartbeatChildren();
-      case 'actor':     return this.actorChildren();
       default:          return [];
     }
+  }
+
+  // ── Sessions ───────────────────────────────────────────────────────────────
+
+  private sessionsChildren(): SidePanelItem[] {
+    const watcherLabel = this.isWatching ? '● Watcher: Running' : '○ Watcher: Stopped';
+    const watcherCmd = this.isWatching ? 'wildwest.stopWatcher' : 'wildwest.startWatcher';
+    const watcherItem = new SidePanelItem(watcherLabel, vscode.TreeItemCollapsibleState.None);
+    watcherItem.iconPath = new vscode.ThemeIcon(this.isWatching ? 'eye' : 'eye-closed');
+    watcherItem.command = { command: watcherCmd, title: this.isWatching ? 'Stop Watcher' : 'Start Watcher' };
+
+    const action = (label: string, cmd: string, icon: string): SidePanelItem => {
+      const item = new SidePanelItem(label, vscode.TreeItemCollapsibleState.None);
+      item.iconPath = new vscode.ThemeIcon(icon);
+      item.command = { command: cmd, title: label };
+      return item;
+    };
+
+    return [
+      watcherItem,
+      action('Export Now', 'wildwest.exportNow', 'sync'),
+      action('Batch Convert', 'wildwest.batchConvert', 'package'),
+      action('Convert to Markdown', 'wildwest.convertToMarkdown', 'file-text'),
+      action('Generate Index', 'wildwest.generateIndex', 'list-unordered'),
+      action('Open Export Folder', 'wildwest.openExportFolder', 'folder-opened'),
+    ];
   }
 
   // ── Telegraph (inbox / outbox / history) ──────────────────────────────────

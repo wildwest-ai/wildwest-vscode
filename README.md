@@ -2,13 +2,15 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.30.0
+**Current version:** 0.32.0
 
 ---
 
 ## What's New
 
-**v0.30.0** — Cascading init commands: `wildwest.initCounty` and `wildwest.initTerritory` scaffold the same `.wildwest/` structure at county and territory scope — registry.json (correct scope field), telegraph dirs (inbox/outbox/history), `.claude/settings.json` (Claude Code hooks), CLAUDE.md template, and `.gitignore` update. County and territory windows now register the `ClaudeCodeAdapter` too; EADDRINUSE is handled silently via auto-retry (no toast). Shared helpers `generateHookConfig`, `writeClaudeSettings`, `updateGitignore`, `createTelegraphDirs` eliminate duplication. 15 new tests; 15 suites, 205 total.
+**v0.32.0** — Sessions section in side panel + tooltip redesign: the Wild West side panel now has a **Sessions** section (watcher state toggle, Export Now, Batch Convert, Convert to Markdown, Generate Index, Open Export Folder — all clickable). Sections reordered: Heartbeat and Actor first, then Sessions, then telegraph sections. Status bar tooltip redesigned: live header (actor · scope), heartbeat state + relative last-beat time, compact watcher toggle, telegraph quick-actions (Send · Ack · Inbox · Solo), compact footer (Log · Settings). Session action links removed from tooltip (moved to side panel).
+
+**v0.31.0** — Unified status bar item: the two status bar items (session watcher eye + heartbeat/actor dot) are merged into a single `$(eye) ● Actor · Scope` item. Click focuses the Wild West side panel. Rich tooltip covers all session + governance actions.** — Cascading init commands: `wildwest.initCounty` and `wildwest.initTerritory` scaffold the same `.wildwest/` structure at county and territory scope — registry.json (correct scope field), telegraph dirs (inbox/outbox/history), `.claude/settings.json` (Claude Code hooks), CLAUDE.md template, and `.gitignore` update. County and territory windows now register the `ClaudeCodeAdapter` too; EADDRINUSE is handled silently via auto-retry (no toast). Shared helpers `generateHookConfig`, `writeClaudeSettings`, `updateGitignore`, `createTelegraphDirs` eliminate duplication. 15 new tests; 15 suites, 205 total.
 
 **v0.29.3** — Scope-gate adapter + territory liveness: `ClaudeCodeAdapter` is now only registered in town-scope workspaces — county/territory windows no longer try to bind port 7379 or show port-conflict errors. `checkLiveness()` now falls through town → county → territory so territory-level windows show a real heartbeat state instead of always `stopped`.
 
@@ -106,16 +108,17 @@ Onboards any repo into the Wild West governance model via a guided wizard (`wild
 
 ## Status Bar
 
-The **Wild West** status bar item (bottom right) shows watcher state and provides quick access to all commands via hover tooltip:
+The **Wild West** status bar item (bottom right) shows watcher state, heartbeat, and actor/scope at a glance. Click to open the Wild West side panel.
 
-- Start / Stop Watcher
-- Export Now
-- Batch Convert to JSON
-- Convert to Markdown
-- Generate Index
-- Open Export Folder
-- View Output Log
-- Settings
+**Tooltip provides:**
+- Live status: actor · scope · heartbeat state · last beat (relative time)
+- Watcher toggle (Start / Stop)
+- Telegraph quick-actions: Send · Ack · View Inbox · Solo Report
+- Footer: Output Log · Settings
+
+**Side panel (Sessions section) provides:**
+- Watcher toggle button
+- Export Now, Batch Convert, Convert to Markdown, Generate Index, Open Export Folder
 
 ---
 

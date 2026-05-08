@@ -60,8 +60,11 @@ export function activate(context: vscode.ExtensionContext) {
   exporter = new SessionExporter(context, outputChannel);
   heartbeatMonitor = new HeartbeatMonitor(outputChannel, wwConfig.worldRoot, wwConfig.countiesDir);
   statusBarManager = new StatusBarManager(heartbeatMonitor);
-  // Notify the unified status bar whenever the session watcher starts/stops
-  exporter.setWatchingCallback((isWatching) => statusBarManager.setWatching(isWatching));
+  // Notify status bar and side panel whenever the session watcher starts/stops
+  exporter.setWatchingCallback((isWatching) => {
+    statusBarManager.setWatching(isWatching);
+    sidePanelProvider?.setWatching(isWatching);
+  });
   telegraphWatcher = new TelegraphWatcher(outputChannel, worktreeManager, heartbeatMonitor);
   soloModeController = new SoloModeController(outputChannel, worktreeManager, heartbeatMonitor);
   telegraphInbox = new TelegraphInbox(outputChannel);
