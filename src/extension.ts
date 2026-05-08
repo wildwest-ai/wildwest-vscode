@@ -15,6 +15,7 @@ import { registerChatParticipant } from './WildwestParticipant';
 import { registerMCPServer } from './mcp/wwMCPServer';
 import { runDoctor } from './WildwestDoctor';
 import { runValidateRegistry } from './RegistryValidator';
+import { SidePanelProvider } from './SidePanelProvider';
 
 // ── Configuration types & helpers ──────────────────────────────────────────
 
@@ -42,6 +43,7 @@ let worktreeManager: WorktreeManager;
 let telegraphCommands: TelegraphCommands;
 let telegraphInbox: TelegraphInbox;
 let aiToolBridge: AIToolBridge;
+let sidePanelProvider: SidePanelProvider;
 let outputChannel: vscode.OutputChannel;
 
 export function activate(context: vscode.ExtensionContext) {
@@ -72,6 +74,16 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
   aiToolBridge.start();
+
+  // ── Side panel (TreeView) ─────────────────────────────────────────────────
+  sidePanelProvider = new SidePanelProvider(heartbeatMonitor);
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider('wildwest.sidepanel', sidePanelProvider),
+    vscode.commands.registerCommand('wildwest.refreshSidePanel', () =>
+      sidePanelProvider.refresh(),
+    ),
+    sidePanelProvider,
+  );
 
   // ── @wildwest Copilot Chat participant (P3) ───────────────────────────────
   registerChatParticipant(context, outputChannel);
@@ -246,5 +258,6 @@ export async function deactivate(): Promise<void> {
   heartbeatMonitor?.dispose();
   telegraphWatcher?.dispose();
   statusBarManager?.dispose();
+  sidePanelProvider?.dispose();
   await aiToolBridge?.stop();
 }

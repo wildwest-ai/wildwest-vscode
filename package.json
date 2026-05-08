@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
   },
-  "version": "0.27.0",
+  "version": "0.28.0",
   "publisher": "wildwest-ai",
   "engines": {
     "vscode": "^1.90.0"
@@ -129,8 +129,40 @@
         "command": "wildwest.telegraphSend",
         "title": "Send Telegraph Memo",
         "category": "Wild West"
+      },
+      {
+        "command": "wildwest.refreshSidePanel",
+        "title": "Refresh",
+        "icon": "$(refresh)",
+        "category": "Wild West"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "wildwest-panel",
+          "title": "Wild West",
+          "icon": "media/wildwest-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "wildwest-panel": [
+        {
+          "id": "wildwest.sidepanel",
+          "name": "Wild West"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "wildwest.refreshSidePanel",
+          "when": "view == wildwest.sidepanel",
+          "group": "navigation"
+        }
+      ]
+    },
     "chatParticipants": [
       {
         "id": "wildwest.participant",
