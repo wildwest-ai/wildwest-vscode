@@ -1,195 +1,38 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import * as vscode from 'vscode';
 
 /**
  * Test suite for telegraph delivery operator (deliverPendingOutbox).
- * 
+ *
+ * Uses the production implementation exported via HeartbeatMonitor.__test__
+ * instead of a local stub. This exercises the real delivery code paths.
+ *
  * Scenarios:
- * 1. Happy path — memo delivered to remote inbox
- * 2. Unknown destination role — warning logged, memo stays in outbox
+ * 1. Happy path — memo delivered to county inbox
+ * 2. Unknown destination role — memo marked failed (!prefix), not in inbox
  * 3. Empty outbox — no-op, returns 0 delivered
- * 4. Local destination (same scope) — delivers into local inbox and archives sent copy
- * 5. Invalid role format — warning logged, skip memo
- * 6. Missing 'to:' field — warning logged, skip memo
- * 7. Invalid YAML — handled gracefully, logs error
+ * 4. Local destination (same scope) — delivers into local inbox
+ * 5. Invalid role format — memo marked failed
+ * 6. Missing 'to:' field — memo marked failed
  */
 
-// Mocked scope resolution functions (extracted from HeartbeatMonitor)
-const SCOPE_ROLES: Record<string, string[]> = {
-  'territory': ['G', 'RA'],
-  'county': ['S', 'CD', 'TM'],
-  'town': ['Mayor', 'TM', 'HG'],
-};
+jest.mock('vscode', () => ({
+  workspace: {
+    getConfiguration: jest.fn(() => ({
+      get: jest.fn((_key: string, defaultValue: unknown) => defaultValue),
+    })),
+  },
+}), { virtual: true });
 
-function extractRole(actorField: string): string | null {
-  const match = actorField.match(/^([A-Za-z]+)/);
-  return match ? match[1] : null;
+import { __test__ as HeartbeatMonitorTest } from '../src/HeartbeatMonitor';
+
+function makeOutputChannel(logs: string[]): vscode.OutputChannel {
+  return { appendLine: (msg: string) => logs.push(msg) } as unknown as vscode.OutputChannel;
 }
 
-function resolveRoleToScope(role: string): string | null {
-  for (const [scope, roles] of Object.entries(SCOPE_ROLES)) {
-    if (roles.includes(role)) {
-      return scope;
-    }
-  }
-  return null;
-}
-
-function resolveScopePath(
-  currentScope: string,
-  currentPath: string,
-  destScope: string,
-  worldRoot: string,
-  countiesDir: string,
-): string | null {
-  if (currentScope === destScope) {
-    return currentPath;
-  }
-
-  if (destScope === 'territory') {
-    return worldRoot;
-  }
-
-  if (destScope === 'county') {
-    if (currentScope === 'town') {
-      const parts = currentPath.split(path.sep);
-      const countiesIdx = parts.indexOf(countiesDir);
-      if (countiesIdx >= 0 && countiesIdx + 1 < parts.length) {
-        return parts.slice(0, countiesIdx + 2).join(path.sep);
-      }
-    }
-    return null;
-  }
-
-  return null;
-}
-
-function parseMemoFrontmatter(memoPath: string): Record<string, unknown> {
-  try {
-    const content = fs.readFileSync(memoPath, 'utf8');
-    const match = content.match(/^---\n([\s\S]*?)\n---/);
-    if (!match) return {};
-    const frontmatter = match[1];
-    const result: Record<string, unknown> = {};
-    const lines = frontmatter.split('\n');
-    for (const line of lines) {
-      const [key, ...valueParts] = line.split(':');
-      if (key && valueParts.length > 0) {
-        const value = valueParts.join(':').trim();
-        result[key.trim()] = value;
-      }
-    }
-    return result;
-  } catch {
-    return {};
-  }
-}
-
-// Test delivery operator (simplified version of actual implementation)
-function deliverPendingOutbox(
-  rootPath: string,
-  scope: string,
-  logs: string[],
-  worldRoot: string,
-  countiesDir: string,
-): { delivered: number; failed: number } {
-  let delivered = 0;
-  let failed = 0;
-
-  try {
-    const outboxDir = path.join(rootPath, '.wildwest', 'telegraph', 'outbox');
-    if (!fs.existsSync(outboxDir)) {
-      return { delivered, failed };
-    }
-
-    const entries = fs.readdirSync(outboxDir);
-    const memoFiles = entries.filter((e) => e.endsWith('.md') && !e.startsWith('.'));
-
-    for (const memoFile of memoFiles) {
-      try {
-        const memoPath = path.join(outboxDir, memoFile);
-        const frontmatter = parseMemoFrontmatter(memoPath);
-        const toField = frontmatter['to'] as string | undefined;
-
-        if (!toField) {
-          logs.push(`[HeartbeatMonitor] delivery: ${memoFile} has no 'to:' field — skipping`);
-          failed++;
-          continue;
-        }
-
-        const role = extractRole(toField);
-        if (!role) {
-          logs.push(`[HeartbeatMonitor] delivery: ${memoFile} → ${toField} — invalid role format`);
-          failed++;
-          continue;
-        }
-
-        const destScope = resolveRoleToScope(role);
-        if (!destScope) {
-          logs.push(`[HeartbeatMonitor] delivery: ${memoFile} → ${role} — unknown role`);
-          failed++;
-          continue;
-        }
-
-        const destPath = resolveScopePath(scope, rootPath, destScope, worldRoot, countiesDir);
-
-        if (!destPath) {
-          logs.push(
-            `[HeartbeatMonitor] delivery: ${memoFile} → ${toField} — unresolvable recipient`,
-          );
-          failed++;
-          continue;
-        } else {
-          // Delivery to destination inbox, including local self-addressed mail
-          const destInboxDir = path.join(destPath, '.wildwest', 'telegraph', 'inbox');
-          if (!fs.existsSync(destInboxDir)) {
-            fs.mkdirSync(destInboxDir, { recursive: true });
-          }
-          const destMemoPath = path.join(destInboxDir, memoFile);
-          const originalContent = fs.readFileSync(memoPath, 'utf8');
-          fs.writeFileSync(destMemoPath, originalContent, 'utf8');
-          logs.push(
-            `[HeartbeatMonitor] delivery: ${memoFile} → ${destPath}/.wildwest/telegraph/inbox/`,
-          );
-        }
-
-        // Stamp delivered_at
-        let content = fs.readFileSync(memoPath, 'utf8');
-        const now = new Date().toISOString();
-        const deliveredLine = `delivered_at: ${now}\n`;
-        const frontmatterMatch = content.match(/^(---\n)/);
-        if (frontmatterMatch) {
-          content = frontmatterMatch[1] + deliveredLine + content.substring(frontmatterMatch[1].length);
-        }
-
-        // Archive
-        const historyDir = path.join(outboxDir, 'history');
-        if (!fs.existsSync(historyDir)) {
-          fs.mkdirSync(historyDir, { recursive: true });
-        }
-        const historyPath = path.join(historyDir, memoFile);
-        fs.writeFileSync(historyPath, content, 'utf8');
-        fs.unlinkSync(memoPath);
-
-        delivered++;
-      } catch (err) {
-        logs.push(`[HeartbeatMonitor] delivery error for ${memoFile}: ${err}`);
-        failed++;
-      }
-    }
-  } catch (err) {
-    logs.push(`[HeartbeatMonitor] outbox scan error: ${err}`);
-  }
-
-  if (delivered > 0 || failed > 0) {
-    logs.push(`[HeartbeatMonitor] outbox delivery: ${delivered} delivered, ${failed} failed`);
-  }
-
-  return { delivered, failed };
-}
-
-describe('Telegraph Delivery', () => {
+describe('Telegraph Delivery — production deliverPendingOutbox', () => {
   let tempDir: string;
 
   beforeEach(() => {
@@ -197,202 +40,127 @@ describe('Telegraph Delivery', () => {
   });
 
   afterEach(() => {
-    if (fs.existsSync(tempDir)) {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    }
+    fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  describe('deliverPendingOutbox()', () => {
-    test('Happy path — memo delivered to remote inbox', () => {
-      // Create nested structure: worldRoot/counties/mycounty/, worldRoot/counties/mycounty/towns/mytown/
-      const worldRoot = tempDir;
-      const countyPath = path.join(worldRoot, 'counties', 'mycounty');
-      const townPath = path.join(countyPath, 'mytown');
+  function deliver(townPath: string, worldRoot: string, countiesDir = 'counties') {
+    const logs: string[] = [];
+    const oc = makeOutputChannel(logs);
+    const result = HeartbeatMonitorTest.deliverPendingOutbox(
+      townPath, 'town', oc, worldRoot, countiesDir,
+    );
+    return { result, logs };
+  }
 
-      fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
-      fs.mkdirSync(countyPath, { recursive: true });
+  test('Happy path — memo delivered to county inbox', () => {
+    const worldRoot = tempDir;
+    const countyPath = path.join(worldRoot, 'counties', 'mycounty');
+    const townPath = path.join(countyPath, 'mytown');
+    fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
 
-      const memoContent = `---
-to: CD(RSn).Cpt
-from: TM(RHk).Cpt
-subject: test
----
+    const memoContent = `---\nto: CD\nfrom: TM\nsubject: test\n---\n\nTest memo`;
+    fs.writeFileSync(
+      path.join(townPath, '.wildwest', 'telegraph', 'outbox', '20260508-1200Z-to-CD-from-TM--test.md'),
+      memoContent,
+    );
 
-Test memo`;
+    const { result, logs } = deliver(townPath, worldRoot);
 
-      fs.writeFileSync(
-        path.join(townPath, '.wildwest', 'telegraph', 'outbox', 'test-memo.md'),
-        memoContent,
-      );
+    expect(result.delivered).toBe(1);
+    expect(result.failed).toBe(0);
+    expect(logs.some((l) => l.includes('delivery:'))).toBe(true);
 
-      const logs: string[] = [];
-      const result = deliverPendingOutbox(townPath, 'town', logs, worldRoot, 'counties');
+    const filename = '20260508-1200Z-to-CD-from-TM--test.md';
+    expect(fs.existsSync(path.join(countyPath, '.wildwest', 'telegraph', 'inbox', filename))).toBe(true);
+    const historyPath = path.join(townPath, '.wildwest', 'telegraph', 'outbox', 'history', filename);
+    expect(fs.existsSync(historyPath)).toBe(true);
+    expect(fs.readFileSync(historyPath, 'utf8')).toContain('delivered_at:');
+  });
 
-      expect(result.delivered).toBe(1);
-      expect(result.failed).toBe(0);
-      expect(logs.some((l) => l.includes('delivered'))).toBe(true);
+  test('Unknown role — memo marked failed, not delivered', () => {
+    const worldRoot = tempDir;
+    const townPath = path.join(worldRoot, 'counties', 'myc', 'mytown');
+    fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
 
-      // Check memo was archived
-      const historyPath = path.join(townPath, '.wildwest', 'telegraph', 'outbox', 'history', 'test-memo.md');
-      expect(fs.existsSync(historyPath)).toBe(true);
+    const filename = '20260508-1200Z-to-BOGUS-from-TM--test.md';
+    fs.writeFileSync(
+      path.join(townPath, '.wildwest', 'telegraph', 'outbox', filename),
+      `---\nto: BOGUS\nfrom: TM\n---\n\nTest`,
+    );
 
-      // Check memo was delivered to county inbox
-      const countyInboxPath = path.join(countyPath, '.wildwest', 'telegraph', 'inbox', 'test-memo.md');
-      expect(fs.existsSync(countyInboxPath)).toBe(true);
+    const { result, logs } = deliver(townPath, worldRoot);
 
-      // Check delivered_at was stamped
-      const archivedContent = fs.readFileSync(historyPath, 'utf8');
-      expect(archivedContent).toContain('delivered_at:');
-    });
+    expect(result.delivered).toBe(0);
+    expect(result.failed).toBe(1);
+    expect(logs.some((l) => l.includes('unknown role'))).toBe(true);
+    // Production renames to !<filename> on failure
+    expect(fs.existsSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox', `!${filename}`))).toBe(true);
+    expect(fs.existsSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox', filename))).toBe(false);
+  });
 
-    test('Unknown role — warning logged, memo stays in outbox', () => {
-      const worldRoot = tempDir;
-      const townPath = path.join(worldRoot, 'counties', 'myc', 'mytown');
-      fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
+  test('Empty outbox — no-op', () => {
+    const worldRoot = tempDir;
+    const townPath = path.join(worldRoot, 'counties', 'myc', 'mytown');
+    fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
 
-      const memoContent = `---
-to: INVALID(XXX).Cpt
-from: TM(RHk).Cpt
----
+    const { result } = deliver(townPath, worldRoot);
 
-Test`;
+    expect(result.delivered).toBe(0);
+    expect(result.failed).toBe(0);
+  });
 
-      fs.writeFileSync(
-        path.join(townPath, '.wildwest', 'telegraph', 'outbox', 'test-memo.md'),
-        memoContent,
-      );
+  test('Local (same-scope) destination — delivered to local inbox', () => {
+    const worldRoot = tempDir;
+    const townPath = path.join(worldRoot, 'counties', 'myc', 'mytown');
+    fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
 
-      const logs: string[] = [];
-      const result = deliverPendingOutbox(townPath, 'town', logs, worldRoot, 'counties');
+    // HG is town-only in SCOPE_ROLES → same scope → local delivery
+    const filename = '20260508-1200Z-to-HG-from-TM--local.md';
+    fs.writeFileSync(
+      path.join(townPath, '.wildwest', 'telegraph', 'outbox', filename),
+      `---\nto: HG\nfrom: TM\n---\n\nLocal`,
+    );
 
-      expect(result.delivered).toBe(0);
-      expect(result.failed).toBe(1);
-      expect(logs.some((l) => l.includes('unknown role'))).toBe(true);
+    const { result, logs } = deliver(townPath, worldRoot);
 
-      // Memo should still be in outbox
-      expect(fs.existsSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox', 'test-memo.md'))).toBe(true);
-    });
+    expect(result.delivered).toBe(1);
+    expect(logs.some((l) => l.includes('inbox'))).toBe(true);
+    expect(fs.existsSync(path.join(townPath, '.wildwest', 'telegraph', 'inbox', filename))).toBe(true);
+  });
 
-    test('Empty outbox — no-op', () => {
-      const worldRoot = tempDir;
-      const townPath = path.join(worldRoot, 'counties', 'myc', 'mytown');
-      fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
+  test('Missing to: field — memo marked failed', () => {
+    const worldRoot = tempDir;
+    const townPath = path.join(worldRoot, 'counties', 'myc', 'mytown');
+    fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
 
-      const logs: string[] = [];
-      const result = deliverPendingOutbox(townPath, 'town', logs, worldRoot, 'counties');
+    const filename = '20260508-1200Z-to-MISSING-from-TM--no-to.md';
+    fs.writeFileSync(
+      path.join(townPath, '.wildwest', 'telegraph', 'outbox', filename),
+      `---\nfrom: TM\nsubject: test\n---\n\nNo to field`,
+    );
 
-      expect(result.delivered).toBe(0);
-      expect(result.failed).toBe(0);
-    });
+    const { result, logs } = deliver(townPath, worldRoot);
 
-    test('Local destination (same scope) — delivered to local inbox', () => {
-      const worldRoot = tempDir;
-      const townPath = path.join(worldRoot, 'counties', 'myc', 'mytown');
-      fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
+    expect(result.delivered).toBe(0);
+    expect(result.failed).toBe(1);
+    expect(logs.some((l) => l.includes("missing 'to:' field"))).toBe(true);
+  });
 
-      // Use HG role (town-only) instead of TM (which exists in both town and county)
-      const memoContent = `---
-to: HG(XXX).Cpt
-from: Mayor(YYY).Cpt
----
+  test('Invalid role format — memo marked failed', () => {
+    const worldRoot = tempDir;
+    const townPath = path.join(worldRoot, 'counties', 'myc', 'mytown');
+    fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
 
-Test`;
+    const filename = '20260508-1200Z-to-INVALID-from-TM--bad-role.md';
+    fs.writeFileSync(
+      path.join(townPath, '.wildwest', 'telegraph', 'outbox', filename),
+      `---\nto: (BadRole)\nfrom: TM\n---\n\nTest`,
+    );
 
-      fs.writeFileSync(
-        path.join(townPath, '.wildwest', 'telegraph', 'outbox', 'test-memo.md'),
-        memoContent,
-      );
+    const { result, logs } = deliver(townPath, worldRoot);
 
-      const logs: string[] = [];
-      const result = deliverPendingOutbox(townPath, 'town', logs, worldRoot, 'counties');
-
-      expect(result.delivered).toBe(1);
-      expect(logs.some((l) => l.includes('/.wildwest/telegraph/inbox/'))).toBe(true);
-
-      // Local destination still receives an inbox copy.
-      expect(fs.existsSync(path.join(townPath, '.wildwest', 'telegraph', 'inbox', 'test-memo.md'))).toBe(true);
-    });
-
-    test('Missing to: field — warning logged, skip memo', () => {
-      const worldRoot = tempDir;
-      const townPath = path.join(worldRoot, 'counties', 'myc', 'mytown');
-      fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
-
-      const memoContent = `---
-from: TM(RHk).Cpt
-subject: test
----
-
-No to field`;
-
-      fs.writeFileSync(
-        path.join(townPath, '.wildwest', 'telegraph', 'outbox', 'test-memo.md'),
-        memoContent,
-      );
-
-      const logs: string[] = [];
-      const result = deliverPendingOutbox(townPath, 'town', logs, worldRoot, 'counties');
-
-      expect(result.delivered).toBe(0);
-      expect(result.failed).toBe(1);
-      expect(logs.some((l) => l.includes("has no 'to:' field"))).toBe(true);
-    });
-
-    test('Invalid role format — warning logged, skip memo', () => {
-      const worldRoot = tempDir;
-      const townPath = path.join(worldRoot, 'counties', 'myc', 'mytown');
-      fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
-
-      const memoContent = `---
-to: (Invalid).Cpt
----
-
-Test`;
-
-      fs.writeFileSync(
-        path.join(townPath, '.wildwest', 'telegraph', 'outbox', 'test-memo.md'),
-        memoContent,
-      );
-
-      const logs: string[] = [];
-      const result = deliverPendingOutbox(townPath, 'town', logs, worldRoot, 'counties');
-
-      expect(result.delivered).toBe(0);
-      expect(result.failed).toBe(1);
-      expect(logs.some((l) => l.includes('invalid role format'))).toBe(true);
-    });
-
-    test('Territory delivery — uses world root', () => {
-      // Create: worldRoot/counties/myc/mytown/, worldRoot/
-      const worldRoot = tempDir;
-      const countyPath = path.join(worldRoot, 'counties', 'myc');
-      const townPath = path.join(countyPath, 'mytown');
-
-      fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
-      fs.mkdirSync(worldRoot, { recursive: true });
-
-      // Use 'G' role (Governor, territory scope) per SCOPE_ROLES mapping
-      const memoContent = `---
-to: G(R).Cpt
-from: TM(RHk).Cpt
----
-
-Test`;
-
-      fs.writeFileSync(
-        path.join(townPath, '.wildwest', 'telegraph', 'outbox', 'test-memo.md'),
-        memoContent,
-      );
-
-      const logs: string[] = [];
-      const result = deliverPendingOutbox(townPath, 'town', logs, worldRoot, 'counties');
-
-      expect(result.delivered).toBe(1);
-      expect(logs.some((l) => l.includes(worldRoot))).toBe(true);
-
-      // Check memo delivered to world inbox
-      const worldInboxPath = path.join(worldRoot, '.wildwest', 'telegraph', 'inbox', 'test-memo.md');
-      expect(fs.existsSync(worldInboxPath)).toBe(true);
-    });
+    expect(result.delivered).toBe(0);
+    expect(result.failed).toBe(1);
+    expect(logs.some((l) => l.includes('invalid addressing format') || l.includes('FAILED'))).toBe(true);
   });
 });

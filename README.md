@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.25.9
+**Current version:** 0.25.10
 
 ---
 
 ## What's New
+
+**v0.25.10** — Production telegraph tests: replaced stub-based `telegraphDelivery.test.ts` with tests that drive the real `deliverPendingOutbox()` from `HeartbeatMonitor`; added `TelegraphService.test.ts` covering all 8 shared primitives. Test suite: 10 suites, 91 tests (was 9/71).
 
 **v0.25.9** — TelegraphService abstraction: extracted shared telegraph primitives (`telegraphTimestamp`, `telegraphISOTimestamp`, `inboxPath`, `outboxPath`, `parseFrontmatter`, `archiveMemo`, `readRegistryAlias`, `getTelegraphDirs`) into `src/TelegraphService.ts`. Eliminated 6 duplicate implementations across `TelegraphCommands`, `TelegraphInbox`, and `WildwestParticipant`. No user-visible change.
 
