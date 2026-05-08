@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.25.7
+**Current version:** 0.25.8
 
 ---
 
 ## What's New
+
+**v0.25.8** — Wild West Doctor: new `wildwest.doctor` command validates the full local setup — registry fields, telegraph dirs, heartbeat freshness, export path, hook port 7379, MCP state, session consent, inbox memo count, and actor role. Results printed to the output channel with ✅/⚠️/❌ per check. Also available from the Wild West menu under Settings.
 
 **v0.25.7** — First-run consent: session export now requires explicit user approval on first activation. A one-time dialog ("Allow" / "Not now") gates `SessionExporter.start()`. Consent stored in `globalState`; revoke via `Wild West: Reset Session Export Consent` command. Heartbeat and telegraph start regardless of consent.
 
