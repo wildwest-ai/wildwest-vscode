@@ -190,7 +190,12 @@ export class SidePanelProvider
   private readSentinelTimestamp(): string {
     const wwRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!wwRoot) return '—';
-    const sentinelFile = path.join(wwRoot, '.wildwest', 'telegraph', '.last-beat');
+    const scope = this.heartbeatMonitor.detectScope();
+    // Town sentinel: .wildwest/telegraph/.last-beat
+    // County/territory sentinel: .wildwest/.last-beat
+    const sentinelFile = scope === 'town'
+      ? path.join(wwRoot, '.wildwest', 'telegraph', '.last-beat')
+      : path.join(wwRoot, '.wildwest', '.last-beat');
     try {
       return fs.readFileSync(sentinelFile, 'utf8').trim() || '—';
     } catch {

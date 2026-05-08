@@ -2,11 +2,15 @@
 
 Governance framework for AI-assisted development. Tracks devPair activity, exports chat sessions, monitors heartbeat, and coordinates actors across the Wild West county model.
 
-**Current version:** 0.29.0
+**Current version:** 0.29.2
 
 ---
 
 ## What's New
+
+**v0.29.2** — Side panel heartbeat fix: `readSentinelTimestamp()` now reads the correct sentinel path per scope — `.wildwest/telegraph/.last-beat` for town, `.wildwest/.last-beat` for county/territory. County-level windows were showing a stale town sentinel (or `—`) instead of the current county beat.
+
+**v0.29.1** — ClaudeCodeAdapter auto-retry + county liveness fix: adapter now retries every 30 s on EADDRINUSE so recovery is automatic when the holding window closes (warning toast shown once only). `checkLiveness()` falls back to county sentinel when no town scope is present, so county-level windows show correct alive/stopped state. New `wildwest.restartAdapter` command for manual recovery.
 
 **v0.29.0** — Delivery receipts: new `DeliveryReceipts` module tracks status of all outbound memos — `pending` (in outbox), `failed` (!-prefixed), `delivered` (in outbox/history), `acknowledged` (ack-done received), `blocked` (ack-blocked received). Side panel Receipts section shows live status with icons (○ ✓ ✓✓ ✗ ⚠). `wildwest.showReceipts` QuickPick command opens any memo directly. 19 new tests; 15 suites, 190 total.
 
