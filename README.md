@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.13
+**Current version:** 0.31.14
 
 ---
 
 ## What's New
+
+**v0.31.14** — Sessions section in side panel now has a clickable **Sort: Created / Sort: Updated** toggle row. Default is `Created`. Click cycles between grouping by `created_at` (session start) or `last_turn_at` (most recent activity). Persists for the session lifetime. `wildwest.toggleSessionSortBy` command registered.
 
 **v0.31.13** — Side panel session buckets now use `created_at` (session creation date) instead of `last_turn_at` for date grouping (today/yesterday/7d/older). Matches ChatGPT "sort by created" default. Falls back to `last_turn_at` if `created_at` absent.
 

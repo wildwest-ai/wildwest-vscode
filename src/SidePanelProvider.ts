@@ -38,6 +38,7 @@ export class SidePanelProvider
 
   private isWatching: boolean = false;
   private exportPath: string = '';
+  private sessionSortBy: 'created' | 'updated' = 'created';
 
   constructor(private readonly heartbeatMonitor: HeartbeatMonitor) {
     this.refreshInterval = setInterval(() => this.refresh(), REFRESH_INTERVAL_MS);
@@ -52,6 +53,12 @@ export class SidePanelProvider
   /** Called by extension.ts to provide the export path for Sessions section. */
   setExportPath(p: string): void {
     this.exportPath = p;
+  }
+
+  /** Toggle session date grouping between created and updated. */
+  toggleSessionSortBy(): void {
+    this.sessionSortBy = this.sessionSortBy === 'created' ? 'updated' : 'created';
+    this.refresh();
   }
 
   refresh(): void {
@@ -88,7 +95,7 @@ export class SidePanelProvider
     const historyFiles = this.collectTelegraphFiles('history');
     const boardFiles = this.collectBoardFiles();
     const receipts = this.collectAllReceipts();
-    const sessionCounts = this.countStagedSessions();
+    const sessionCounts = this.countStagedSessions(this.sessionSortBy);
     const sessionTotal = sessionCounts.today + sessionCounts.yesterday + sessionCounts.last7d + sessionCounts.older;
     return [
       new SidePanelItem('Heartbeat', vscode.TreeItemCollapsibleState.Collapsed, 'heartbeat'),
@@ -125,7 +132,7 @@ export class SidePanelProvider
 
   // ── Sessions ───────────────────────────────────────────────────────────────
 
-  private countStagedSessions(): { today: number; yesterday: number; last7d: number; older: number } {
+  private countStagedSessions(sortBy: 'created' | 'updated'): { today: number; yesterday: number; last7d: number; older: number } {
     const counts = { today: 0, yesterday: 0, last7d: 0, older: 0 };
     if (!this.exportPath) return counts;
     const indexPath = path.join(this.exportPath, 'staged', 'storage', 'index.json');
@@ -138,7 +145,10 @@ export class SidePanelProvider
       const todayMs = todayStart.getTime();
       for (const session of (index.sessions ?? [])) {
         try {
-          const mtime = new Date(session.created_at ?? session.last_turn_at).getTime();
+          const ts = sortBy === 'updated'
+            ? (session.last_turn_at ?? session.created_at)
+            : (session.created_at ?? session.last_turn_at);
+          const mtime = new Date(ts).getTime();
           const age = now - mtime;
           if (mtime >= todayMs) counts.today++;
           else if (age < 2 * dayMs) counts.yesterday++;
@@ -157,7 +167,13 @@ export class SidePanelProvider
     watcherItem.iconPath = new vscode.ThemeIcon(this.isWatching ? 'eye' : 'eye-closed');
     watcherItem.command = { command: watcherCmd, title: this.isWatching ? 'Stop Watcher' : 'Start Watcher' };
 
-    const counts = this.countStagedSessions();
+    const sortLabel = this.sessionSortBy === 'created' ? 'Sort: Created' : 'Sort: Updated';
+    const sortItem = new SidePanelItem(sortLabel, vscode.TreeItemCollapsibleState.None);
+    sortItem.iconPath = new vscode.ThemeIcon('sort-precedence');
+    sortItem.tooltip = 'Click to toggle between Created and Updated date';
+    sortItem.command = { command: 'wildwest.toggleSessionSortBy', title: 'Toggle Session Sort' };
+
+    const counts = this.countStagedSessions(this.sessionSortBy);
     const bucket = (label: string, count: number): SidePanelItem => {
       const item = new SidePanelItem(`${label}   ${count}`, vscode.TreeItemCollapsibleState.None);
       item.iconPath = new vscode.ThemeIcon('history');
@@ -166,6 +182,7 @@ export class SidePanelProvider
 
     return [
       watcherItem,
+      sortItem,
       bucket('Today', counts.today),
       bucket('Yesterday', counts.yesterday),
       bucket('Last 7 days', counts.last7d),

@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
   },
-  "version": "0.31.13",
+  "version": "0.31.14",
   "publisher": "wildwest-ai",
   "engines": {
     "vscode": "^1.90.0"
@@ -33,6 +33,11 @@
       {
         "command": "wildwest.exportNow",
         "title": "Export Dyad Log Now",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.toggleSessionSortBy",
+        "title": "Toggle Session Sort (Created / Updated)",
         "category": "Wild West"
       },
       {
