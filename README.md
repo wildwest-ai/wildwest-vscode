@@ -8,7 +8,7 @@ Governance framework for AI-assisted development. Tracks dyad activity, exports 
 
 ## What's New
 
-**v0.31.56** — Fix `toolSpecificData.cwd` extraction: VSCode URI dicts use `path` key (not always `fsPath`). Fall back to `path` when `fsPath` is absent. `rebuildIndex` now re-attributes all `cpt` sessions (not just empty `project_path`) when the current workspace has evidence — fixes attribution race where another window claimed a session first.
+**v0.31.56** — Fix `toolSpecificData.cwd` extraction: VSCode URI dicts use `path` key (not always `fsPath`). Fall back to `path` when `fsPath` is absent. Revert v0.31.56-rc aggressive rebuildIndex re-attribution (it stole sessions from other workspace windows); rebuildIndex now only patches `cpt` sessions with empty `project_path`.
 
 **v0.31.55** — (skipped — incomplete fix)
 
