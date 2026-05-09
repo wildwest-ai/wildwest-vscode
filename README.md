@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.62
+**Current version:** 0.31.63
 
 ---
 
 ## What's New
+
+**v0.31.63** — Attribution is now fully window-agnostic. `resolveAttribution()` replaces all window-context inference: for `cld`/`ccx` reads `project_path` from raw file then looks up that path's `.wildwest/registry.json` for `recorder_wwuid`; for `cpt` counts all cwd/contentRef signals per workspace root (walking up to find `.wildwest/registry.json`), picks the workspace with the most hits. Same result from any window — no need to run Export Now from every town.
 
 **v0.31.62** — Fix cross-window attribution: when a session has no new turns but the current window can claim it (empty `recorder_wwuid` + `project_path`), patch the existing record in place. Enables `wildwest-framework` window to claim its sessions even when the `wildwest-vscode` window wrote them first with empty attribution.
 

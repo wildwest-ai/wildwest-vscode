@@ -117,26 +117,22 @@ export class SessionExportPipeline {
     // 3. Generate wwuid
     const wwuid = generateWwuid('session', tool, tool_sid);
 
-    // 4. Check cursor to determine delta
+    // 4. Resolve attribution from session data — deterministic, window-agnostic.
+    // cld/ccx: project_path is in the raw file; look up the path's registry for wwuid.
+    // cpt: no built-in project field; find workspace with most cwd/ref signals, look up its registry.
+    const { projectPath: resolvedProjectPath, recorderWwuid: resolvedRecorderWwuid } =
+      this.resolveAttribution(tool, rawSession, metadata.project_path);
+
+    // 5. Check cursor to determine delta
     const newTurns = this.filterNewTurns(wwuid, filteredTurns);
 
     if (newTurns.length === 0 && !closed) {
-      // No new turns — but try to patch attribution on the existing record if this
-      // window can claim it (recorder_wwuid or project_path not yet set).
-      if (this.recorderWwuid || this.projectPath) {
-        let resolvedProjectPath = metadata.project_path;
-        if (!resolvedProjectPath && tool === 'cpt' && this.projectPath) {
-          resolvedProjectPath = this.inferCptProjectPath(rawSession, this.projectPath);
-        }
-        const isOwnSession = this.recorderWwuid && this.projectPath && resolvedProjectPath === this.projectPath;
-        if (isOwnSession) {
-          this.patchAttribution(wwuid, resolvedProjectPath, this.recorderWwuid);
-        }
-      }
+      // No new turns — patch attribution if existing record has none yet
+      this.patchAttribution(wwuid, resolvedProjectPath, resolvedRecorderWwuid);
       return;
     }
 
-    // 5. Write packet
+    // 6. Write packet
     const turnsForPacket = newTurns.length > 0 ? newTurns : filteredTurns;
     try {
       await this.packetWriter.writePacket(wwuid, tool, tool_sid, turnsForPacket, closed);
@@ -144,16 +140,8 @@ export class SessionExportPipeline {
       throw new Error(`Packet write failed: ${error}`);
     }
 
-    // 6. Apply to storage
+    // 7. Apply to storage
     try {
-      // Resolve project_path: use raw metadata when present; for cpt sessions that
-      // lack a workspaceFolder field, infer from contentReferences (if any referenced
-      // file lives inside this.projectPath, attribute the session to this workspace).
-      let resolvedProjectPath = metadata.project_path;
-      if (!resolvedProjectPath && tool === 'cpt' && this.projectPath) {
-        resolvedProjectPath = this.inferCptProjectPath(rawSession, this.projectPath);
-      }
-
       const packet: SessionPacket = {
         schema_version: '1',
         packet_id: uuidv4(),
@@ -169,10 +157,6 @@ export class SessionExportPipeline {
         closed,
         turns: turnsForPacket,
       };
-      // Only stamp recorder_wwuid when the session is attributed to this workspace.
-      // Sessions belonging to other workspaces get an empty recorder_wwuid and fall
-      // back to project_path filtering in the side panel.
-      const isOwnSession = this.recorderWwuid && this.projectPath && resolvedProjectPath === this.projectPath;
       await this.packetWriter.applyPacketToStorage(
         packet,
         resolvedProjectPath,
@@ -182,7 +166,7 @@ export class SessionExportPipeline {
           value: turnsForPacket[turnsForPacket.length - 1].meta?.tool_cursor_value || turnsForPacket[turnsForPacket.length - 1].turn_index,
         },
         metadata.created_at,
-        isOwnSession ? this.recorderWwuid : undefined
+        resolvedRecorderWwuid || undefined
       );
     } catch (error) {
       throw new Error(`Storage update failed: ${error}`);
@@ -278,32 +262,94 @@ export class SessionExportPipeline {
    *   2. response[].toolSpecificData.cwd      — tool invocation working directory
    * Returns workspaceRoot if any evidence points there, otherwise ''.
    */
-  private inferCptProjectPath(rawSession: unknown, workspaceRoot: string): string {
+  /**
+   * Resolve attribution from session data alone — no dependency on recording window.
+   *
+   * cld/ccx: project_path is in the raw file. Look up that path's registry for wwuid.
+   * cpt: count signals (cwd + contentRef hits) per workspace root found in the session,
+   *      pick the one with the most hits, look up its registry.
+   *
+   * Returns { projectPath, recorderWwuid } — both may be empty if no evidence found.
+   */
+  private resolveAttribution(
+    tool: string,
+    rawSession: unknown,
+    metadataProjectPath: string
+  ): { projectPath: string; recorderWwuid: string } {
+    // cld / ccx: project_path is authoritative from raw file
+    if (metadataProjectPath) {
+      return {
+        projectPath: metadataProjectPath,
+        recorderWwuid: this.readRegistryWwuid(metadataProjectPath),
+      };
+    }
+
+    // cpt: infer from signals across all workspace roots mentioned in the session
+    if (tool !== 'cpt') {
+      return { projectPath: '', recorderWwuid: '' };
+    }
+
     const session = rawSession as Record<string, unknown>;
     const requests = (session['requests'] as Record<string, unknown>[]) ?? [];
-    const prefix = workspaceRoot + path.sep;
+
+    // Count signal hits per resolved workspace root (walk up path to find registry)
+    const hits = new Map<string, number>(); // workspaceRoot → count
+
+    const tally = (p: string) => {
+      if (!p) return;
+      const root = this.findWorkspaceRoot(p);
+      if (root) hits.set(root, (hits.get(root) ?? 0) + 1);
+    };
+
     for (const req of requests) {
-      // 1. contentReferences
-      const refs = (req['contentReferences'] as Record<string, unknown>[]) ?? [];
-      for (const ref of refs) {
-        const fsPath = ((ref['reference'] as Record<string, unknown>)?.['fsPath'] as string) ?? '';
-        if (fsPath && (fsPath === workspaceRoot || fsPath.startsWith(prefix))) {
-          return workspaceRoot;
-        }
+      for (const ref of (req['contentReferences'] as Record<string, unknown>[]) ?? []) {
+        tally(((ref['reference'] as Record<string, unknown>)?.['fsPath'] as string) ?? '');
       }
-      // 2. toolSpecificData.cwd in response items
-      // cwd may be a plain string or a VSCode URI dict { fsPath, external, ... }
-      const response = (req['response'] as Record<string, unknown>[]) ?? [];
-      for (const item of response) {
+      for (const item of (req['response'] as Record<string, unknown>[]) ?? []) {
         const cwdRaw = (item['toolSpecificData'] as Record<string, unknown>)?.['cwd'];
         const cwdDict = cwdRaw as Record<string, unknown> | undefined;
-        const cwd = typeof cwdRaw === 'string' ? cwdRaw
-          : (cwdDict?.['fsPath'] as string) ?? (cwdDict?.['path'] as string) ?? '';
-        if (cwd && (cwd === workspaceRoot || cwd.startsWith(prefix))) {
-          return workspaceRoot;
-        }
+        tally(typeof cwdRaw === 'string' ? cwdRaw
+          : (cwdDict?.['fsPath'] as string) ?? (cwdDict?.['path'] as string) ?? '');
       }
     }
+
+    if (hits.size === 0) return { projectPath: '', recorderWwuid: '' };
+
+    // Pick the workspace with the most signals
+    const best = [...hits.entries()].reduce((a, b) => b[1] > a[1] ? b : a);
+    const projectPath = best[0];
+    return { projectPath, recorderWwuid: this.readRegistryWwuid(projectPath) };
+  }
+
+  /**
+   * Walk up from a file/dir path to find the nearest ancestor that has
+   * .wildwest/registry.json. Returns that directory path or '' if not found.
+   */
+  private findWorkspaceRoot(filePath: string): string {
+    let current = fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()
+      ? filePath : path.dirname(filePath);
+    const fsRoot = path.parse(current).root;
+    while (current && current !== fsRoot) {
+      if (fs.existsSync(path.join(current, '.wildwest', 'registry.json'))) {
+        return current;
+      }
+      const parent = path.dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
     return '';
+  }
+
+  /**
+   * Read wwuid from a workspace's .wildwest/registry.json. Returns '' if absent.
+   */
+  private readRegistryWwuid(workspacePath: string): string {
+    if (!workspacePath) return '';
+    try {
+      const regPath = path.join(workspacePath, '.wildwest', 'registry.json');
+      if (!fs.existsSync(regPath)) return '';
+      const reg = JSON.parse(fs.readFileSync(regPath, 'utf8')) as Record<string, unknown>;
+      return (reg['wwuid'] as string) || '';
+    } catch { return ''; }
   }
 }
