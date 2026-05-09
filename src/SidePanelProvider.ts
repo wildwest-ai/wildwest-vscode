@@ -565,7 +565,8 @@ export class SidePanelProvider
   private sessionRow(s: Record<string, unknown>, showDate = false): SidePanelItem {
     const tool = (s['tool'] as string) || '???';
     const projectPath = (s['project_path'] as string) || '';
-    const projectName = projectPath ? path.basename(projectPath) : '(unknown)';
+    const { alias: registryAlias } = this.readRegistryScope();
+    const projectName = projectPath ? path.basename(projectPath) : (registryAlias || '(unknown)');
     const createdAt = (s['created_at'] as string) || '';
     const lastTurnAt = (s['last_turn_at'] as string) || '';
     const turnCount = (s['turn_count'] as number) ?? 0;

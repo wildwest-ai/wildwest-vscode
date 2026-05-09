@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.60
+**Current version:** 0.31.61
 
 ---
 
 ## What's New
+
+**v0.31.61** — Session row: show registry alias instead of `(unknown)` when `project_path` is empty but session matched via `recorder_wwuid`.
 
 **v0.31.60** — Fix `recorder_wwuid` over-stamping: only stamp when `resolvedProjectPath === this.projectPath` (session is actually attributed to this workspace). Sessions belonging to other workspaces get empty `recorder_wwuid` and fall back to `project_path` filtering. Same constraint applied to `rebuildIndex` migration stamp.
 
