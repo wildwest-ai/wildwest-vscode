@@ -231,6 +231,32 @@ export class PipelineAdapter {
           }
         }
 
+        // cpt: patch empty project_path using contentReferences (Copilot sessions have
+        // no workspaceFolder field; infer workspace from referenced file paths instead).
+        if (record['tool'] === 'cpt' && !record['project_path'] && workspaceRoot) {
+          const sid = record['tool_sid'] as string;
+          const rawPath = path.join(rawDir, 'github-copilot', `${sid}.json`);
+          if (fs.existsSync(rawPath)) {
+            try {
+              const raw = JSON.parse(fs.readFileSync(rawPath, 'utf8')) as Record<string, unknown>;
+              const requests = (raw['requests'] as Record<string, unknown>[]) ?? [];
+              const prefix = workspaceRoot + path.sep;
+              outer: for (const req of requests) {
+                const refs = (req['contentReferences'] as Record<string, unknown>[]) ?? [];
+                for (const ref of refs) {
+                  const reference = (ref['reference'] as Record<string, unknown>) ?? {};
+                  const fsPath = (reference['fsPath'] as string) ?? '';
+                  if (fsPath && (fsPath === workspaceRoot || fsPath.startsWith(prefix))) {
+                    record['project_path'] = workspaceRoot;
+                    dirty = true;
+                    break outer;
+                  }
+                }
+              }
+            } catch { /* skip unreadable raw file */ }
+          }
+        }
+
         // Persist any patches back to disk
         if (dirty) {
           fs.writeFileSync(path.join(sessionsDir, file), JSON.stringify(record, null, 2), 'utf8');

@@ -265,11 +265,7 @@ export class SidePanelProvider
       const scopeFilter = (session: S): boolean => {
         const pp = (session['project_path'] as string) || '';
         if (scope === 'town') {
-          // Exact match or ancestor match (governance is cascading: county/territory
-          // sessions that ran from a parent directory still belong to this town's view).
-          // Basename match excluded — same folder name in an unrelated project is a false positive.
-          // Empty pp excluded — Copilot sessions without a workspace path must not match everything.
-          return pp === townRoot || (pp !== '' && townRoot.startsWith(pp + path.sep));
+          return pp === townRoot;
         }
         if (scope === 'county') {
           const root = filterPath ?? countyRoot;
@@ -429,7 +425,7 @@ export class SidePanelProvider
       const scopeFilter = (session: Record<string, unknown>): boolean => {
         const pp = (session['project_path'] as string) || '';
         if (scope === 'town') {
-          return pp === townRoot || (pp !== '' && townRoot.startsWith(pp + path.sep));
+          return pp === townRoot;
         }
         if (scope === 'county') {
           return filterPath !== null && (pp === filterPath || pp.startsWith(filterPath + path.sep));

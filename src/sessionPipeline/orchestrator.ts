@@ -128,6 +128,14 @@ export class SessionExportPipeline {
 
     // 6. Apply to storage
     try {
+      // Resolve project_path: use raw metadata when present; for cpt sessions that
+      // lack a workspaceFolder field, infer from contentReferences (if any referenced
+      // file lives inside this.projectPath, attribute the session to this workspace).
+      let resolvedProjectPath = metadata.project_path;
+      if (!resolvedProjectPath && tool === 'cpt' && this.projectPath) {
+        resolvedProjectPath = this.inferCptProjectPath(rawSession, this.projectPath);
+      }
+
       const packet: SessionPacket = {
         schema_version: '1',
         packet_id: uuidv4(),
@@ -145,11 +153,7 @@ export class SessionExportPipeline {
       };
       await this.packetWriter.applyPacketToStorage(
         packet,
-        // Use raw project_path from session metadata (governance is cascading: scope level is meaningful).
-        // e.g. cld projectPath=~/wildwest is world-scope and cascades to all towns.
-        // Do NOT fall back to this.projectPath — sessions with no workspace info must not be
-        // falsely attributed to the currently active workspace.
-        metadata.project_path,
+        resolvedProjectPath,
         metadata.session_type,
         {
           type: getCursorType(tool),
@@ -215,5 +219,27 @@ export class SessionExportPipeline {
    */
   getProjectPath(): string {
     return this.projectPath;
+  }
+
+  /**
+   * Infer project_path for a Copilot session that lacks a workspaceFolder field.
+   * Scans all requests' contentReferences for fsPath values; if any file lives
+   * inside workspaceRoot, returns workspaceRoot. Otherwise returns ''.
+   */
+  private inferCptProjectPath(rawSession: unknown, workspaceRoot: string): string {
+    const session = rawSession as Record<string, unknown>;
+    const requests = (session['requests'] as Record<string, unknown>[]) ?? [];
+    const prefix = workspaceRoot.endsWith(path.sep) ? workspaceRoot : workspaceRoot + path.sep;
+    for (const req of requests) {
+      const refs = (req['contentReferences'] as Record<string, unknown>[]) ?? [];
+      for (const ref of refs) {
+        const reference = (ref['reference'] as Record<string, unknown>) ?? {};
+        const fsPath = (reference['fsPath'] as string) ?? '';
+        if (fsPath && (fsPath === workspaceRoot || fsPath.startsWith(prefix))) {
+          return workspaceRoot;
+        }
+      }
+    }
+    return '';
   }
 }
