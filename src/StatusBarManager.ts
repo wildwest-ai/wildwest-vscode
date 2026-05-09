@@ -16,6 +16,7 @@ import { HeartbeatMonitor } from './HeartbeatMonitor';
  */
 export class StatusBarManager {
   private statusBarItem: vscode.StatusBarItem;
+  private identityBarItem: vscode.StatusBarItem;
   private heartbeatMonitor: HeartbeatMonitor;
   private disposables: vscode.Disposable[] = [];
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
@@ -29,6 +30,14 @@ export class StatusBarManager {
       100,
     );
     this.statusBarItem.command = 'wildwest.sidepanel.focus';
+
+    this.identityBarItem = vscode.window.createStatusBarItem(
+      'wildwest-identity',
+      vscode.StatusBarAlignment.Right,
+      99,
+    );
+    this.identityBarItem.command = 'wildwest.setIdentity';
+    this.identityBarItem.tooltip = 'Click to edit Wild West identity';
   }
 
   /** Called by SessionExporter when the watcher starts or stops. */
@@ -41,6 +50,7 @@ export class StatusBarManager {
     const scope = this.heartbeatMonitor.detectScope();
     if (!scope) {
       this.statusBarItem.hide();
+      this.identityBarItem.hide();
       return;
     }
 
@@ -50,16 +60,19 @@ export class StatusBarManager {
     const eyeIcon = this.isWatching ? '$(eye)' : '$(eye-closed)';
     const heartDot = liveness === 'alive' ? '●' : liveness === 'flagged' ? '⚑' : '○';
 
-    if (identitySetting) {
-      this.statusBarItem.text = `${eyeIcon} ${heartDot} ${identitySetting} · ${scopeLabel}`;
-      this.statusBarItem.color = new vscode.ThemeColor('statusBar.foreground');
-    } else {
-      this.statusBarItem.text = `${eyeIcon} ${heartDot} ${scopeLabel}`;
-      this.statusBarItem.color = new vscode.ThemeColor('statusBarItem.warningForeground');
-    }
-
+    this.statusBarItem.text = `${eyeIcon} ${heartDot} ${scopeLabel}`;
+    this.statusBarItem.color = new vscode.ThemeColor('statusBar.foreground');
     this.statusBarItem.tooltip = this.createTooltip();
     this.statusBarItem.show();
+
+    if (identitySetting) {
+      this.identityBarItem.text = `$(person) ${identitySetting}`;
+      this.identityBarItem.show();
+    } else {
+      this.identityBarItem.text = `$(person) Set identity…`;
+      this.identityBarItem.color = new vscode.ThemeColor('statusBarItem.warningForeground');
+      this.identityBarItem.show();
+    }
   }
 
   private createTooltip(): vscode.MarkdownString {
@@ -168,5 +181,6 @@ export class StatusBarManager {
     }
     this.disposables = [];
     this.statusBarItem.dispose();
+    this.identityBarItem.dispose();
   }
 }
