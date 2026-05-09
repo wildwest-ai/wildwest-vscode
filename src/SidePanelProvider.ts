@@ -275,10 +275,13 @@ export class SidePanelProvider
       if (info.scope === 'town') {
         if (info.wwuid) {
           if (scopeRefs.length > 0) {
-            // Session belongs to this town only if it's the primary (highest signal_count among town refs)
+            // Session belongs to this town only if it's the primary (highest signal_count among town refs).
+            // Exception: if this town's ref has no signal_count (null/undefined), it was editorially
+            // injected via session-map — accept it unconditionally as an explicit attribution override.
             const townRefs = scopeRefs.filter((ref) => ref.scope === 'town');
             const thisRef = townRefs.find((ref) => ref.wwuid === info.wwuid);
             if (!thisRef) return false;
+            if (thisRef.signal_count == null) return true; // editorial override — no rank check
             const maxSignal = Math.max(...townRefs.map((ref) => ref.signal_count ?? 0));
             return (thisRef.signal_count ?? 0) >= maxSignal;
           }

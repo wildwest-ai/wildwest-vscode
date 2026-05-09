@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.70
+**Current version:** 0.31.71
 
 ---
 
 ## What's New
+
+**v0.31.71** — Fix town sidebar filter rejecting session-map editorial overrides. Session-map injected refs have `signal_count: null` (no raw signal data). The primary-signal rank check now treats `null` as an explicit editorial attribution and accepts it unconditionally — so seeded sessions show in the correct town's Older bucket.
 
 **v0.31.70** — Fix town sidebar over-matching. Town scope filter now only shows sessions where this town is the **primary** attribution (highest `signal_count` among all town `scope_refs`). Fixes Older showing sessions that merely mention the town as a secondary workspace but belong to another town.
 

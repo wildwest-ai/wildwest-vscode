@@ -329,7 +329,9 @@ export class PipelineAdapter {
           const existingScopeRefs = Array.isArray(record['scope_refs'])
             ? record['scope_refs'] as ScopeRef[]
             : [];
-          const nextScopeRefs = this.mergeScopeRefs(attribution.scopeRefs);
+          // Merge attribution refs WITH existing (additive — session-map overrides
+          // written into scope_refs must survive re-attribution from raw).
+          const nextScopeRefs = this.mergeScopeRefs(existingScopeRefs, attribution.scopeRefs);
           if (JSON.stringify(nextScopeRefs) !== JSON.stringify(existingScopeRefs)) {
             record['scope_refs'] = nextScopeRefs;
             dirty = true;
