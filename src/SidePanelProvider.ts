@@ -275,15 +275,22 @@ export class SidePanelProvider
       if (info.scope === 'town') {
         if (info.wwuid) {
           if (scopeRefs.length > 0) {
-            // Session belongs to this town only if it's the primary (highest signal_count among town refs).
-            // Exception: if this town's ref has no signal_count (null/undefined), it was editorially
-            // injected via session-map — accept it unconditionally as an explicit attribution override.
+            // Session belongs to this town if:
+            //   1. Raw signals: any signal_count > 0 means the session actively used this town's workspace.
+            //      We don't require being the primary — multi-workspace sessions should show in all
+            //      towns where the user did meaningful work.
+            //   2. Editorial override (null signal_count from session-map): accept only if no other town
+            //      has raw signals, to avoid seeded overrides appearing for sessions that are clearly
+            //      attributed to a different primary town by raw evidence.
             const townRefs = scopeRefs.filter((ref) => ref.scope === 'town');
             const thisRef = townRefs.find((ref) => ref.wwuid === info.wwuid);
             if (!thisRef) return false;
-            if (thisRef.signal_count == null) return true; // editorial override — no rank check
-            const maxSignal = Math.max(...townRefs.map((ref) => ref.signal_count ?? 0));
-            return (thisRef.signal_count ?? 0) >= maxSignal;
+            const sc = thisRef.signal_count;
+            if (sc == null) {
+              // Editorial override — only accept if no competing town has raw signal presence
+              return !townRefs.some((r) => r.wwuid !== info.wwuid && (r.signal_count ?? 0) > 0);
+            }
+            return sc > 0;
           }
           if (recorderScope) return recorderScope === 'town' && recorderWwuid === info.wwuid;
           if (workspaceWwuids.includes(info.wwuid) || recorderWwuid === info.wwuid) return true;
