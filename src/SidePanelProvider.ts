@@ -39,6 +39,7 @@ interface SidebarScopeRef {
   scope?: string;
   wwuid?: string;
   signal_count?: number;
+  commit_count?: number;
 }
 
 export class SidePanelProvider
@@ -275,20 +276,22 @@ export class SidePanelProvider
       if (info.scope === 'town') {
         if (info.wwuid) {
           if (scopeRefs.length > 0) {
-            // Session belongs to this town if it has raw signal evidence (signal_count > 0)
-            // and was recorded at town level (not county or territory).
+            // Primary rule: sessions with git commits to this town's repo during the
+            // session window (commit_count > 0) are definitive attributions.
             //
-            // County/territory sessions don't belong in individual town views even if they
-            // incidentally referenced town files — they belong in the county/territory view.
-            //
-            // Null signal_count means the workspace was present in the session but had no
-            // raw signal hits. This is too weak to claim the session — reject.
+            // Fallback rule: signal_count > 0 (file references) is accepted only when
+            // the session was recorded from this town (not county/territory) — prevents
+            // nx-icouponads-style false positives where a multi-workspace session
+            // incidentally references town files without doing primary work here.
             const townRefs = scopeRefs.filter((ref) => ref.scope === 'town');
             const thisRef = townRefs.find((ref) => ref.wwuid === info.wwuid);
             if (!thisRef) return false;
+            if (recorderScope === 'county' || recorderScope === 'territory') return false;
+            // Prefer commit_count as primary evidence
+            if ((thisRef.commit_count ?? 0) > 0) return true;
+            // Fall back to signal_count — only if no other town has commits
             const sc = thisRef.signal_count;
             if (sc == null || sc <= 0) return false;
-            if (recorderScope === 'county' || recorderScope === 'territory') return false;
             return true;
           }
           if (recorderScope) return recorderScope === 'town' && recorderWwuid === info.wwuid;

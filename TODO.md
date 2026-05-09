@@ -1,6 +1,6 @@
 # TODO — wildwest-vscode
 
-> **Last updated:** 2026-05-08T12:56Z
+> **Last updated:** 2026-05-09T19:25Z
 > **Review source:** `docs/20260507-2253Z-repo-review-findings.md`
 
 ---
@@ -33,3 +33,5 @@
 - [x] **CLAUDE.md template** — auto-scaffold on `initTown` (v0.26.0)
 - [x] **Registry validator** — lint `.wildwest/registry.json` for schema compliance (v0.25.12)
 - [x] **Release artifact hygiene** — VSIX files excluded from git; use GitHub Releases or CI artifacts (v0.25.11)
+- [ ] **Session attribution — git commit signal** — Add `GitCommitMatcher` step to Rebuild orchestrator: for each town scope_ref, shell `git log --after --before` on the town repo during the session window; store `commit_count` on the scope_ref. Sessions with `commit_count > 0` are primary attributions; sessions with only `signal_count > 0` are "referenced". Use this as the default filter replacing the current recorder-wwuid proxy.
+- [ ] **Session attribution — UI editorial layer** — Side panel Sessions tab shows three sub-lists: **Active** (passing filter), **Excluded** (have `exclude_scope_refs` in session-map), **Candidates** (reference this town but don't pass primary filter). Each session row has **Include** / **Exclude** inline actions that write to `.wildwest/session-map.json` and trigger Rebuild. An **Overrides** view lists all current inject/exclude entries with notes and an Undo action.

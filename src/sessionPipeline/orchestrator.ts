@@ -16,6 +16,7 @@ import { NormalizedTurn, ScopeRef, SessionPacket, WildWestScope } from './types'
 import { generateWwuid, generateDeviceId, getCursorType } from './utils';
 import { redactTurns } from '../PrivacyFilter';
 import { SessionMapService } from '../SessionMapService';
+import { GitCommitMatcher } from '../GitCommitMatcher';
 
 export interface PipelineOptions {
   /**
@@ -163,6 +164,19 @@ export class SessionExportPipeline {
       scopeRefs: resolvedScopeRefs,
     } =
       this.resolveAttribution(tool, rawSession, metadata.project_path, tool_sid);
+
+    // 4b. Enrich scope_refs with commit_count for town refs
+    const sessionStart = metadata.created_at || (allTurns[0]?.timestamp ?? '');
+    const sessionEnd = allTurns[allTurns.length - 1]?.timestamp ?? sessionStart;
+    if (sessionStart) {
+      for (let i = 0; i < resolvedScopeRefs.length; i++) {
+        const ref = resolvedScopeRefs[i];
+        if (ref.scope === 'town' && ref.path) {
+          const cc = GitCommitMatcher.countCommits(ref.path, sessionStart, sessionEnd);
+          if (cc > 0) resolvedScopeRefs[i] = { ...ref, commit_count: cc };
+        }
+      }
+    }
 
     // 5. Check cursor to determine delta
     const newTurns = this.filterNewTurns(wwuid, filteredTurns);

@@ -58,6 +58,7 @@ export interface ScopeRef {
   alias: string;
   path: string;
   signal_count?: number;
+  commit_count?: number; // git commits to this scope's repo during session window
 }
 
 /**

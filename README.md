@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.75
+**Current version:** 0.31.76
 
 ---
 
 ## What's New
+
+**v0.31.76** — Add `GitCommitMatcher`: counts git commits to each town's repo during the session window and stores `commit_count` on `ScopeRef`. Town filter now uses `commit_count > 0` as the primary attribution signal (definitive proof of work), with `signal_count > 0` as fallback for sessions pre-dating this change. Eliminates false positives from multi-workspace sessions that only reference a town's files incidentally.
 
 **v0.31.75** — Add `exclude_scope_refs` to session-map schema. Allows explicit negation of auto-attributed or seeded scope_refs for sessions falsely claimed by a town. Exclusions are applied after injection during Rebuild, overriding seeded inject entries. Added exclusion for `9c1cd171` (nx-icouponads primary with incidental wildwest-vscode signals).
 
