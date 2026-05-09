@@ -105,7 +105,29 @@ export class SidePanelProvider
     const lastBeatAgo = this.timeAgo(lastBeat);
     const hbItem = new SidePanelItem(`${hbIcon} ${hbState}  ${lastBeatAgo}`, vscode.TreeItemCollapsibleState.None);
     hbItem.iconPath = new vscode.ThemeIcon(hbState === 'alive' ? 'pulse' : 'warning');
-    hbItem.tooltip = `Heartbeat: ${hbState}\nLast beat: ${lastBeat}`;
+
+    if (hbState === 'flagged') {
+      const wwRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const inboxDir = wwRoot ? path.join(wwRoot, '.wildwest', 'telegraph', 'inbox') : null;
+      let memos: string[] = [];
+      try {
+        if (inboxDir && fs.existsSync(inboxDir)) {
+          memos = fs.readdirSync(inboxDir).filter(f => f.endsWith('.md') && !f.startsWith('.') && f !== '.gitkeep');
+        }
+      } catch { /* ignore */ }
+      const tip = new vscode.MarkdownString(`**⚑ Flagged** — Last beat: ${lastBeat}\n\n`);
+      if (memos.length > 0) {
+        tip.appendMarkdown(`**Unprocessed inbox (${memos.length}):**\n\n`);
+        for (const memo of memos.slice(0, 5)) {
+          const subject = memo.replace(/^\d{8}-\d{4}Z?-/, '').replace(/\.md$/, '');
+          tip.appendMarkdown(`- ${subject}\n`);
+        }
+        if (memos.length > 5) tip.appendMarkdown(`- …and ${memos.length - 5} more\n`);
+      }
+      hbItem.tooltip = tip;
+    } else {
+      hbItem.tooltip = `Heartbeat: ${hbState}\nLast beat: ${lastBeat}`;
+    }
 
     // ── Scope inline ────────────────────────────────────────────────────────
     const { scope, label: scopeLabel } = this.readRegistryScope();

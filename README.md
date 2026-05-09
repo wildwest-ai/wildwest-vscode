@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.45
+**Current version:** 0.31.46
 
 ---
 
 ## What's New
+
+**v0.31.46** — Sidebar heartbeat item: when flagged, tooltip shows unprocessed inbox memo subjects (same as status bar tooltip).
 
 **v0.31.45** — Status bar tooltip: when heartbeat is flagged, lists unprocessed inbox memos by subject (up to 5, with overflow count). Subject extracted by stripping timestamp prefix.
 
