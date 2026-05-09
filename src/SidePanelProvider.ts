@@ -123,7 +123,6 @@ export class SidePanelProvider
     idItem.command = { command: 'wildwest.setIdentity', title: 'Set Identity' };
 
     return [
-      hbItem,
       scopeItem,
       idItem,
       this.sectionItem('Sessions', 'sessions', sessionTotal),
@@ -133,6 +132,7 @@ export class SidePanelProvider
       this.sectionItem('History', 'history', historyFiles.length),
       this.sectionItem('Board', 'board', boardFiles.length),
       this.sectionItem('Receipts', 'receipts', receipts.length),
+      hbItem,
     ];
   }
 

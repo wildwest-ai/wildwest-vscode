@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.38
+**Current version:** 0.31.39
 
 ---
 
 ## What's New
+
+**v0.31.39** — Move Heartbeat item to bottom of sidebar root.
 
 **v0.31.38** — Sidebar root redesign: Heartbeat, Scope, and Identity are now flat inline items at the root (no collapsible nodes). Heartbeat shows `● alive  Last beat: HH:MM` with pulse icon. Scope shows `town  [alias]` with home icon. Identity shows role/dyad inline, click to edit via Command Palette (`wildwest.setIdentity`). Scope row removed from inside Sessions section.
 
