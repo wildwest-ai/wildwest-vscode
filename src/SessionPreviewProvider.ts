@@ -91,19 +91,47 @@ function renderSessionMarkdown(s: Record<string, unknown>): string {
 
   lines.push('', '---', '', '## Conversation', '');
 
-  for (let i = 0; i < turns.length; i++) {
-    const t = turns[i];
+  // Collapse consecutive assistant fragments into single blocks (CPT emits many partial turns)
+  type Block = { role: string; text: string; timestamp: string };
+  const blocks: Block[] = [];
+  for (const t of turns) {
     const role = (t['role'] as string) || '?';
-    const content = ((t['content'] as string) || '').trimEnd();
+    const rawContent = (t['content'] as string) || '';
+    const parts = Array.isArray(t['parts'])
+      ? (t['parts'] as Array<Record<string, unknown>>)
+      : [];
+
+    // Assemble text: prefer content field, else join text parts (skip thinking-only)
+    const textFromParts = parts
+      .filter(p => p['kind'] === 'text' || p['kind'] === 'None')
+      .map(p => (p['content'] as string) || '')
+      .join('');
+    const text = (rawContent || textFromParts).trimEnd();
+
+    // Skip pure thinking turns (no displayable text)
+    if (!text) continue;
+
     const ts = (t['timestamp'] as string) || '';
-    const timeStr = ts
-      ? new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+    // Merge consecutive assistant fragments into one block
+    const last = blocks[blocks.length - 1];
+    if (last && last.role === role && role === 'assistant') {
+      last.text += text;
+    } else {
+      blocks.push({ role, text, timestamp: ts });
+    }
+  }
+
+  for (let i = 0; i < blocks.length; i++) {
+    const { role, text, timestamp } = blocks[i];
+    const timeStr = timestamp
+      ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : '';
     const heading = role === 'user' ? '### Human' : '### Assistant';
     const timeLabel = timeStr ? `  ·  ${timeStr}` : '';
 
     if (i > 0) lines.push('', '---', '');
-    lines.push(`${heading}${timeLabel}`, '', content);
+    lines.push(`${heading}${timeLabel}`, '', text);
   }
 
   return lines.join('\n');
