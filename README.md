@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.50
+**Current version:** 0.31.51
 
 ---
 
 ## What's New
+
+**v0.31.52** — Town-scope session filter: restore ancestor-path matching (`townRoot.startsWith(pp + '/')`) while keeping basename match removed. Sessions run from territory/county roots (e.g. `~/wildwest`) now correctly appear in the town panel. Fixes sessions showing as zero.
 
 **v0.31.51** — Session pipeline: fix three `CopilotTransformer` bugs: (1) response content extraction now correctly reads array-format responses (null-kind items' `value` field) and user messages (`text` field); (2) `project_path` no longer falls back to active workspace for sessions with no `workspaceFolder` in raw data — false attributions eliminated; (3) `created_at` now uses `session.creationDate` instead of first-turn timestamp.
 
