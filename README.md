@@ -191,13 +191,13 @@ Generates readable Markdown transcripts from staged JSON. Each session becomes a
 Generates `INDEX.md` — a sorted index of all staged transcripts.
 
 ### Heartbeat Monitor
-Writes periodic heartbeat beats to the `_heartbeat` worktree of the active repo. The worktree is a standard git worktree (`git worktree add ../_heartbeat _heartbeat`) and must exist before the monitor can run. Beat sentinel: `_heartbeat/.wildwest/telegraph/.last-beat`.
+Writes periodic heartbeat sentinels to `.wildwest/telegraph/.last-beat` in the main checkout. Monitors town, county, and territory scopes for liveness. State is `alive`, `flagged` (unprocessed inbox memos), or `stopped` (stale sentinel).
 
 ### Telegraph Watcher
-Monitors `_heartbeat/.wildwest/telegraph/` in the active repo's `_heartbeat` worktree for inter-actor messages. Flags new messages in the status bar.
+Monitors `.wildwest/telegraph/inbox/` in the active repo for inter-actor messages. Flags new memos in the status bar and sidebar heartbeat item.
 
 ### Town Init
-Onboards any repo into the Wild West governance model via a guided wizard (`wildwest.initTown`). Creates the `.wildwest/` directory structure, sets up the `_heartbeat` worktree, and updates `.gitignore`. Designed to be run once per repo.
+Onboards any repo into the Wild West governance model via a guided wizard (`wildwest.initTown`). Creates the full v1 `.wildwest/` directory structure (telegraph, board, operations, dailies), generates `registry.json` with a stable UUIDv5 `wwuid`, and updates `.gitignore`. Designed to be run once per repo.
 
 ---
 
@@ -242,7 +242,7 @@ All commands are available via `Cmd+Shift+P` → `Wild West: ...`
 | Init Town | Initialize `.wildwest/` governance structure in the current repo |
 | Start Heartbeat | Start heartbeat monitor |
 | Stop Heartbeat | Stop heartbeat monitor |
-| View Telegraph | Open `_heartbeat/.wildwest/telegraph/` in Finder |
+| View Telegraph | Open `.wildwest/telegraph/` in Finder |
 | Solo Mode Report | Show solo mode activity report |
 
 ---

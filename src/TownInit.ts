@@ -2,6 +2,7 @@ import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { generateWwuid } from './sessionPipeline/utils';
 
 // ---------------------------------------------------------------------------
 // CLAUDE.md template generator
@@ -337,14 +338,23 @@ function createTelegraphDirs(wildwestDir: string, log: (msg: string) => void): v
   for (const sub of [
     'telegraph',
     'telegraph/inbox',
+    'telegraph/inbox/history',
     'telegraph/outbox',
     'telegraph/outbox/history',
-    'telegraph/history',
+    'board',
+    'board/branches',
+    'board/branches/drafts',
+    'board/branches/planned',
+    'board/branches/active',
+    'board/branches/merged',
+    'board/branches/abandoned',
+    'operations',
+    'dailies',
   ]) {
     fs.mkdirSync(path.join(wildwestDir, sub), { recursive: true });
   }
   fs.writeFileSync(path.join(wildwestDir, 'telegraph', '.gitkeep'), '');
-  log('created telegraph dir structure');
+  log('created v1 .wildwest/ domain structure (telegraph, board, operations, dailies)');
 }
 
 export async function initTown(outputChannel: vscode.OutputChannel): Promise<void> {
@@ -391,21 +401,19 @@ export async function initTown(outputChannel: vscode.OutputChannel): Promise<voi
       try {
         // Step 1 — directory structure
         progress.report({ message: 'Creating .wildwest/ structure…' });
-        for (const sub of ['telegraph', 'scripts', 'docs']) {
-          fs.mkdirSync(path.join(wildwestDir, sub), { recursive: true });
-          fs.writeFileSync(path.join(wildwestDir, sub, '.gitkeep'), '');
-        }
+        createTelegraphDirs(wildwestDir, log);
         log('created .wildwest/ directory structure');
 
         // Step 2 — registry.json identity block
         progress.report({ message: 'Creating registry.json…' });
-        const wwuid = `town-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+        const wwuid = generateWwuid('town', repoName);
         let remote = '';
         try {
           remote = git(['config', '--get', 'remote.origin.url']);
         } catch { /* no remote set */ }
 
         const registry = {
+          schema_version: '2',
           scope: 'town',
           wwuid,
           alias: repoName,
@@ -547,7 +555,7 @@ export async function initCounty(outputChannel: vscode.OutputChannel): Promise<v
 
         // Step 2 — registry.json
         progress.report({ message: 'Creating registry.json…' });
-        const wwuid = `county-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+        const wwuid = generateWwuid('county', repoName);
         let remote = '';
         try { remote = git(['config', '--get', 'remote.origin.url']); } catch { /* no remote */ }
 
@@ -658,7 +666,7 @@ export async function initTerritory(outputChannel: vscode.OutputChannel): Promis
 
         // Step 2 — registry.json
         progress.report({ message: 'Creating registry.json…' });
-        const wwuid = `territory-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+        const wwuid = generateWwuid('territory', repoName);
 
         const registry = {
           scope: 'territory',
