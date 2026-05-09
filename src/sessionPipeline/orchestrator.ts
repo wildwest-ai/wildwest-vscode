@@ -15,12 +15,18 @@ import { PacketWriter } from './packetWriter';
 import { NormalizedTurn, ScopeRef, SessionPacket, WildWestScope } from './types';
 import { generateWwuid, generateDeviceId, getCursorType } from './utils';
 import { redactTurns } from '../PrivacyFilter';
+import { SessionMapService } from '../SessionMapService';
 
 export interface PipelineOptions {
   /**
    * Base directory for sessions (e.g., ~/wildwest/sessions)
    */
   sessionsDir: string;
+  /**
+   * Directories to search for .wildwest/session-map.json override files.
+   * Typically: [projectPath, countyPath, territoryPath] — all ancestors.
+   */
+  sessionMapDirs?: string[];
   /**
    * Git username of session author (e.g., 'reneyap')
    */
@@ -72,6 +78,7 @@ export class SessionExportPipeline {
   private device_id: string;
   private privacyMode: boolean;
   private homeDir: string;
+  private sessionMapService: SessionMapService;
 
   constructor(options: PipelineOptions) {
     this.sessionsDir = options.sessionsDir;
@@ -88,6 +95,23 @@ export class SessionExportPipeline {
       author: this.author,
       device_id: this.device_id,
     });
+
+    this.sessionMapService = new SessionMapService();
+    const mapDirs = options.sessionMapDirs ?? (
+      this.projectPath ? SessionMapService.collectAncestorDirs(this.projectPath) : []
+    );
+    this.sessionMapService.loadFromDirs(mapDirs);
+  }
+
+  /**
+   * Reload session-map.json overrides from disk.
+   * Call after seeding or when override files change.
+   */
+  reloadSessionMap(dirs?: string[]): void {
+    const mapDirs = dirs ?? (
+      this.projectPath ? SessionMapService.collectAncestorDirs(this.projectPath) : []
+    );
+    this.sessionMapService.loadFromDirs(mapDirs);
   }
 
   /**
@@ -135,7 +159,7 @@ export class SessionExportPipeline {
       workspaceWwuids: resolvedWorkspaceWwuids,
       scopeRefs: resolvedScopeRefs,
     } =
-      this.resolveAttribution(tool, rawSession, metadata.project_path);
+      this.resolveAttribution(tool, rawSession, metadata.project_path, tool_sid);
 
     // 5. Check cursor to determine delta
     const newTurns = this.filterNewTurns(wwuid, filteredTurns);
@@ -337,13 +361,17 @@ export class SessionExportPipeline {
   resolveAttribution(
     tool: string,
     rawSession: unknown,
-    metadataProjectPath: string
+    metadataProjectPath: string,
+    toolSid?: string,
   ): AttributionResult {
     // cld / ccx: project_path is authoritative from raw file
     if (metadataProjectPath) {
       const workspaceRoot = this.findWorkspaceRoot(metadataProjectPath) || metadataProjectPath;
       const recorderRef = this.readRegistryScopeRef(workspaceRoot);
-      const scopeRefs = this.collectScopeRefs(workspaceRoot);
+      let scopeRefs = this.collectScopeRefs(workspaceRoot);
+      if (toolSid) {
+        scopeRefs = SessionMapService.mergeOverrideInto(scopeRefs, this.sessionMapService.getOverride(toolSid));
+      }
       return {
         projectPath: metadataProjectPath,
         recorderWwuid: recorderRef?.wwuid ?? '',
@@ -393,7 +421,13 @@ export class SessionExportPipeline {
     // project_path/recorder_wwuid stay as the primary; secondary workspaces are
     // preserved in scope_refs so town/county filters can find multi-workspace sessions.
     const allScopeRefArrays = [...hits.entries()].map(([root, count]) => this.collectScopeRefs(root, count));
-    const scopeRefs = this.mergeScopeRefs(...allScopeRefArrays);
+    let scopeRefs = this.mergeScopeRefs(...allScopeRefArrays);
+    // Apply session-map overrides (additive)
+    const rawSessionRecord = rawSession as Record<string, unknown>;
+    const sid = toolSid ?? (rawSessionRecord['sessionId'] as string | undefined) ?? '';
+    if (sid) {
+      scopeRefs = SessionMapService.mergeOverrideInto(scopeRefs, this.sessionMapService.getOverride(sid));
+    }
     const workspaceWwuids = [...new Set(scopeRefs.map((ref) => ref.wwuid).filter((wwuid) => wwuid !== ''))];
 
     return {

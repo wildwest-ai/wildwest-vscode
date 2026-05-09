@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
   },
-  "version": "0.31.68",
+  "version": "0.31.69",
   "publisher": "wildwest-ai",
   "engines": {
     "vscode": "^1.90.0"
@@ -38,6 +38,11 @@
       {
         "command": "wildwest.rebuildIndex",
         "title": "Rebuild Session Index",
+        "category": "Wild West"
+      },
+      {
+        "command": "wildwest.seedSessionMap",
+        "title": "Seed Session Map",
         "category": "Wild West"
       },
       {

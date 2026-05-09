@@ -242,7 +242,7 @@ export class PipelineAdapter {
       const transformer = getTransformer(tool);
       const rawSession = transformer.parseRaw(fs.readFileSync(rawPath, 'utf8'));
       const metadata = transformer.getSessionMetadata(rawSession);
-      return this.pipeline.resolveAttribution(tool, rawSession, metadata.project_path);
+      return this.pipeline.resolveAttribution(tool, rawSession, metadata.project_path, toolSid);
     } catch {
       return null;
     }
@@ -284,6 +284,9 @@ export class PipelineAdapter {
    * Returns number of sessions indexed.
    */
   rebuildIndexFromRecords(): number {
+    // Reload session-map overrides from disk before rebuilding —
+    // ensures any seeded overrides are applied to every session.
+    this.pipeline.reloadSessionMap();
     const stagedDir = this.pipeline.getStagedDir();
     const workspaceRoot = this.pipeline.getProjectPath();
     const recorderWwuid = this.pipeline.getRecorderWwuid();

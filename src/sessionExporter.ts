@@ -7,6 +7,7 @@ import { convertJsonFileToMarkdown } from './jsonToMarkdown';
 import { generateIndex } from './generateIndex';
 import { execSync, execFileSync } from 'child_process';
 import { PipelineAdapter } from './sessionPipeline';
+import { SessionMapSeeder } from './SessionMapSeeder';
 
 export class SessionExporter {
   private watcher: chokidar.FSWatcher | null = null;
@@ -1367,6 +1368,37 @@ export class SessionExporter {
       vscode.window.showInformationMessage(`Index rebuilt: ${count} sessions indexed.`);
     } catch (error) {
       vscode.window.showErrorMessage(`Rebuild index failed: ${error}`);
+    }
+  }
+
+  async seedSessionMap(): Promise<void> {
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspaceRoot) {
+      vscode.window.showWarningMessage('No workspace folder open.');
+      return;
+    }
+    const rawDir = path.join(this.exportPath, 'raw');
+    if (!fs.existsSync(rawDir)) {
+      vscode.window.showWarningMessage(`Raw sessions directory not found: ${rawDir}`);
+      return;
+    }
+    try {
+      const seeder = new SessionMapSeeder(rawDir);
+      const results = seeder.seed(workspaceRoot);
+      if (results.length === 0) {
+        vscode.window.showInformationMessage('Session map seeding: no matching sessions found.');
+        return;
+      }
+      const total = results.reduce((sum, r) => sum + r.matchedSessions, 0);
+      const detail = results
+        .filter((r) => r.matchedSessions > 0)
+        .map((r) => `${path.basename(r.townPath)}: ${r.matchedSessions}`)
+        .join(', ');
+      vscode.window.showInformationMessage(
+        `Session map seeded: ${total} session(s) mapped. ${detail}. Run Rebuild Index to apply.`
+      );
+    } catch (error) {
+      vscode.window.showErrorMessage(`Seed session map failed: ${error}`);
     }
   }
 
