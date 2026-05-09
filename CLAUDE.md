@@ -28,7 +28,7 @@
 | **TM(RHk)** — Town Marshal | GitHub Copilot (Claude Haiku) | Town | Branch lifecycle, telegraph, board, HG ops |
 | **CD(RSn)** — Chief Deputy | GitHub Copilot (Claude 3.5) | County | PR gate, scope decisions, CLAUDE.md ownership |
 
-**Your role (as TM(RHk).Cpt):** Town-level operations — heartbeat, telegraph processing, devPair session export, branch state management.
+**Your role (as TM(RHk).Cpt):** Town-level operations — heartbeat, telegraph processing, dyad session export, branch state management.
 
 ---
 
@@ -164,7 +164,7 @@ On each activation:
 
 ## 8. Extension Architecture Overview
 
-**Purpose:** Wild West governance framework for VSCode — heartbeat, telegraph, devPair activity log
+**Purpose:** Wild West governance framework for VSCode — heartbeat, telegraph, dyad activity log
 
 **Core Components:**
 

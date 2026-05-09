@@ -57,4 +57,4 @@ Stable. v0.3.4 in progress.
 ### Actor Assignment
 
 **RSn — reneyap + Claude Sonnet (Claude Code)**
-Primary development devPair. All governance and feature work.
+Primary development dyad. All governance and feature work.

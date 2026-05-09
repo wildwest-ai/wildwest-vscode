@@ -75,12 +75,13 @@ describe('SidePanelProvider', () => {
     jest.clearAllMocks();
   });
 
-  it('returns 9 root sections with correct sectionIds', () => {
+  it('returns 10 root items with correct sectionIds', () => {
     const provider = new SidePanelProvider(mockMonitor);
     const roots = provider.getChildren();
-    expect(roots).toHaveLength(9);
+    // Structure: [scopeItem, idItem, Sessions, Utilities, Inbox, Outbox, History, Board, Receipts, hbItem]
+    expect(roots).toHaveLength(10);
     expect(roots.map((r) => r.sectionId)).toEqual([
-      'heartbeat', 'identity', 'sessions', 'utilities', 'inbox', 'outbox', 'history', 'board', 'receipts',
+      undefined, undefined, 'sessions', 'utilities', 'inbox', 'outbox', 'history', 'board', 'receipts', undefined,
     ]);
     provider.dispose();
   });
@@ -176,19 +177,18 @@ describe('SidePanelProvider', () => {
     provider.dispose();
   });
 
-  it('heartbeat section shows state, scope, town alias, and last beat timestamp', () => {
+  it('heartbeat root item shows state and last beat timestamp', () => {
     const provider = new SidePanelProvider(mockMonitor);
-    const hbSection = provider.getChildren().find((r) => r.sectionId === 'heartbeat')!;
-    const children = provider.getChildren(hbSection);
-    expect(children).toHaveLength(4);
-    expect((children[0] as SidePanelItem).label).toContain('alive');
-    expect((children[1] as SidePanelItem).label).toContain('town');
-    expect((children[2] as SidePanelItem).label).toContain('Town:');
-    expect((children[3] as SidePanelItem).label).toContain('2026-05-08T12:00:00.000Z');
+    // hbItem is the last root item (index 9) — a flat inline item with no sectionId
+    const roots = provider.getChildren();
+    const hbItem = roots[roots.length - 1] as SidePanelItem;
+    expect(hbItem.sectionId).toBeUndefined();
+    expect(hbItem.label).toContain('alive');
+    expect(hbItem.tooltip).toContain('2026-05-08T12:00:00.000Z');
     provider.dispose();
   });
 
-  it('identity section shows parsed role and dyad from config', () => {
+  it('identity root item shows parsed role and dyad from config', () => {
     const vscode = require('vscode');
     (vscode.workspace.getConfiguration as jest.Mock).mockReturnValue({
       get: (_key: string, def: unknown) =>
@@ -196,12 +196,13 @@ describe('SidePanelProvider', () => {
     });
 
     const provider = new SidePanelProvider(mockMonitor);
-    const identitySection = provider.getChildren().find((r) => r.sectionId === 'identity')!;
-    const children = provider.getChildren(identitySection);
-    expect(children).toHaveLength(3);
-    expect((children[0] as SidePanelItem).label).toContain('Role: TM');
-    expect((children[1] as SidePanelItem).label).toContain('dyad: RHk');
-    expect((children[2] as SidePanelItem).label).toContain('Edit identity');
+    // idItem is root index 1 — a flat inline item with contextValue 'identity'
+    const roots = provider.getChildren();
+    const idItem = roots[1] as SidePanelItem;
+    expect(idItem.sectionId).toBeUndefined();
+    expect(idItem.contextValue).toBe('identity');
+    expect(idItem.label).toContain('TM');
+    expect(idItem.label).toContain('RHk');
     provider.dispose();
   });
 

@@ -8,6 +8,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { scopeRoleMap } from './roles/roleRegistry';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -32,11 +33,12 @@ export interface RegistryValidationResult {
 const VALID_SCOPES = ['town', 'county', 'territory'] as const;
 type Scope = (typeof VALID_SCOPES)[number];
 
-const SCOPE_ROLES: Record<Scope, string[]> = {
-  town: ['Mayor', 'TM', 'HG'],
-  county: ['S', 'CD', 'TM'],
-  territory: ['G', 'RA'],
-};
+// Canonical scope → role mapping — derived from src/roles/roleRegistry.ts.
+// Corrections applied per S(R)-approved role-scope-registry.md:
+//   - 'Mayor' replaced by 'M' (Phase 0 decision)
+//   - 'TM' removed from county row (TM is town-scoped only)
+//   - 'DS', 'aCD', 'DM' added as routable roles
+const SCOPE_ROLES: Record<Scope, string[]> = scopeRoleMap();
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

@@ -97,9 +97,58 @@ export class SidePanelProvider
     const receipts = this.collectAllReceipts();
     const sessionCounts = this.countStagedSessions(this.sessionSortBy);
     const sessionTotal = sessionCounts.today + sessionCounts.yesterday + sessionCounts.last7d + sessionCounts.older;
+
+    // ── Heartbeat inline ────────────────────────────────────────────────────
+    const hbState = this.heartbeatMonitor.checkLiveness();
+    const hbIcon = hbState === 'alive' ? '●' : hbState === 'flagged' ? '⚑' : '○';
+    const lastBeat = this.readSentinelTimestamp();
+    const lastBeatAgo = this.timeAgo(lastBeat);
+    const hbItem = new SidePanelItem(`${hbIcon} ${hbState}  ${lastBeatAgo}`, vscode.TreeItemCollapsibleState.None);
+    hbItem.iconPath = new vscode.ThemeIcon(hbState === 'alive' ? 'pulse' : 'warning');
+
+    if (hbState === 'flagged') {
+      const wwRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const inboxDir = wwRoot ? path.join(wwRoot, '.wildwest', 'telegraph', 'inbox') : null;
+      let memos: string[] = [];
+      try {
+        if (inboxDir && fs.existsSync(inboxDir)) {
+          memos = fs.readdirSync(inboxDir).filter(f => f.endsWith('.md') && !f.startsWith('.') && f !== '.gitkeep');
+        }
+      } catch { /* ignore */ }
+      const tip = new vscode.MarkdownString(`**⚑ Flagged** — Last beat: ${lastBeat}\n\n`);
+      if (memos.length > 0) {
+        tip.appendMarkdown(`**Unprocessed inbox (${memos.length}):**\n\n`);
+        for (const memo of memos.slice(0, 5)) {
+          const subject = memo.replace(/^\d{8}-\d{4}Z?-/, '').replace(/\.md$/, '');
+          tip.appendMarkdown(`- ${subject}\n`);
+        }
+        if (memos.length > 5) tip.appendMarkdown(`- …and ${memos.length - 5} more\n`);
+      }
+      hbItem.tooltip = tip;
+    } else {
+      hbItem.tooltip = `Heartbeat: ${hbState}\nLast beat: ${lastBeat}`;
+    }
+
+    // ── Scope inline ────────────────────────────────────────────────────────
+    const { scope, label: scopeLabel } = this.readRegistryScope();
+    const SCOPE_ICONS: Record<string, string> = { town: 'home', county: 'organization', territory: 'globe' };
+    const scopeItem = new SidePanelItem(`${scope}  [${scopeLabel}]`, vscode.TreeItemCollapsibleState.None);
+    scopeItem.iconPath = new vscode.ThemeIcon(SCOPE_ICONS[scope] ?? 'globe');
+    scopeItem.tooltip = 'Scope filter set by .wildwest/registry.json';
+
+    // ── Identity inline ─────────────────────────────────────────────────────
+    const identitySetting = vscode.workspace.getConfiguration('wildwest').get<string>('identity', '') || '';
+    const idMatch = identitySetting.match(/^([^(]+)\(([^)]+)\)$/);
+    const idLabel = idMatch ? `${idMatch[1].trim()}  (${idMatch[2].trim()})` : (identitySetting || 'Identity not set');
+    const idItem = new SidePanelItem(idLabel, vscode.TreeItemCollapsibleState.None);
+    idItem.iconPath = new vscode.ThemeIcon('person');
+    idItem.contextValue = 'identity';
+    idItem.tooltip = 'Click to edit identity';
+    idItem.command = { command: 'wildwest.setIdentity', title: 'Set Identity' };
+
     return [
-      new SidePanelItem('Heartbeat', vscode.TreeItemCollapsibleState.Collapsed, 'heartbeat'),
-      new SidePanelItem('Identity', vscode.TreeItemCollapsibleState.Collapsed, 'identity'),
+      scopeItem,
+      idItem,
       this.sectionItem('Sessions', 'sessions', sessionTotal),
       new SidePanelItem('Utilities', vscode.TreeItemCollapsibleState.Collapsed, 'utilities'),
       this.sectionItem('Inbox', 'inbox', inboxFiles.length),
@@ -107,6 +156,7 @@ export class SidePanelProvider
       this.sectionItem('History', 'history', historyFiles.length),
       this.sectionItem('Board', 'board', boardFiles.length),
       this.sectionItem('Receipts', 'receipts', receipts.length),
+      hbItem,
     ];
   }
 
@@ -263,14 +313,20 @@ export class SidePanelProvider
 
   private countStagedSessions(sortBy: 'created' | 'updated'): {
     today: number; yesterday: number; last7d: number; older: number;
+    todayTurns: number; yesterdayTurns: number; last7dTurns: number; olderTurns: number;
     byTool: Record<string, number>;
   } {
     const data = this.loadAndBucketSessions(sortBy);
+    const turns = (arr: Record<string, unknown>[]) => arr.reduce((s, x) => s + ((x['turn_count'] as number) || 0), 0);
     return {
       today: data.today.length,
       yesterday: data.yesterday.length,
       last7d: data.last7d.length,
       older: data.older.length,
+      todayTurns: turns(data.today),
+      yesterdayTurns: turns(data.yesterday),
+      last7dTurns: turns(data.last7d),
+      olderTurns: turns(data.older),
       byTool: data.byTool,
     };
   }
@@ -289,17 +345,12 @@ export class SidePanelProvider
     sortItem.command = { command: 'wildwest.toggleSessionSortBy', title: 'Toggle Session Sort' };
 
     const counts = this.countStagedSessions(this.sessionSortBy);
-    const { scope, label: scopeLabel } = this.readRegistryScope();
-    const SCOPE_ICONS: Record<string, string> = { town: 'home', county: 'organization', territory: 'globe' };
-    const scopeDisplay = new SidePanelItem(`Scope: ${scope}  [${scopeLabel}]`, vscode.TreeItemCollapsibleState.None);
-    scopeDisplay.iconPath = new vscode.ThemeIcon(SCOPE_ICONS[scope] ?? 'globe');
-    scopeDisplay.tooltip = 'Filter set by .wildwest/registry.json scope field';
 
-    const makeBucket = (lbl: string, sectionId: string, count: number): SidePanelItem => {
+    const makeBucket = (lbl: string, sectionId: string, count: number, turns: number): SidePanelItem => {
       const state = count > 0
         ? vscode.TreeItemCollapsibleState.Collapsed
         : vscode.TreeItemCollapsibleState.None;
-      const item = new SidePanelItem(`${lbl}   ${count}`, state, sectionId);
+      const item = new SidePanelItem(`${lbl}   ${count} (${turns})`, state, sectionId);
       item.iconPath = new vscode.ThemeIcon('history');
       return item;
     };
@@ -327,9 +378,8 @@ export class SidePanelProvider
     return [
       watcherItem,
       sortItem,
-      scopeDisplay,
       recentItem,
-      makeBucket('Older', 'sessions:older', counts.older),
+      makeBucket('Older', 'sessions:older', counts.older, counts.olderTurns),
       ...toolRows,
     ];
   }
@@ -342,11 +392,11 @@ export class SidePanelProvider
 
   private sessionRecentChildren(): SidePanelItem[] {
     const counts = this.countStagedSessions(this.sessionSortBy);
-    const makeBucket = (lbl: string, sectionId: string, count: number): SidePanelItem => {
+    const makeBucket = (lbl: string, sectionId: string, count: number, turns: number): SidePanelItem => {
       const state = count > 0
         ? vscode.TreeItemCollapsibleState.Collapsed
         : vscode.TreeItemCollapsibleState.None;
-      const item = new SidePanelItem(`${lbl}   ${count}`, state, sectionId);
+      const item = new SidePanelItem(`${lbl}   ${count} (${turns})`, state, sectionId);
       item.iconPath = new vscode.ThemeIcon('history');
       return item;
     };
@@ -361,9 +411,9 @@ export class SidePanelProvider
         return item;
       });
     return [
-      makeBucket('Today', 'sessions:today', counts.today),
-      makeBucket('Yesterday', 'sessions:yesterday', counts.yesterday),
-      makeBucket('Last 7 days', 'sessions:last7d', counts.last7d),
+      makeBucket('Today', 'sessions:today', counts.today, counts.todayTurns),
+      makeBucket('Yesterday', 'sessions:yesterday', counts.yesterday, counts.yesterdayTurns),
+      makeBucket('Last 7 days', 'sessions:last7d', counts.last7d, counts.last7dTurns),
       ...toolRows,
     ];
   }
@@ -591,6 +641,22 @@ export class SidePanelProvider
       new SidePanelItem(`Town: ${townAlias}`, vscode.TreeItemCollapsibleState.None),
       new SidePanelItem(`Last beat: ${lastBeat}`, vscode.TreeItemCollapsibleState.None),
     ];
+  }
+
+  private timeAgo(ts: string): string {
+    if (!ts || ts === '—') return '—';
+    try {
+      const ms = Date.now() - new Date(ts).getTime();
+      if (ms < 0) return 'just now';
+      const sec = Math.floor(ms / 1000);
+      if (sec < 60) return `${sec}s ago`;
+      const min = Math.floor(sec / 60);
+      if (min < 60) return `${min}m ago`;
+      const hr = Math.floor(min / 60);
+      if (hr < 24) return `${hr}h ago`;
+      const day = Math.floor(hr / 24);
+      return `${day}d ago`;
+    } catch { return ts; }
   }
 
   private readSentinelTimestamp(): string {

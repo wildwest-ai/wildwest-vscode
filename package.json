@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
   },
-  "version": "0.31.36",
+  "version": "0.31.46",
   "publisher": "wildwest-ai",
   "engines": {
     "vscode": "^1.90.0"
@@ -148,7 +148,8 @@
       {
         "command": "wildwest.setIdentity",
         "title": "Set Identity",
-        "category": "Wild West"
+        "category": "Wild West",
+        "icon": "$(edit)"
       },
       {
         "command": "wildwest.telegraphAck",
@@ -195,6 +196,13 @@
           "command": "wildwest.refreshSidePanel",
           "when": "view == wildwest.sidepanel",
           "group": "navigation"
+        }
+      ],
+      "view/item/inline": [
+        {
+          "command": "wildwest.setIdentity",
+          "when": "view == wildwest.sidepanel && viewItem == identity",
+          "group": "inline"
         }
       ]
     },

@@ -2,11 +2,31 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.36
+**Current version:** 0.31.46
 
 ---
 
 ## What's New
+
+**v0.31.46** — Sidebar heartbeat item: when flagged, tooltip shows unprocessed inbox memo subjects (same as status bar tooltip).
+
+**v0.31.45** — Status bar tooltip: when heartbeat is flagged, lists unprocessed inbox memos by subject (up to 5, with overflow count). Subject extracted by stripping timestamp prefix.
+
+**v0.31.44** — Status bar: add dedicated identity item (`$(person) TM(RHk)`) at priority 99, right of the main heartbeat item. Click it to edit identity directly. Shows warning color when unset.
+
+**v0.31.43** — Identity row: restore click-to-edit (input box). contextValue='identity' kept for view/item/inline pencil (requires Developer: Reload Window after install).
+
+**v0.31.42** — Identity row: remove click-to-edit (was opening palette on every click); edit only via hover pencil button. Requires window reload after install for menus contribution to take effect.
+
+**v0.31.41** — Identity row: inline edit button (pencil icon) appears on hover in the sidebar. Click the row or the pencil to open the input box. Uses `view/item/inline` menu contribution with `contextValue = 'identity'`.
+
+**v0.31.40** — Heartbeat item shows relative time instead of ISO timestamp: `10s ago`, `3m ago`, `2h ago`, `1d ago`. Full ISO timestamp still available in tooltip.
+
+**v0.31.39** — Move Heartbeat item to bottom of sidebar root.
+
+**v0.31.38** — Sidebar root redesign: Heartbeat, Scope, and Identity are now flat inline items at the root (no collapsible nodes). Heartbeat shows `● alive  Last beat: HH:MM` with pulse icon. Scope shows `town  [alias]` with home icon. Identity shows role/dyad inline, click to edit via Command Palette (`wildwest.setIdentity`). Scope row removed from inside Sessions section.
+
+**v0.31.37** — Session buckets (Today/Yesterday/Last 7 days/Older) now show total turn count in parens: `Today   1 (30)`. Turn sums computed from `turn_count` field per session.
 
 **v0.31.36** — Recent node: add per-tool breakdown rows (Copilot/Claude/Codex) as children, showing only sessions in the recent 8-day window. `countRecentByTool()` applies scope filter + date filter independently.
 
@@ -151,7 +171,7 @@ See: [Telegraph Addressing Protocol v0.18.0+](./docs/telegraph-addressing-v2.md)
 
 ## Features
 
-### devPair Log Watcher
+### Dyad Log Watcher
 Automatically polls chat session storage every 5 seconds and exports raw sessions to `~/wildwest/sessions/{git-username}/raw/`:
 
 | Provider | Source | Output folder |
@@ -196,7 +216,7 @@ The **Wild West** status bar item (bottom right) shows watcher state, heartbeat,
 | Section | Contents |
 |---|---|
 | Heartbeat | State, scope, town alias, last beat |
-| Actor | Role, devPair, Edit actor… |
+| Actor | Role, dyad, Edit identity… |
 | Sessions | Watcher toggle, Today/Yesterday/Last 7d/Older counts |
 | Utilities | Export Now, Open Export Folder, Doctor, Validate Registry, Reset Consent, Log, Settings |
 | Inbox | Incoming telegraph memos |
@@ -215,7 +235,7 @@ All commands are available via `Cmd+Shift+P` → `Wild West: ...`
 |---|---|
 | Start Watcher | Begin polling chat sessions |
 | Stop Watcher | Stop polling |
-| Export devPair Log Now | Manual export of all current sessions |
+| Export Dyad Log Now | Manual export of all current sessions |
 | Batch Convert All Sessions | Normalize raw → staged |
 | Convert Exports to Markdown | Generate transcripts from staged JSON |
 | Generate Index | Create INDEX.md for staged transcripts |

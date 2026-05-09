@@ -273,10 +273,14 @@ original_memo: ${originalFileName}
     subject: string,
     body: string
   ): void {
-    // Derive sender alias from registry; fall back to 'TM' if unreadable
+    // Derive sender in Rule-14 format: Role(alias) for multi-town county.
+    // Role comes from the wildwest.identity setting; alias from registry.
     const wwRoot = path.dirname(path.dirname(telegraphDir)); // telegraphDir/../.. = wsPath
     const alias = readRegistryAlias(path.join(wwRoot, '.wildwest'));
-    const fromActor = alias ?? 'TM';
+    const identitySetting = vscode.workspace.getConfiguration('wildwest').get<string>('identity') ?? '';
+    const roleMatch = identitySetting.match(/^([A-Za-z]+)/);
+    const role = roleMatch ? roleMatch[1] : 'TM';
+    const fromActor = alias ? `${role}(${alias})` : (identitySetting || 'TM');
 
     // Build filename: YYYYMMDD-HHMMZ-to-<ToActor>-from-<FromActor>--<subject>.md
     const timestamp = this.getTimestamp();

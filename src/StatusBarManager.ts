@@ -16,6 +16,7 @@ import { HeartbeatMonitor } from './HeartbeatMonitor';
  */
 export class StatusBarManager {
   private statusBarItem: vscode.StatusBarItem;
+  private identityBarItem: vscode.StatusBarItem;
   private heartbeatMonitor: HeartbeatMonitor;
   private disposables: vscode.Disposable[] = [];
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
@@ -29,6 +30,14 @@ export class StatusBarManager {
       100,
     );
     this.statusBarItem.command = 'wildwest.sidepanel.focus';
+
+    this.identityBarItem = vscode.window.createStatusBarItem(
+      'wildwest-identity',
+      vscode.StatusBarAlignment.Right,
+      99,
+    );
+    this.identityBarItem.command = 'wildwest.setIdentity';
+    this.identityBarItem.tooltip = 'Click to edit Wild West identity';
   }
 
   /** Called by SessionExporter when the watcher starts or stops. */
@@ -41,6 +50,7 @@ export class StatusBarManager {
     const scope = this.heartbeatMonitor.detectScope();
     if (!scope) {
       this.statusBarItem.hide();
+      this.identityBarItem.hide();
       return;
     }
 
@@ -50,16 +60,19 @@ export class StatusBarManager {
     const eyeIcon = this.isWatching ? '$(eye)' : '$(eye-closed)';
     const heartDot = liveness === 'alive' ? '●' : liveness === 'flagged' ? '⚑' : '○';
 
-    if (identitySetting) {
-      this.statusBarItem.text = `${eyeIcon} ${heartDot} ${identitySetting} · ${scopeLabel}`;
-      this.statusBarItem.color = new vscode.ThemeColor('statusBar.foreground');
-    } else {
-      this.statusBarItem.text = `${eyeIcon} ${heartDot} ${scopeLabel}`;
-      this.statusBarItem.color = new vscode.ThemeColor('statusBarItem.warningForeground');
-    }
-
+    this.statusBarItem.text = `${eyeIcon} ${heartDot} ${scopeLabel}`;
+    this.statusBarItem.color = new vscode.ThemeColor('statusBar.foreground');
     this.statusBarItem.tooltip = this.createTooltip();
     this.statusBarItem.show();
+
+    if (identitySetting) {
+      this.identityBarItem.text = `$(person) ${identitySetting}`;
+      this.identityBarItem.show();
+    } else {
+      this.identityBarItem.text = `$(person) Set identity…`;
+      this.identityBarItem.color = new vscode.ThemeColor('statusBarItem.warningForeground');
+      this.identityBarItem.show();
+    }
   }
 
   private createTooltip(): vscode.MarkdownString {
@@ -81,6 +94,30 @@ export class StatusBarManager {
     const heartDot = liveness === 'alive' ? '●' : liveness === 'flagged' ? '⚑' : '○';
     const lastBeat = this.timeSince(this.readSentinelTimestamp());
     tooltip.appendMarkdown(`${heartDot} ${liveness} · Last beat: ${lastBeat}\n\n`);
+
+    // If flagged, list unprocessed inbox memos
+    if (liveness === 'flagged') {
+      const wwRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (wwRoot) {
+        const inboxDir = path.join(wwRoot, '.wildwest', 'telegraph', 'inbox');
+        try {
+          const memos = fs.readdirSync(inboxDir)
+            .filter(f => f.endsWith('.md') && !f.startsWith('.') && f !== '.gitkeep');
+          if (memos.length > 0) {
+            tooltip.appendMarkdown(`**⚑ Unprocessed inbox (${memos.length})**\n\n`);
+            for (const memo of memos.slice(0, 5)) {
+              // Strip timestamp prefix for readability: YYYYMMDD-HHMMz-to-...-from-...--.subject.md
+              const subject = memo.replace(/^\d{8}-\d{4}Z?-/, '').replace(/\.md$/, '');
+              tooltip.appendMarkdown(`- ${subject}\n`);
+            }
+            if (memos.length > 5) {
+              tooltip.appendMarkdown(`- …and ${memos.length - 5} more\n`);
+            }
+            tooltip.appendMarkdown('\n');
+          }
+        } catch { /* inbox unreadable */ }
+      }
+    }
 
     // Watcher toggle (compact)
     const eyeIcon = this.isWatching ? '$(eye)' : '$(eye-closed)';
@@ -168,5 +205,6 @@ export class StatusBarManager {
     }
     this.disposables = [];
     this.statusBarItem.dispose();
+    this.identityBarItem.dispose();
   }
 }
