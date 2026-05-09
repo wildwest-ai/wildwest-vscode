@@ -276,20 +276,20 @@ export class SidePanelProvider
       if (info.scope === 'town') {
         if (info.wwuid) {
           if (scopeRefs.length > 0) {
-            // Primary rule: sessions with git commits to this town's repo during the
-            // session window (commit_count > 0) are definitive attributions.
+            // A session belongs to this town if:
+            //   1. It was recorded FROM this town (recorder_wwuid matches) — required gate
+            //   2. AND has any evidence: git commits to this repo (commit_count > 0)
+            //      OR file reference signals (signal_count > 0)
             //
-            // Fallback rule: signal_count > 0 (file references) is accepted only when
-            // the session was recorded from this town (not county/territory) — prevents
-            // nx-icouponads-style false positives where a multi-workspace session
-            // incidentally references town files without doing primary work here.
+            // County/territory recorders are excluded — they don't belong in town views.
+            // Non-matching recorder_wwuid is excluded — a parallel session in another town
+            // that incidentally commits to or references this repo is not this town's session.
             const townRefs = scopeRefs.filter((ref) => ref.scope === 'town');
             const thisRef = townRefs.find((ref) => ref.wwuid === info.wwuid);
             if (!thisRef) return false;
             if (recorderScope === 'county' || recorderScope === 'territory') return false;
-            // Prefer commit_count as primary evidence
+            if (recorderWwuid !== info.wwuid) return false;
             if ((thisRef.commit_count ?? 0) > 0) return true;
-            // Fall back to signal_count — only if no other town has commits
             const sc = thisRef.signal_count;
             if (sc == null || sc <= 0) return false;
             return true;

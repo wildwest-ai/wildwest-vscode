@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.76
+**Current version:** 0.31.77
 
 ---
 
 ## What's New
+
+**v0.31.77** — Tighten town filter: require `recorder_wwuid === town_wwuid` as a gate. Commits to a town's repo during a session window are strong evidence, but only when the session was actually recorded from that town. Eliminates wildwest-framework and other parallel-town false positives where commits happened in a separate terminal.
 
 **v0.31.76** — Add `GitCommitMatcher`: counts git commits to each town's repo during the session window and stores `commit_count` on `ScopeRef`. Town filter now uses `commit_count > 0` as the primary attribution signal (definitive proof of work), with `signal_count > 0` as fallback for sessions pre-dating this change. Eliminates false positives from multi-workspace sessions that only reference a town's files incidentally.
 
