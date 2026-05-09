@@ -137,6 +137,7 @@ export class CopilotTransformer implements ISessionTransformer {
               parts: [part],
               meta: {
                 tool_cursor_value: (request['requestId'] as string | number | undefined) ?? requests.indexOf(request),
+                model: this.resolveModel(request),
                 ...(request['meta'] as TurnMeta | undefined),
               },
               timestamp: resolveTimestamp(request['responseTimestamp'], sessionEnd),
@@ -151,6 +152,7 @@ export class CopilotTransformer implements ISessionTransformer {
             parts: responseParts,
             meta: {
               tool_cursor_value: (request['requestId'] as string | number | undefined) ?? requests.indexOf(request),
+              model: this.resolveModel(request),
               ...(request['meta'] as TurnMeta | undefined),
             },
             timestamp: resolveTimestamp(request['responseTimestamp'], sessionEnd),
@@ -240,6 +242,12 @@ export class CopilotTransformer implements ISessionTransformer {
         .join('');
     }
     return '';
+  }
+
+  private resolveModel(request: Record<string, unknown>): string | undefined {
+    const result = request['result'] as Record<string, unknown> | undefined;
+    const meta = result?.['metadata'] as Record<string, unknown> | undefined;
+    return (meta?.['resolvedModel'] as string | undefined) || (request['modelId'] as string | undefined);
   }
 }
 
@@ -367,7 +375,9 @@ export class CodexTransformer implements ISessionTransformer {
     const projectPath: string =
       (metaPayload?.['cwd'] as string | undefined) || '';
 
-    return { messages: parsed, line_count: lines.length, session_start: sessionStart, project_path: projectPath };
+    const model: string | undefined = metaPayload?.['model'] as string | undefined;
+
+    return { messages: parsed, line_count: lines.length, session_start: sessionStart, project_path: projectPath, model };
   }
 
   getCurrentCursor(rawSession: unknown): Cursor {
@@ -379,6 +389,7 @@ export class CodexTransformer implements ISessionTransformer {
     const session = rawSession as Record<string, unknown>;
     const messages = (session['messages'] as Record<string, unknown>[]) || [];
     const sessionStart = (session['session_start'] as string | undefined) || new Date().toISOString();
+    const sessionModel = session['model'] as string | undefined;
     const turns: NormalizedTurn[] = [];
     let turn_index = 0;
 
@@ -411,7 +422,7 @@ export class CodexTransformer implements ISessionTransformer {
             role: 'assistant',
             content,
             parts: this.extractParts(payload['content']),
-            meta: { tool_cursor_value: turn_index - 1 },
+            meta: { tool_cursor_value: turn_index - 1, model: sessionModel },
             timestamp,
           });
         }

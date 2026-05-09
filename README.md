@@ -2,11 +2,15 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.32.6
+**Current version:** v0.32.8
 
 ---
 
 ## What's New
+
+**v0.32.8** — Session pipeline: capture model per turn for all tools. CPT uses `result.metadata.resolvedModel`; CCX uses session-level `payload.model`; CLD already captured. Session preview header now shows **Model** row when available.
+
+**v0.32.7** — Session preview: turn headings use `### User` and `### ${toolName}` (e.g. `### GitHub Copilot`) instead of Human/Assistant.
 
 **v0.32.6** — Session preview: show thinking turns inline as `> 💭 ...` blockquotes within the assistant block.
 

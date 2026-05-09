@@ -61,11 +61,18 @@ function renderSessionMarkdown(s: Record<string, unknown>): string {
   const lastTurnAt = (s['last_turn_at'] as string) || '';
   const turnCount = (s['turn_count'] as number) ?? 0;
   const toolName = TOOL_NAMES[tool] || tool;
-  const scopeRefs = Array.isArray(s['scope_refs'])
-    ? (s['scope_refs'] as Array<Record<string, unknown>>)
-    : [];
   const turns = Array.isArray(s['turns'])
     ? (s['turns'] as Array<Record<string, unknown>>)
+    : [];
+
+  // Derive model from first assistant turn that has meta.model
+  const model = turns
+    .find(t => t['role'] === 'assistant' && (t['meta'] as Record<string, unknown> | undefined)?.['model'])
+    ?.['meta'] as Record<string, unknown> | undefined;
+  const modelStr = model?.['model'] as string | undefined;
+
+  const scopeRefs = Array.isArray(s['scope_refs'])
+    ? (s['scope_refs'] as Array<Record<string, unknown>>)
     : [];
 
   const lines: string[] = [
@@ -74,6 +81,7 @@ function renderSessionMarkdown(s: Record<string, unknown>): string {
     `| | |`,
     `|---|---|`,
     `| **Tool** | ${toolName} (\`${tool}\`) |`,
+    ...(modelStr ? [`| **Model** | \`${modelStr}\` |`] : []),
     `| **Project** | \`${projectPath || '—'}\` |`,
     `| **Created** | ${fmtTime(createdAt)} |`,
     `| **Last turn** | ${fmtTime(lastTurnAt)} |`,
