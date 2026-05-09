@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.44
+**Current version:** 0.31.45
 
 ---
 
 ## What's New
+
+**v0.31.45** — Status bar tooltip: when heartbeat is flagged, lists unprocessed inbox memos by subject (up to 5, with overflow count). Subject extracted by stripping timestamp prefix.
 
 **v0.31.44** — Status bar: add dedicated identity item (`$(person) TM(RHk)`) at priority 99, right of the main heartbeat item. Click it to edit identity directly. Shows warning color when unset.
 

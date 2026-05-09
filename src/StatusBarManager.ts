@@ -95,6 +95,30 @@ export class StatusBarManager {
     const lastBeat = this.timeSince(this.readSentinelTimestamp());
     tooltip.appendMarkdown(`${heartDot} ${liveness} · Last beat: ${lastBeat}\n\n`);
 
+    // If flagged, list unprocessed inbox memos
+    if (liveness === 'flagged') {
+      const wwRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (wwRoot) {
+        const inboxDir = path.join(wwRoot, '.wildwest', 'telegraph', 'inbox');
+        try {
+          const memos = fs.readdirSync(inboxDir)
+            .filter(f => f.endsWith('.md') && !f.startsWith('.') && f !== '.gitkeep');
+          if (memos.length > 0) {
+            tooltip.appendMarkdown(`**⚑ Unprocessed inbox (${memos.length})**\n\n`);
+            for (const memo of memos.slice(0, 5)) {
+              // Strip timestamp prefix for readability: YYYYMMDD-HHMMz-to-...-from-...--.subject.md
+              const subject = memo.replace(/^\d{8}-\d{4}Z?-/, '').replace(/\.md$/, '');
+              tooltip.appendMarkdown(`- ${subject}\n`);
+            }
+            if (memos.length > 5) {
+              tooltip.appendMarkdown(`- …and ${memos.length - 5} more\n`);
+            }
+            tooltip.appendMarkdown('\n');
+          }
+        } catch { /* inbox unreadable */ }
+      }
+    }
+
     // Watcher toggle (compact)
     const eyeIcon = this.isWatching ? '$(eye)' : '$(eye-closed)';
     const watcherState = this.isWatching ? 'Watching' : 'Stopped';
