@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.39
+**Current version:** 0.31.40
 
 ---
 
 ## What's New
+
+**v0.31.40** — Heartbeat item shows relative time instead of ISO timestamp: `10s ago`, `3m ago`, `2h ago`, `1d ago`. Full ISO timestamp still available in tooltip.
 
 **v0.31.39** — Move Heartbeat item to bottom of sidebar root.
 
