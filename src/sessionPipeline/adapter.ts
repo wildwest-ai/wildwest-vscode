@@ -277,8 +277,11 @@ export class PipelineAdapter {
           }
         }
 
-        // Stamp recorder_wwuid on records that lack it (migration for existing records)
-        if (!record['recorder_wwuid'] && recorderWwuid) {
+        // Stamp recorder_wwuid on records that lack it (migration for existing records).
+        // Only stamp when project_path matches the current workspace — don't claim
+        // sessions that belong to other workspaces.
+        if (!record['recorder_wwuid'] && recorderWwuid && workspaceRoot
+            && record['project_path'] === workspaceRoot) {
           record['recorder_wwuid'] = recorderWwuid;
           dirty = true;
         }

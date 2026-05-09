@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.59
+**Current version:** 0.31.60
 
 ---
 
 ## What's New
+
+**v0.31.60** — Fix `recorder_wwuid` over-stamping: only stamp when `resolvedProjectPath === this.projectPath` (session is actually attributed to this workspace). Sessions belonging to other workspaces get empty `recorder_wwuid` and fall back to `project_path` filtering. Same constraint applied to `rebuildIndex` migration stamp.
 
 **v0.31.59** — Fix: `staged/` not recreated after manual sessions/ delete. `PacketWriter` called `ensureDirectories()` only at construction time; directories gone after delete caused silent write failures. Now called before every packet and storage write.
 

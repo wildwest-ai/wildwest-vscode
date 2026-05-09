@@ -158,6 +158,10 @@ export class SessionExportPipeline {
         closed,
         turns: turnsForPacket,
       };
+      // Only stamp recorder_wwuid when the session is attributed to this workspace.
+      // Sessions belonging to other workspaces get an empty recorder_wwuid and fall
+      // back to project_path filtering in the side panel.
+      const isOwnSession = this.recorderWwuid && this.projectPath && resolvedProjectPath === this.projectPath;
       await this.packetWriter.applyPacketToStorage(
         packet,
         resolvedProjectPath,
@@ -167,7 +171,7 @@ export class SessionExportPipeline {
           value: turnsForPacket[turnsForPacket.length - 1].meta?.tool_cursor_value || turnsForPacket[turnsForPacket.length - 1].turn_index,
         },
         metadata.created_at,
-        this.recorderWwuid
+        isOwnSession ? this.recorderWwuid : undefined
       );
     } catch (error) {
       throw new Error(`Storage update failed: ${error}`);
