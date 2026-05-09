@@ -94,32 +94,45 @@ function renderSessionMarkdown(s: Record<string, unknown>): string {
   // Collapse consecutive assistant fragments into single blocks (CPT emits many partial turns)
   type Block = { role: string; text: string; timestamp: string };
   const blocks: Block[] = [];
+  let thinkingSkipped = false;
+
   for (const t of turns) {
     const role = (t['role'] as string) || '?';
     const rawContent = (t['content'] as string) || '';
     const parts = Array.isArray(t['parts'])
       ? (t['parts'] as Array<Record<string, unknown>>)
       : [];
+    const isPureThinking = parts.length > 0 && parts.every(p => p['kind'] === 'thinking');
 
-    // Assemble text: prefer content field, else join text parts (skip thinking-only)
+    // Track thinking gaps between text fragments
+    if (isPureThinking) {
+      thinkingSkipped = true;
+      continue;
+    }
+
+    // Assemble text: prefer content field, else join text parts
     const textFromParts = parts
       .filter(p => p['kind'] === 'text' || p['kind'] === 'None')
       .map(p => (p['content'] as string) || '')
       .join('');
     const text = (rawContent || textFromParts).trimEnd();
 
-    // Skip pure thinking turns (no displayable text)
-    if (!text) continue;
+    // Skip empty turns and lone fence artifacts (e.g. '\n```\n' streaming delimiters)
+    if (!text || text.trim() === '```') {
+      thinkingSkipped = false;
+      continue;
+    }
 
     const ts = (t['timestamp'] as string) || '';
 
-    // Merge consecutive assistant fragments into one block
+    // Merge consecutive assistant fragments; only insert paragraph break if thinking was skipped
     const last = blocks[blocks.length - 1];
     if (last && last.role === role && role === 'assistant') {
-      last.text += '\n\n' + text;
+      last.text += thinkingSkipped ? '\n\n' + text : text;
     } else {
       blocks.push({ role, text, timestamp: ts });
     }
+    thinkingSkipped = false;
   }
 
   for (let i = 0; i < blocks.length; i++) {
