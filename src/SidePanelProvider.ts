@@ -267,6 +267,7 @@ export class SidePanelProvider
         : [];
       const recorderWwuid = (session['recorder_wwuid'] as string) || '';
       const recorderScope = (session['recorder_scope'] as string) || '';
+      const tool = (session['tool'] as string) || '';
       const scopeRefs = Array.isArray(session['scope_refs'])
         ? session['scope_refs'] as SidebarScopeRef[]
         : [];
@@ -284,11 +285,16 @@ export class SidePanelProvider
             // County/territory recorders are excluded — they don't belong in town views.
             // Non-matching recorder_wwuid is excluded — a parallel session in another town
             // that incidentally commits to or references this repo is not this town's session.
+            //
+            // Signal gate (commit_count / signal_count) applies only to cpt:
+            // For cld/ccx, recorder_wwuid is derived directly from project_path,
+            // so recorder match is already ground-truth confirmation of attribution.
             const townRefs = scopeRefs.filter((ref) => ref.scope === 'town');
             const thisRef = townRefs.find((ref) => ref.wwuid === info.wwuid);
             if (!thisRef) return false;
             if (recorderScope === 'county' || recorderScope === 'territory') return false;
             if (recorderWwuid !== info.wwuid) return false;
+            if (tool !== 'cpt') return true;  // cld/ccx: recorder match is sufficient
             if ((thisRef.commit_count ?? 0) > 0) return true;
             const sc = thisRef.signal_count;
             if (sc == null || sc <= 0) return false;
