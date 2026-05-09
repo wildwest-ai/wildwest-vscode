@@ -101,7 +101,7 @@ function renderSessionMarkdown(s: Record<string, unknown>): string {
 
   // Collapse consecutive assistant fragments into single blocks (CPT emits many partial turns)
   type Fragment = { kind: 'text' | 'thinking'; text: string };
-  type Block = { role: string; fragments: Fragment[]; timestamp: string };
+  type Block = { role: string; fragments: Fragment[]; timestamp: string; model?: string };
   const blocks: Block[] = [];
 
   for (const t of turns) {
@@ -110,6 +110,7 @@ function renderSessionMarkdown(s: Record<string, unknown>): string {
     const parts = Array.isArray(t['parts'])
       ? (t['parts'] as Array<Record<string, unknown>>)
       : [];
+    const turnModel = (t['meta'] as Record<string, unknown> | undefined)?.['model'] as string | undefined;
 
     const thinkingText = parts
       .filter(p => p['kind'] === 'thinking')
@@ -128,7 +129,7 @@ function renderSessionMarkdown(s: Record<string, unknown>): string {
       if (last && last.role === role) {
         last.fragments.push({ kind: 'thinking', text: thinkingText.trim() });
       } else if (role === 'assistant') {
-        blocks.push({ role, fragments: [{ kind: 'thinking', text: thinkingText.trim() }], timestamp: (t['timestamp'] as string) || '' });
+        blocks.push({ role, fragments: [{ kind: 'thinking', text: thinkingText.trim() }], timestamp: (t['timestamp'] as string) || '', model: turnModel });
       }
       continue;
     }
@@ -141,17 +142,19 @@ function renderSessionMarkdown(s: Record<string, unknown>): string {
     // Merge consecutive assistant text fragments into the same block
     if (last && last.role === role && role === 'assistant') {
       last.fragments.push({ kind: 'text', text });
+      if (!last.model && turnModel) last.model = turnModel;
     } else {
-      blocks.push({ role, fragments: [{ kind: 'text', text }], timestamp: ts });
+      blocks.push({ role, fragments: [{ kind: 'text', text }], timestamp: ts, model: turnModel });
     }
   }
 
   for (let i = 0; i < blocks.length; i++) {
-    const { role, fragments, timestamp } = blocks[i];
+    const { role, fragments, timestamp, model: blockModel } = blocks[i];
     const timeStr = timestamp
       ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : '';
-    const heading = role === 'user' ? '### User' : `### ${toolName}`;
+    const modelLabel = blockModel ? `  ·  \`${blockModel}\`` : '';
+    const heading = role === 'user' ? '### User' : `### ${toolName}${modelLabel}`;
     const timeLabel = timeStr ? `  ·  ${timeStr}` : '';
 
     if (i > 0) lines.push('', '---', '');
