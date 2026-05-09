@@ -235,11 +235,6 @@ export class SidePanelProvider
     }
   }
 
-  private pathContains(root: string | null, candidate: string): boolean {
-    if (!root || !candidate) return false;
-    return candidate === root || candidate.startsWith(root + path.sep);
-  }
-
   private collectTownWwuidsInCounty(countyRoot: string | null): Set<string> {
     const ids = new Set<string>();
     if (!countyRoot) return ids;
@@ -282,7 +277,7 @@ export class SidePanelProvider
           if (recorderScope) return recorderScope === 'town' && recorderWwuid === info.wwuid;
           if (workspaceWwuids.includes(info.wwuid) || recorderWwuid === info.wwuid) return true;
         }
-        return this.pathContains(info.filterPath ?? workspaceRoot, projectPath);
+        return false;
       }
 
       if (info.scope === 'county') {
@@ -299,7 +294,7 @@ export class SidePanelProvider
         }
         if (recorderWwuid && countyTownWwuids.has(recorderWwuid)) return true;
         if (workspaceWwuids.some((wwuid) => countyTownWwuids.has(wwuid))) return true;
-        return this.pathContains(countyRoot, projectPath);
+        return false;
       }
 
       return true; // territory
