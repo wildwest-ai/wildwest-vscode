@@ -79,6 +79,9 @@ export class SessionExportPipeline {
   private privacyMode: boolean;
   private homeDir: string;
   private sessionMapService: SessionMapService;
+  // Lazily-built map: directory basename/alias → real workspace root on disk.
+  // Used as fallback when a cpt session references a path that no longer exists.
+  private workspaceAliasCache: Map<string, string> | null = null;
 
   constructor(options: PipelineOptions) {
     this.sessionsDir = options.sessionsDir;
@@ -442,6 +445,9 @@ export class SessionExportPipeline {
   /**
    * Walk up from a file/dir path to find the nearest ancestor that has
    * .wildwest/registry.json. Returns that directory path or '' if not found.
+   *
+   * Fallback: if the path doesn't exist on disk (e.g. stale /Dev/ paths in old
+   * cpt sessions), check each path component against the workspace alias cache.
    */
   private findWorkspaceRoot(filePath: string): string {
     let current = fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()
@@ -455,7 +461,53 @@ export class SessionExportPipeline {
       if (parent === current) break;
       current = parent;
     }
+    // Alias fallback: resolve stale/moved paths by matching path components
+    // against all known workspace roots discovered under the territory root.
+    const cache = this.getWorkspaceAliasCache();
+    const parts = filePath.split(path.sep);
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const part = parts[i];
+      if (part && cache.has(part)) {
+        return cache.get(part)!;
+      }
+    }
     return '';
+  }
+
+  /**
+   * Lazily scan the territory root for all .wildwest/registry.json files and
+   * build a basename/alias → workspace root map.  Used to resolve stale paths
+   * stored in older cpt sessions that point to directories that no longer exist.
+   */
+  private getWorkspaceAliasCache(): Map<string, string> {
+    if (this.workspaceAliasCache) return this.workspaceAliasCache;
+    this.workspaceAliasCache = new Map();
+    // sessionsDir = ~/wildwest/sessions/<author> → go up 2 levels to get territory root
+    const territoryRoot = path.dirname(path.dirname(this.sessionsDir));
+    const scan = (dir: string, depth: number) => {
+      if (depth < 0) return;
+      try {
+        const regPath = path.join(dir, '.wildwest', 'registry.json');
+        if (fs.existsSync(regPath)) {
+          const reg = JSON.parse(fs.readFileSync(regPath, 'utf8')) as Record<string, unknown>;
+          const basename = path.basename(dir);
+          const alias = (reg['alias'] as string) || '';
+          this.workspaceAliasCache!.set(basename, dir);
+          if (alias && alias !== basename) {
+            this.workspaceAliasCache!.set(alias, dir);
+          }
+        }
+        for (const entry of fs.readdirSync(dir)) {
+          if (entry.startsWith('.') || entry === 'node_modules' || entry === '.worktrees') continue;
+          const child = path.join(dir, entry);
+          try {
+            if (fs.statSync(child).isDirectory()) scan(child, depth - 1);
+          } catch { /* skip */ }
+        }
+      } catch { /* skip */ }
+    };
+    scan(territoryRoot, 4);
+    return this.workspaceAliasCache;
   }
 
   private isWildWestScope(value: unknown): value is WildWestScope {
