@@ -255,7 +255,9 @@ export class PipelineAdapter {
                 // 2. toolSpecificData.cwd in response items
                 const response = (req['response'] as Record<string, unknown>[]) ?? [];
                 for (const item of response) {
-                  const cwd = ((item['toolSpecificData'] as Record<string, unknown>)?.['cwd'] as string) ?? '';
+                  const cwdRaw = (item['toolSpecificData'] as Record<string, unknown>)?.['cwd'];
+                  const cwd = typeof cwdRaw === 'string' ? cwdRaw
+                    : (cwdRaw as Record<string, unknown>)?.['fsPath'] as string ?? '';
                   if (cwd && (cwd === workspaceRoot || cwd.startsWith(prefix))) {
                     record['project_path'] = workspaceRoot;
                     dirty = true;
