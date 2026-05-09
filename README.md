@@ -171,7 +171,7 @@ See: [Telegraph Addressing Protocol v0.18.0+](./docs/telegraph-addressing-v2.md)
 
 ## Features
 
-### devPair Log Watcher
+### Dyad Log Watcher
 Automatically polls chat session storage every 5 seconds and exports raw sessions to `~/wildwest/sessions/{git-username}/raw/`:
 
 | Provider | Source | Output folder |
@@ -216,7 +216,7 @@ The **Wild West** status bar item (bottom right) shows watcher state, heartbeat,
 | Section | Contents |
 |---|---|
 | Heartbeat | State, scope, town alias, last beat |
-| Actor | Role, devPair, Edit actor… |
+| Actor | Role, dyad, Edit identity… |
 | Sessions | Watcher toggle, Today/Yesterday/Last 7d/Older counts |
 | Utilities | Export Now, Open Export Folder, Doctor, Validate Registry, Reset Consent, Log, Settings |
 | Inbox | Incoming telegraph memos |
@@ -235,7 +235,7 @@ All commands are available via `Cmd+Shift+P` → `Wild West: ...`
 |---|---|
 | Start Watcher | Begin polling chat sessions |
 | Stop Watcher | Stop polling |
-| Export devPair Log Now | Manual export of all current sessions |
+| Export Dyad Log Now | Manual export of all current sessions |
 | Batch Convert All Sessions | Normalize raw → staged |
 | Convert Exports to Markdown | Generate transcripts from staged JSON |
 | Generate Index | Create INDEX.md for staged transcripts |

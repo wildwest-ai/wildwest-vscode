@@ -30,7 +30,7 @@ Release v0.X.Y complete!
    'git push origin main && git tag vX.Y.Z && git push origin vX.Y.Z'
 ```
 
-The push must be performed manually by the devPair lead (S(R)) with explicit authorization:
+The push must be performed manually by the dyad lead (S(R)) with explicit authorization:
 ```bash
 git push origin main               # Push commit
 git push origin v0.X.Y             # Push tag to remote

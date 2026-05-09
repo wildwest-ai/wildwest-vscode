@@ -1,6 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import {
+  type WildWestScope,
+  scopeRoleMap,
+  resolveRoleToScope as resolveRoleToScopeFromRegistry,
+} from './roles/roleRegistry';
+
+export type { WildWestScope };
 
 // Absolute hardcoded floor — 5 min.
 // Used when no registry.json and no VS Code setting overrides for a scope.
@@ -11,14 +18,9 @@ const FLOOR_MS = 300_000;
 const STALE_MULTIPLIER = 2;
 
 export type HeartbeatState = 'alive' | 'flagged' | 'stopped';
-export type WildWestScope = 'town' | 'county' | 'territory';
 
-// Approved scope → roles mapping per CD decision
-const SCOPE_ROLES: Record<WildWestScope, string[]> = {
-  'territory': ['G', 'RA'],
-  'county': ['S', 'CD'],
-  'town': ['Mayor', 'TM', 'HG'],
-};
+// Canonical scope → roles mapping — derived from src/roles/roleRegistry.ts
+const SCOPE_ROLES = scopeRoleMap();
 
 interface HeartbeatConfig {
   intervalMs: number;
@@ -331,17 +333,11 @@ function parseMemoFrontmatter(
 }
 
 /**
-
  * Resolve a role to its scope tier.
- * Based on SCOPE_ROLES mapping defined at top of file.
+ * Delegates to canonical roleRegistry — see src/roles/roleRegistry.ts.
  */
 function resolveRoleToScope(role: string): WildWestScope | null {
-  for (const [scope, roles] of Object.entries(SCOPE_ROLES)) {
-    if (roles.includes(role)) {
-      return scope as WildWestScope;
-    }
-  }
-  return null;
+  return resolveRoleToScopeFromRegistry(role);
 }
 
 /**
@@ -494,7 +490,7 @@ function resolveScopePath(
   }
 
   if (destScope === 'town') {
-    // Town roles (Mayor, TM, HG) require a pattern — multiple towns exist
+    // Town roles (M, TM, DM, HG) require a pattern — multiple towns exist
     if (!pattern) return 'AMBIGUOUS';
     let countyPath: string | null = null;
     const parts = currentPath.split(path.sep);

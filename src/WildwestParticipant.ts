@@ -16,7 +16,7 @@ import {
  * same scope rules as existing wildwest.* commands. Telegraph protocol is not bypassed.
  *
  * Commands:
- *   @wildwest inbox                — county + town inbox sweep; per-memo [Archive] button
+ *   @wildwest inbox                — town inbox only (scope-enforced); per-memo [Archive] button
  *   @wildwest send <role> "<msg>"  — draft memo → preview → [Confirm Send] button
  *   @wildwest ack <timestamp>      — generate ack for that timestamp → [Send Ack] button
  *   @wildwest archive <filename>   — move memo from inbox to inbox/history
@@ -135,26 +135,42 @@ export function registerChatParticipant(
 
 async function handleInbox(wwRoot: string, stream: vscode.ChatResponseStream): Promise<void> {
   const townInboxDir = path.join(wwRoot, 'telegraph', 'inbox');
-  const countyRoot = findCountyRootFromWwDir(wwRoot);
-  const countyInboxDir = countyRoot ? path.join(countyRoot, '.wildwest', 'telegraph', 'inbox') : null;
+
+  // Scope enforcement: town workspace reads only its own inbox.
+  // Cross-scope (county) inbox reads are blocked for town identity (Rule 14).
+  const registryPath = path.join(wwRoot, 'registry.json');
+  let workspaceScope: string | null = null;
+  try {
+    const reg = JSON.parse(fs.readFileSync(registryPath, 'utf8')) as Record<string, unknown>;
+    workspaceScope = (reg['scope'] as string) ?? null;
+  } catch { /* registry unreadable — default to town-only */ }
 
   const townMemos = listMemos(townInboxDir);
-  const countyMemos = countyInboxDir ? listMemos(countyInboxDir) : [];
 
-  const total = townMemos.length + countyMemos.length;
-  if (total === 0) {
-    stream.markdown('**All inboxes empty.** Nothing to process.');
-    return;
-  }
+  if (workspaceScope !== 'town') {
+    // Non-town workspace: also sweep county inbox
+    const countyRoot = findCountyRootFromWwDir(wwRoot);
+    const countyInboxDir = countyRoot ? path.join(countyRoot, '.wildwest', 'telegraph', 'inbox') : null;
+    const countyMemos = countyInboxDir ? listMemos(countyInboxDir) : [];
 
-  if (countyMemos.length > 0) {
-    stream.markdown(`**County inbox** — ${countyMemos.length} memo(s):\n\n`);
-    for (const memo of countyMemos) {
-      const subject = extractSubject(path.join(countyInboxDir!, memo), memo);
-      stream.markdown(`- \`${memo}\`  \n  ${subject}\n`);
-      stream.button({ command: CMD_ARCHIVE_MEMO, title: 'Archive', arguments: [{ inboxDir: countyInboxDir!, filename: memo }] });
-      stream.markdown('\n');
+    const total = townMemos.length + countyMemos.length;
+    if (total === 0) {
+      stream.markdown('**All inboxes empty.** Nothing to process.');
+      return;
     }
+
+    if (countyMemos.length > 0) {
+      stream.markdown(`**County inbox** — ${countyMemos.length} memo(s):\n\n`);
+      for (const memo of countyMemos) {
+        const subject = extractSubject(path.join(countyInboxDir!, memo), memo);
+        stream.markdown(`- \`${memo}\`  \n  ${subject}\n`);
+        stream.button({ command: CMD_ARCHIVE_MEMO, title: 'Archive', arguments: [{ inboxDir: countyInboxDir!, filename: memo }] });
+        stream.markdown('\n');
+      }
+    }
+  } else if (townMemos.length === 0) {
+    stream.markdown('**Inbox empty.** Nothing to process.');
+    return;
   }
 
   if (townMemos.length > 0) {
@@ -179,7 +195,12 @@ async function handleSend(wwRoot: string, rawPrompt: string, stream: vscode.Chat
 
   const toRole = match[1];
   const body = match[2].trim();
-  const senderAlias = readRegistryAlias(wwRoot) ?? 'TM';
+  // Build sender in Rule-14 format: Role(alias) for multi-town county.
+  const alias = readRegistryAlias(wwRoot);
+  const identitySetting = vscode.workspace.getConfiguration('wildwest').get<string>('identity') ?? '';
+  const roleMatch = identitySetting.match(/^([A-Za-z]+)/);
+  const role = roleMatch ? roleMatch[1] : 'TM';
+  const senderAlias = alias ? `${role}(${alias})` : (identitySetting || 'TM');
   const outboxDir = path.join(wwRoot, 'telegraph', 'outbox');
   const now = new Date();
   const ts = telegraphTimestamp(now);
@@ -214,7 +235,12 @@ async function handleAck(wwRoot: string, timestampArg: string, stream: vscode.Ch
   const originalFrom = (frontmatter['from'] as string) ?? 'unknown';
   const originalSubject = (frontmatter['subject'] as string) ?? matched;
 
-  const senderAlias = readRegistryAlias(wwRoot) ?? 'TM';
+  // Build sender in Rule-14 format: Role(alias) for multi-town county.
+  const alias = readRegistryAlias(wwRoot);
+  const identitySetting = vscode.workspace.getConfiguration('wildwest').get<string>('identity') ?? '';
+  const roleMatch = identitySetting.match(/^([A-Za-z]+)/);
+  const role = roleMatch ? roleMatch[1] : 'TM';
+  const senderAlias = alias ? `${role}(${alias})` : (identitySetting || 'TM');
   const outboxDir = path.join(wwRoot, 'telegraph', 'outbox');
   const now = new Date();
   const ts = telegraphTimestamp(now);
