@@ -375,7 +375,10 @@ export class CodexTransformer implements ISessionTransformer {
     const projectPath: string =
       (metaPayload?.['cwd'] as string | undefined) || '';
 
-    const model: string | undefined = metaPayload?.['model'] as string | undefined;
+    // Model is in turn_context lines, not session_meta
+    const turnContextLine = parsed.find((m) => m['type'] === 'turn_context');
+    const turnContextPayload = turnContextLine?.['payload'] as Record<string, unknown> | undefined;
+    const model: string | undefined = turnContextPayload?.['model'] as string | undefined;
 
     return { messages: parsed, line_count: lines.length, session_start: sessionStart, project_path: projectPath, model };
   }

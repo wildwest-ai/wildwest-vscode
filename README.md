@@ -2,13 +2,17 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.32.8
+**Current version:** v0.32.10
 
 ---
 
 ## What's New
 
-**v0.32.8** — Session pipeline: capture model per turn for all tools. CPT uses `result.metadata.resolvedModel`; CCX uses session-level `payload.model`; CLD already captured. Session preview header now shows **Model** row when available.
+**v0.32.10** — Fix CCX model capture: model is in `turn_context` lines (not `session_meta`). Corrects v0.32.8 which always wrote `undefined` for Codex sessions.
+
+**v0.32.9** — Session preview: show model beside tool name in each assistant turn heading (e.g. `### GitHub Copilot  ·  \`claude-haiku-4-5-20251001\``).
+
+**v0.32.8** — Session pipeline: capture model per turn for all tools. CPT uses `result.metadata.resolvedModel`; CCX uses `turn_context.model`; CLD already captured. Session preview header shows **Model** row when available.
 
 **v0.32.7** — Session preview: turn headings use `### User` and `### ${toolName}` (e.g. `### GitHub Copilot`) instead of Human/Assistant.
 
