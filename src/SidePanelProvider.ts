@@ -97,9 +97,35 @@ export class SidePanelProvider
     const receipts = this.collectAllReceipts();
     const sessionCounts = this.countStagedSessions(this.sessionSortBy);
     const sessionTotal = sessionCounts.today + sessionCounts.yesterday + sessionCounts.last7d + sessionCounts.older;
+
+    // ── Heartbeat inline ────────────────────────────────────────────────────
+    const hbState = this.heartbeatMonitor.checkLiveness();
+    const hbIcon = hbState === 'alive' ? '●' : hbState === 'flagged' ? '⚑' : '○';
+    const lastBeat = this.readSentinelTimestamp();
+    const hbItem = new SidePanelItem(`${hbIcon} ${hbState}  Last beat: ${lastBeat}`, vscode.TreeItemCollapsibleState.None);
+    hbItem.iconPath = new vscode.ThemeIcon(hbState === 'alive' ? 'pulse' : 'warning');
+    hbItem.tooltip = `Heartbeat: ${hbState}\nLast beat: ${lastBeat}`;
+
+    // ── Scope inline ────────────────────────────────────────────────────────
+    const { scope, label: scopeLabel } = this.readRegistryScope();
+    const SCOPE_ICONS: Record<string, string> = { town: 'home', county: 'organization', territory: 'globe' };
+    const scopeItem = new SidePanelItem(`${scope}  [${scopeLabel}]`, vscode.TreeItemCollapsibleState.None);
+    scopeItem.iconPath = new vscode.ThemeIcon(SCOPE_ICONS[scope] ?? 'globe');
+    scopeItem.tooltip = 'Scope filter set by .wildwest/registry.json';
+
+    // ── Identity inline ─────────────────────────────────────────────────────
+    const identitySetting = vscode.workspace.getConfiguration('wildwest').get<string>('identity', '') || '';
+    const idMatch = identitySetting.match(/^([^(]+)\(([^)]+)\)$/);
+    const idLabel = idMatch ? `${idMatch[1].trim()}  (${idMatch[2].trim()})` : (identitySetting || 'Identity not set');
+    const idItem = new SidePanelItem(idLabel, vscode.TreeItemCollapsibleState.None);
+    idItem.iconPath = new vscode.ThemeIcon('person');
+    idItem.tooltip = 'Click to edit identity';
+    idItem.command = { command: 'wildwest.setIdentity', title: 'Set Identity' };
+
     return [
-      new SidePanelItem('Heartbeat', vscode.TreeItemCollapsibleState.Collapsed, 'heartbeat'),
-      new SidePanelItem('Identity', vscode.TreeItemCollapsibleState.Collapsed, 'identity'),
+      hbItem,
+      scopeItem,
+      idItem,
       this.sectionItem('Sessions', 'sessions', sessionTotal),
       new SidePanelItem('Utilities', vscode.TreeItemCollapsibleState.Collapsed, 'utilities'),
       this.sectionItem('Inbox', 'inbox', inboxFiles.length),
@@ -295,11 +321,6 @@ export class SidePanelProvider
     sortItem.command = { command: 'wildwest.toggleSessionSortBy', title: 'Toggle Session Sort' };
 
     const counts = this.countStagedSessions(this.sessionSortBy);
-    const { scope, label: scopeLabel } = this.readRegistryScope();
-    const SCOPE_ICONS: Record<string, string> = { town: 'home', county: 'organization', territory: 'globe' };
-    const scopeDisplay = new SidePanelItem(`Scope: ${scope}  [${scopeLabel}]`, vscode.TreeItemCollapsibleState.None);
-    scopeDisplay.iconPath = new vscode.ThemeIcon(SCOPE_ICONS[scope] ?? 'globe');
-    scopeDisplay.tooltip = 'Filter set by .wildwest/registry.json scope field';
 
     const makeBucket = (lbl: string, sectionId: string, count: number, turns: number): SidePanelItem => {
       const state = count > 0
@@ -333,7 +354,6 @@ export class SidePanelProvider
     return [
       watcherItem,
       sortItem,
-      scopeDisplay,
       recentItem,
       makeBucket('Older', 'sessions:older', counts.older, counts.olderTurns),
       ...toolRows,
