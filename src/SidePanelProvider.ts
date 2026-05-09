@@ -180,10 +180,13 @@ export class SidePanelProvider
       case 'sessions:today':    return this.sessionBucketChildren('today');
       case 'sessions:yesterday': return this.sessionBucketChildren('yesterday');
       case 'sessions:last7d':   return this.sessionLast7dChildren();
-      case 'sessions:older':    return this.sessionBucketChildren('older');
+      case 'sessions:older':    return this.sessionOlderChildren();
       default:
         if (sectionId.startsWith('sessions:last7d:')) {
           return this.sessionDateChildren(sectionId.slice('sessions:last7d:'.length));
+        }
+        if (sectionId.startsWith('sessions:older:')) {
+          return this.sessionOlderMonthChildren(sectionId.slice('sessions:older:'.length));
         }
         return [];
     }
@@ -428,9 +431,7 @@ export class SidePanelProvider
       const scopeFilter = (session: Record<string, unknown>): boolean => {
         const pp = (session['project_path'] as string) || '';
         if (scope === 'town') {
-          if (path.basename(pp) === alias) return true;
-          if (pp && townRoot.startsWith(pp + path.sep)) return true;
-          return false;
+          return pp === townRoot || path.basename(pp) === alias;
         }
         if (scope === 'county') {
           return filterPath !== null && (pp === filterPath || pp.startsWith(filterPath + path.sep));
@@ -454,13 +455,69 @@ export class SidePanelProvider
     } catch { return {}; }
   }
 
-  private sessionBucketChildren(bucket: 'today' | 'yesterday' | 'older'): SidePanelItem[] {
+  private sessionBucketChildren(bucket: 'today' | 'yesterday'): SidePanelItem[] {
     const data = this.loadAndBucketSessions(this.sessionSortBy);
     const sessions = data[bucket];
     if (sessions.length === 0) {
       return [new SidePanelItem('(none)', vscode.TreeItemCollapsibleState.None)];
     }
     return sessions.map((s) => this.sessionRow(s));
+  }
+
+  private sessionOlderChildren(): SidePanelItem[] {
+    const data = this.loadAndBucketSessions(this.sessionSortBy);
+    const sessions = data.older;
+    if (sessions.length === 0) {
+      return [new SidePanelItem('(none)', vscode.TreeItemCollapsibleState.None)];
+    }
+    // Group by YYYY-MM, newest month first
+    const byMonth = new Map<string, Record<string, unknown>[]>();
+    for (const s of sessions) {
+      const ts = this.sessionSortBy === 'updated'
+        ? ((s['last_turn_at'] ?? s['created_at']) as string)
+        : ((s['created_at'] ?? s['last_turn_at']) as string);
+      const d = new Date(ts);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!byMonth.has(key)) byMonth.set(key, []);
+      byMonth.get(key)!.push(s);
+    }
+    const now = new Date();
+    const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthKey = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}`;
+    const monthLabel = (key: string): string => {
+      if (key === thisMonthKey) return 'This month';
+      if (key === lastMonthKey) return 'Last month';
+      const [yr, mo] = key.split('-').map(Number);
+      return new Date(yr, mo - 1, 1).toLocaleDateString([], { month: 'long', year: 'numeric' });
+    };
+    const sortedMonths = [...byMonth.keys()].sort((a, b) => b.localeCompare(a));
+    return sortedMonths.map((key) => {
+      const monthSessions = byMonth.get(key)!;
+      const item = new SidePanelItem(
+        `${monthLabel(key)}   ${monthSessions.length}`,
+        vscode.TreeItemCollapsibleState.Collapsed,
+        `sessions:older:${key}`,
+      );
+      item.iconPath = new vscode.ThemeIcon('calendar');
+      return item;
+    });
+  }
+
+  private sessionOlderMonthChildren(monthKey: string): SidePanelItem[] {
+    const data = this.loadAndBucketSessions(this.sessionSortBy);
+    const sessions = data.older.filter((s) => {
+      const ts = this.sessionSortBy === 'updated'
+        ? ((s['last_turn_at'] ?? s['created_at']) as string)
+        : ((s['created_at'] ?? s['last_turn_at']) as string);
+      const d = new Date(ts);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      return key === monthKey;
+    });
+    if (sessions.length === 0) {
+      return [new SidePanelItem('(none)', vscode.TreeItemCollapsibleState.None)];
+    }
+    return sessions.map((s) => this.sessionRow(s, true));
   }
 
   private sessionLast7dChildren(): SidePanelItem[] {
@@ -504,7 +561,7 @@ export class SidePanelProvider
     return sessions.map((s) => this.sessionRow(s));
   }
 
-  private sessionRow(s: Record<string, unknown>): SidePanelItem {
+  private sessionRow(s: Record<string, unknown>, showDate = false): SidePanelItem {
     const tool = (s['tool'] as string) || '???';
     const projectPath = (s['project_path'] as string) || '';
     const projectName = projectPath ? path.basename(projectPath) : '(unknown)';
@@ -512,9 +569,13 @@ export class SidePanelProvider
     const lastTurnAt = (s['last_turn_at'] as string) || '';
     const turnCount = (s['turn_count'] as number) ?? 0;
     const ts = this.sessionSortBy === 'updated' ? (lastTurnAt || createdAt) : (createdAt || lastTurnAt);
-    const timeStr = ts ? new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    const d = ts ? new Date(ts) : null;
+    const timeStr = d ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    const dateStr = d ? d.toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
     const TOOL_ICONS: Record<string, string> = { cpt: 'github', cld: 'comment-discussion', ccx: 'circuit-board' };
-    const label = `[${tool}] ${projectName}  ${timeStr}  ${turnCount}↕`;
+    const label = showDate
+      ? `[${tool}] ${dateStr}  ${projectName}  ${timeStr}  ${turnCount}↕`
+      : `[${tool}] ${projectName}  ${timeStr}  ${turnCount}↕`;
     const item = new SidePanelItem(label, vscode.TreeItemCollapsibleState.None);
     item.iconPath = new vscode.ThemeIcon(TOOL_ICONS[tool] ?? 'symbol-misc');
     item.tooltip = new vscode.MarkdownString(

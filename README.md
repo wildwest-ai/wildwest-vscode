@@ -2,11 +2,15 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.46
+**Current version:** 0.31.48
 
 ---
 
 ## What's New
+
+**v0.31.48** — Sessions › Older: grouped by month (This month / Last month / Month YYYY), each collapsible. Items within a month show `MMM D` date prefix. Town-scope filter: ancestor-match removed from both session list and tool counter — only exact path or alias basename passes.
+
+**v0.31.47** — Sessions: town-scope filter no longer includes ancestor paths (world/county root sessions no longer bleed into town's Recent/Today list).
 
 **v0.31.46** — Sidebar heartbeat item: when flagged, tooltip shows unprocessed inbox memo subjects (same as status bar tooltip).
 
