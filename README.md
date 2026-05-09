@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.58
+**Current version:** 0.31.59
 
 ---
 
 ## What's New
+
+**v0.31.59** — Fix: `staged/` not recreated after manual sessions/ delete. `PacketWriter` called `ensureDirectories()` only at construction time; directories gone after delete caused silent write failures. Now called before every packet and storage write.
 
 **v0.31.58** — Session attribution now anchored to `recorder_wwuid` (the recording town's `.wildwest/registry.json` wwuid) instead of fragile `project_path` inference. The side panel filters by `recorder_wwuid` for town scope — unambiguous, set at export time, unaffected by multi-workspace Copilot sessions. `rebuildIndex` stamps missing `recorder_wwuid` on existing records (migration). Fallback to `project_path` for pre-migration records.
 

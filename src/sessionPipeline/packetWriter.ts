@@ -148,6 +148,7 @@ export class PacketWriter {
       turns,
     };
 
+    this.ensureDirectories();
     const filename = generatePacketFilename(wwuid, seq_from, seq_to);
     const filepath = path.join(this.stagedDir, 'packets', filename);
 
@@ -172,6 +173,7 @@ export class PacketWriter {
     sessionCreatedAt?: string,
     recorderWwuid?: string
   ): Promise<void> {
+    this.ensureDirectories();
     const sessionRecordPath = path.join(
       this.stagedDir,
       'storage',
