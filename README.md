@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.48
+**Current version:** 0.31.49
 
 ---
 
 ## What's New
+
+**v0.31.49** — Town-scope filter: remove alias-basename fallback — sessions from any other project that happened to share the same folder name (e.g. an old `wildwest-vscode` checkout) no longer appear. Exact `project_path` match only.
 
 **v0.31.48** — Sessions › Older: grouped by month (This month / Last month / Month YYYY), each collapsible. Items within a month show `MMM D` date prefix. Town-scope filter: ancestor-match removed from both session list and tool counter — only exact path or alias basename passes.
 

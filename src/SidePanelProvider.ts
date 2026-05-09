@@ -260,18 +260,14 @@ export class SidePanelProvider
 
       // ── Scope filter ──────────────────────────────────────────────────────
       const townRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
-      const { scope, filterPath, alias } = this.readRegistryScope();
-      let countyRoot: string | null = null;
-      if (scope === 'town') {
-        countyRoot = this.findCountyRoot(townRoot);
-      }
+      const { scope, filterPath } = this.readRegistryScope();
+      const countyRoot: string | null = scope === 'county' ? this.findCountyRoot(townRoot) : null;
       const scopeFilter = (session: S): boolean => {
         const pp = (session['project_path'] as string) || '';
         if (scope === 'town') {
-          // Exact path match or alias basename match (handles reorganized/moved paths).
-          // Ancestor match intentionally excluded: broad paths (world/county roots) must not
-          // bleed into a town-scoped session list.
-          return pp === townRoot || path.basename(pp) === alias;
+          // Exact path match only. Basename match removed — any old project
+          // with the same folder name would produce false positives.
+          return pp === townRoot;
         }
         if (scope === 'county') {
           const root = filterPath ?? countyRoot;
@@ -426,12 +422,12 @@ export class SidePanelProvider
     try {
       if (!fs.existsSync(indexPath)) return {};
       const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
-      const { scope, filterPath, alias } = this.readRegistryScope();
       const townRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+      const { scope, filterPath } = this.readRegistryScope();
       const scopeFilter = (session: Record<string, unknown>): boolean => {
         const pp = (session['project_path'] as string) || '';
         if (scope === 'town') {
-          return pp === townRoot || path.basename(pp) === alias;
+          return pp === townRoot;
         }
         if (scope === 'county') {
           return filterPath !== null && (pp === filterPath || pp.startsWith(filterPath + path.sep));
