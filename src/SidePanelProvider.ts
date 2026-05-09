@@ -318,9 +318,10 @@ export class SidePanelProvider
       .map(([tool, count]) => toolBadge(`  ${TOOL_LABELS[tool] ?? tool}`, count));
 
     const recentTotal = counts.today + counts.yesterday + counts.last7d;
-    const totalItem = new SidePanelItem(`Total   ${recentTotal}`, vscode.TreeItemCollapsibleState.None);
+    const allTotal = recentTotal + counts.older;
+    const totalItem = new SidePanelItem(`Recent   ${recentTotal}  /  All   ${allTotal}`, vscode.TreeItemCollapsibleState.None);
     totalItem.iconPath = new vscode.ThemeIcon('pulse');
-    totalItem.tooltip = `Today (${counts.today}) + Yesterday (${counts.yesterday}) + Last 7 days (${counts.last7d})`;
+    totalItem.tooltip = `Recent (last 8 days): Today (${counts.today}) + Yesterday (${counts.yesterday}) + Last 7 days (${counts.last7d})\nAll time: ${allTotal}`;
 
     return [
       watcherItem,

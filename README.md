@@ -2,11 +2,15 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.28
+**Current version:** 0.31.34
 
 ---
 
 ## What's New
+
+**v0.31.34** — Sessions section: rename `Total` row to `Recent  N  /  All  N` — shows recent (last 8 days) and all-time counts side by side. Tooltip breaks down recent as Today + Yesterday + Last 7 days.
+
+**v0.31.33** — Sessions section: add `Total` stat row showing today + yesterday + last 7 days combined (recent window). Tooltip shows per-bucket breakdown. Stale CCX duplicate records (71 records with `.jsonl`-suffixed tool_sid) cleaned from staged storage.
 
 **v0.31.32** — Cascading governance scope filter: town scope now shows direct-match sessions (basename === alias) AND ancestor-match sessions (project_path is a parent of the workspace, e.g. `~/wildwest` world root). Governance is recursive — world/county sessions cascade down to constituent towns. CLD `project_path` preserved as-is (scope level is meaningful data, not a bug).
 
