@@ -145,14 +145,17 @@ export class SessionExportPipeline {
       };
       await this.packetWriter.applyPacketToStorage(
         packet,
-        // Preserve raw project_path — governance is cascading so scope level is meaningful.
+        // Use raw project_path from session metadata (governance is cascading: scope level is meaningful).
         // e.g. cld projectPath=~/wildwest is world-scope and cascades to all towns.
-        metadata.project_path || this.projectPath,
+        // Do NOT fall back to this.projectPath — sessions with no workspace info must not be
+        // falsely attributed to the currently active workspace.
+        metadata.project_path,
         metadata.session_type,
         {
           type: getCursorType(tool),
           value: turnsForPacket[turnsForPacket.length - 1].meta?.tool_cursor_value || turnsForPacket[turnsForPacket.length - 1].turn_index,
-        }
+        },
+        metadata.created_at
       );
     } catch (error) {
       throw new Error(`Storage update failed: ${error}`);

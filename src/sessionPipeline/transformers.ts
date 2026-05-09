@@ -54,6 +54,7 @@ export interface ISessionTransformer {
   getSessionMetadata(rawSession: unknown): {
     project_path: string;
     session_type: 'chat' | 'edit';
+    created_at?: string;
   };
 }
 
@@ -163,9 +164,14 @@ export class CopilotTransformer implements ISessionTransformer {
 
   getSessionMetadata(rawSession: unknown) {
     const session = rawSession as Record<string, unknown>;
+    const rawCreationDate = session['creationDate'];
+    const created_at = typeof rawCreationDate === 'number'
+      ? new Date(rawCreationDate).toISOString()
+      : undefined;
     return {
       project_path: (session['workspaceFolder'] as string) || '',
       session_type: 'chat' as const,
+      created_at,
     };
   }
 
@@ -174,8 +180,32 @@ export class CopilotTransformer implements ISessionTransformer {
       return [{ kind: 'text' as const, content }];
     }
 
-    // If content has structured parts (thinking + text)
+    // Copilot response format: array of typed items
+    // Text items have no kind (null/absent); value field holds markdown text
+    // Thinking items have kind='thinking'; value field holds reasoning text
+    if (Array.isArray(content)) {
+      const parts: ContentPart[] = [];
+      for (const item of content as Record<string, unknown>[]) {
+        const kind = item['kind'];
+        if (kind === 'thinking') {
+          parts.push({ kind: 'thinking' as const, content: (item['value'] as string) || '' });
+        } else if (!kind) {
+          parts.push({ kind: 'text' as const, content: (item['value'] as string) || '' });
+        }
+        // Skip: progressTaskSerialized, mcpServersStarting, prepareToolInvocation,
+        //        toolInvocationSerialized, codeblockUri, unknown, etc.
+      }
+      return parts.length > 0 ? parts : [{ kind: 'text' as const, content: '' }];
+    }
+
+    // Copilot message (user) format: {text: '...', parts: [editor ranges...]}
+    // Top-level 'text' is the canonical user input
     const structured = content as Record<string, unknown>;
+    if (typeof structured['text'] === 'string') {
+      return [{ kind: 'text' as const, content: structured['text'] }];
+    }
+
+    // Older format: dict with explicit parts array (thinking + text)
     if (structured['parts'] && Array.isArray(structured['parts'])) {
       return (structured['parts'] as Record<string, unknown>[]).map((part) => ({
         kind: ((part['kind'] as PartKind | undefined) ?? 'text') as PartKind,
@@ -184,12 +214,25 @@ export class CopilotTransformer implements ISessionTransformer {
       }));
     }
 
-    return [{ kind: 'text' as const, content: JSON.stringify(content) }];
+    return [{ kind: 'text' as const, content: '' }];
   }
 
   private extractTextContent(content: unknown): string {
     if (typeof content === 'string') return content;
+
+    // Copilot response array: join null-kind items' 'value' fields
+    if (Array.isArray(content)) {
+      return (content as Record<string, unknown>[])
+        .filter((item) => !item['kind'])
+        .map((item) => (item['value'] as string) || '')
+        .join('');
+    }
+
     const structured = content as Record<string, unknown>;
+    // Copilot user message: text is in top-level 'text' field
+    if (typeof structured['text'] === 'string') return structured['text'];
+
+    // Older format: dict with parts
     if (structured['parts'] && Array.isArray(structured['parts'])) {
       return (structured['parts'] as Record<string, unknown>[])
         .filter((p) => p['kind'] === 'text' || !p['kind'])

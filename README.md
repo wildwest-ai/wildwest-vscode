@@ -8,6 +8,8 @@ Governance framework for AI-assisted development. Tracks dyad activity, exports 
 
 ## What's New
 
+**v0.31.51** — Session pipeline: fix three `CopilotTransformer` bugs: (1) response content extraction now correctly reads array-format responses (null-kind items' `value` field) and user messages (`text` field); (2) `project_path` no longer falls back to active workspace for sessions with no `workspaceFolder` in raw data — false attributions eliminated; (3) `created_at` now uses `session.creationDate` instead of first-turn timestamp.
+
 **v0.31.50** — Sessions: click any session row to open its JSON file (`staged/storage/sessions/<wwuid>.json`) in the editor.
 
 **v0.31.49** — Town-scope filter: remove alias-basename fallback — sessions from any other project that happened to share the same folder name (e.g. an old `wildwest-vscode` checkout) no longer appear. Exact `project_path` match only.
