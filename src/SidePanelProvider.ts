@@ -197,6 +197,9 @@ export class SidePanelProvider
       case 'sessions:last7d':   return this.sessionLast7dChildren();
       case 'sessions:older':    return this.sessionOlderChildren();
       default:
+        if (sectionId.startsWith('sessions:tool:')) {
+          return this.sessionToolChildren(sectionId.slice('sessions:tool:'.length));
+        }
         if (sectionId.startsWith('sessions:last7d:')) {
           return this.sessionDateChildren(sectionId.slice('sessions:last7d:'.length));
         }
@@ -443,20 +446,19 @@ export class SidePanelProvider
       item.iconPath = new vscode.ThemeIcon('history');
       return item;
     };
-    const toolBadge = (lbl: string, count: number): SidePanelItem => {
-      const item = new SidePanelItem(`${lbl}   ${count}`, vscode.TreeItemCollapsibleState.None);
-      item.iconPath = new vscode.ThemeIcon('robot');
-      return item;
-    };
-
     const TOOL_LABELS: Record<string, string> = {
       cpt: 'Copilot',
       cld: 'Claude',
       ccx: 'Codex',
     };
+    const TOOL_ICONS: Record<string, string> = { cpt: 'github', cld: 'comment-discussion', ccx: 'circuit-board' };
     const toolRows = Object.entries(counts.byTool)
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([tool, count]) => toolBadge(`  ${TOOL_LABELS[tool] ?? tool}`, count));
+      .map(([tool, count]) => {
+        const item = new SidePanelItem(`  ${TOOL_LABELS[tool] ?? tool}   ${count}`, vscode.TreeItemCollapsibleState.Collapsed, `sessions:tool:${tool}`);
+        item.iconPath = new vscode.ThemeIcon(TOOL_ICONS[tool] ?? 'robot');
+        return item;
+      });
 
     const recentTotal = counts.today + counts.yesterday + counts.last7d;
     const allTotal = recentTotal + counts.older;
@@ -465,11 +467,11 @@ export class SidePanelProvider
     recentItem.tooltip = `Recent (last 8 days): Today (${counts.today}) + Yesterday (${counts.yesterday}) + Last 7 days (${counts.last7d})\nAll time: ${allTotal}`;
 
     return [
-      watcherItem,
       sortItem,
       recentItem,
       makeBucket('Older', 'sessions:older', counts.older, counts.olderTurns),
       ...toolRows,
+      watcherItem,
     ];
   }
 
@@ -635,6 +637,16 @@ export class SidePanelProvider
       return [new SidePanelItem('(none)', vscode.TreeItemCollapsibleState.None)];
     }
     return sessions.map((s) => this.sessionRow(s));
+  }
+
+  private sessionToolChildren(tool: string): SidePanelItem[] {
+    const data = this.loadAndBucketSessions(this.sessionSortBy);
+    const all = [...data.today, ...data.yesterday, ...data.last7d, ...data.older]
+      .filter((s) => (s['tool'] as string) === tool);
+    if (all.length === 0) {
+      return [new SidePanelItem('(none)', vscode.TreeItemCollapsibleState.None)];
+    }
+    return all.map((s) => this.sessionRow(s, true));
   }
 
   private sessionRow(s: Record<string, unknown>, showDate = false): SidePanelItem {
