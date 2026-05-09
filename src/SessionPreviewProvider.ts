@@ -143,7 +143,7 @@ function renderSessionMarkdown(s: Record<string, unknown>): string {
     const timeStr = timestamp
       ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : '';
-    const heading = role === 'user' ? '### Human' : '### Assistant';
+    const heading = role === 'user' ? '### User' : `### ${toolName}`;
     const timeLabel = timeStr ? `  ·  ${timeStr}` : '';
 
     if (i > 0) lines.push('', '---', '');
