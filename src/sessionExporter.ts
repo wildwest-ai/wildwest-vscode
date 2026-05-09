@@ -62,10 +62,13 @@ export class SessionExporter {
     try {
       const gitUsername = this.getGitUsername();
       const privacyMode = vscode.workspace.getConfiguration('wildwest').get<boolean>('privacy.enabled', false);
+      const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath;
+      const recorderWwuid = this.readRegistryWwuid(workspacePath);
       this.pipelineAdapter = new PipelineAdapter({
         sessionsDir: this.exportPath,
         author: gitUsername,
-        projectPath: vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath,
+        projectPath: workspacePath,
+        recorderWwuid,
         privacyMode,
         homeDir: this.userHome,
       });
@@ -193,6 +196,18 @@ export class SessionExporter {
 
   private getClaudeProjectsPath(userHome: string): string {
     return path.join(userHome, '.claude', 'projects');
+  }
+
+  private readRegistryWwuid(workspacePath?: string): string {
+    if (!workspacePath) return '';
+    try {
+      const registryPath = path.join(workspacePath, '.wildwest', 'registry.json');
+      if (!fs.existsSync(registryPath)) return '';
+      const reg = JSON.parse(fs.readFileSync(registryPath, 'utf8')) as Record<string, unknown>;
+      return (reg['wwuid'] as string) || '';
+    } catch {
+      return '';
+    }
   }
 
   private getGitUsername(): string {

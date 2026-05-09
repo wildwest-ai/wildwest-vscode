@@ -169,7 +169,8 @@ export class PacketWriter {
     projectPath: string,
     sessionType: 'chat' | 'edit',
     toolCursor?: unknown,
-    sessionCreatedAt?: string
+    sessionCreatedAt?: string,
+    recorderWwuid?: string
   ): Promise<void> {
     const sessionRecordPath = path.join(
       this.stagedDir,
@@ -193,6 +194,7 @@ export class PacketWriter {
         author: packet.author,
         device_id: packet.device_id,
         session_type: sessionType,
+        recorder_wwuid: recorderWwuid ?? '',
         project_path: projectPath,
         created_at: sessionCreatedAt ?? firstTurnTimestamp,
         last_turn_at: lastTurnTimestamp,
@@ -258,6 +260,7 @@ export class PacketWriter {
       author: record.author,
       device_id: record.device_id,
       session_type: record.session_type,
+      recorder_wwuid: record.recorder_wwuid ?? '',
       project_path: record.project_path,
       created_at: record.created_at,
       last_turn_at: record.last_turn_at,

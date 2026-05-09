@@ -2,13 +2,15 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.56
+**Current version:** 0.31.58
 
 ---
 
 ## What's New
 
-**v0.31.56** — Fix `toolSpecificData.cwd` extraction: VSCode URI dicts use `path` key (not always `fsPath`). Fall back to `path` when `fsPath` is absent. Revert v0.31.56-rc aggressive rebuildIndex re-attribution (it stole sessions from other workspace windows); rebuildIndex now only patches `cpt` sessions with empty `project_path`.
+**v0.31.58** — Session attribution now anchored to `recorder_wwuid` (the recording town's `.wildwest/registry.json` wwuid) instead of fragile `project_path` inference. The side panel filters by `recorder_wwuid` for town scope — unambiguous, set at export time, unaffected by multi-workspace Copilot sessions. `rebuildIndex` stamps missing `recorder_wwuid` on existing records (migration). Fallback to `project_path` for pre-migration records.
+
+**v0.31.56/v0.31.57** — Fix `toolSpecificData.cwd` extraction: VSCode URI dicts use `path` key (not always `fsPath`). Revert aggressive rebuildIndex re-attribution that stole sessions from other workspace windows.
 
 **v0.31.55** — (skipped — incomplete fix)
 

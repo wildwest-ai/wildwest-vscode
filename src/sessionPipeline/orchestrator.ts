@@ -30,6 +30,11 @@ export interface PipelineOptions {
    */
   projectPath?: string;
   /**
+   * wwuid from the recording town's .wildwest/registry.json.
+   * Used as the stable session attribution key — avoids fragile project_path inference.
+   */
+  recorderWwuid?: string;
+  /**
    * When true, redact secrets, tokens, and absolute paths from turn
    * content before writing packets (default: false).
    */
@@ -53,6 +58,7 @@ export class SessionExportPipeline {
   private sessionsDir: string;
   private author: string;
   private projectPath: string;
+  private recorderWwuid: string;
   private stagedDir: string;
   private packetWriter: PacketWriter;
   private device_id: string;
@@ -63,6 +69,7 @@ export class SessionExportPipeline {
     this.sessionsDir = options.sessionsDir;
     this.author = options.author;
     this.projectPath = options.projectPath || '';
+    this.recorderWwuid = options.recorderWwuid || '';
     this.stagedDir = path.join(this.sessionsDir, 'staged');
     this.device_id = generateDeviceId();
     this.privacyMode = options.privacyMode ?? false;
@@ -159,7 +166,8 @@ export class SessionExportPipeline {
           type: getCursorType(tool),
           value: turnsForPacket[turnsForPacket.length - 1].meta?.tool_cursor_value || turnsForPacket[turnsForPacket.length - 1].turn_index,
         },
-        metadata.created_at
+        metadata.created_at,
+        this.recorderWwuid
       );
     } catch (error) {
       throw new Error(`Storage update failed: ${error}`);
@@ -212,6 +220,13 @@ export class SessionExportPipeline {
    */
   getAuthor(): string {
     return this.author;
+  }
+
+  /**
+   * Get recorderWwuid (from recording town's .wildwest/registry.json)
+   */
+  getRecorderWwuid(): string {
+    return this.recorderWwuid;
   }
 
   /**

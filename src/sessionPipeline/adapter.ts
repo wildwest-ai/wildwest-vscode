@@ -18,6 +18,7 @@ export interface PipelineAdapterOptions {
   sessionsDir: string;
   author: string;
   projectPath?: string;
+  recorderWwuid?: string;
   privacyMode?: boolean;
   homeDir?: string;
 }
@@ -40,6 +41,7 @@ export class PipelineAdapter {
       sessionsDir: options.sessionsDir,
       author: options.author,
       projectPath: options.projectPath,
+      recorderWwuid: options.recorderWwuid,
       privacyMode: options.privacyMode ?? false,
       homeDir: options.homeDir,
     });
@@ -197,6 +199,7 @@ export class PipelineAdapter {
   rebuildIndexFromRecords(): number {
     const stagedDir = this.pipeline.getStagedDir();
     const workspaceRoot = this.pipeline.getProjectPath();
+    const recorderWwuid = this.pipeline.getRecorderWwuid();
     const sessionsDir = path.join(stagedDir, 'storage', 'sessions');
     const indexPath = path.join(stagedDir, 'storage', 'index.json');
     const rawDir = path.join(stagedDir, '..', 'raw');
@@ -274,6 +277,12 @@ export class PipelineAdapter {
           }
         }
 
+        // Stamp recorder_wwuid on records that lack it (migration for existing records)
+        if (!record['recorder_wwuid'] && recorderWwuid) {
+          record['recorder_wwuid'] = recorderWwuid;
+          dirty = true;
+        }
+
         // Persist any patches back to disk
         if (dirty) {
           fs.writeFileSync(path.join(sessionsDir, file), JSON.stringify(record, null, 2), 'utf8');
@@ -287,6 +296,7 @@ export class PipelineAdapter {
           author: record['author'],
           device_id: record['device_id'],
           session_type: record['session_type'],
+          recorder_wwuid: record['recorder_wwuid'] ?? '',
           project_path: record['project_path'],
           created_at: record['created_at'],
           last_turn_at: record['last_turn_at'],

@@ -199,9 +199,9 @@ export class SidePanelProvider
    * Returns { scope, label, filterPath, alias } where filterPath is the prefix to match
    * against session.project_path (for county), alias is the town/county name.
    */
-  private readRegistryScope(): { scope: string; label: string; filterPath: string | null; alias: string } {
+  private readRegistryScope(): { scope: string; label: string; filterPath: string | null; alias: string; wwuid: string } {
     const townRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
-    const fallback = { scope: 'territory', label: 'Territory', filterPath: null, alias: '' };
+    const fallback = { scope: 'territory', label: 'Territory', filterPath: null, alias: '', wwuid: '' };
     if (!townRoot) return fallback;
     try {
       const regPath = path.join(townRoot, '.wildwest', 'registry.json');
@@ -209,13 +209,14 @@ export class SidePanelProvider
       const reg = JSON.parse(fs.readFileSync(regPath, 'utf8')) as Record<string, unknown>;
       const scope = (reg['scope'] as string) || 'territory';
       const alias = (reg['alias'] as string) || path.basename(townRoot);
+      const wwuid = (reg['wwuid'] as string) || '';
       if (scope === 'town') {
-        return { scope, label: alias, filterPath: townRoot, alias };
+        return { scope, label: alias, filterPath: townRoot, alias, wwuid };
       }
       if (scope === 'county') {
-        return { scope, label: alias, filterPath: townRoot, alias };
+        return { scope, label: alias, filterPath: townRoot, alias, wwuid };
       }
-      return { scope: 'territory', label: alias, filterPath: null, alias };
+      return { scope: 'territory', label: alias, filterPath: null, alias, wwuid };
     } catch {
       return fallback;
     }
@@ -260,15 +261,19 @@ export class SidePanelProvider
 
       // ── Scope filter ──────────────────────────────────────────────────────
       const townRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
-      const { scope, filterPath } = this.readRegistryScope();
+      const { scope, filterPath, wwuid: townWwuid } = this.readRegistryScope();
       const countyRoot: string | null = scope === 'county' ? this.findCountyRoot(townRoot) : null;
       const scopeFilter = (session: S): boolean => {
-        const pp = (session['project_path'] as string) || '';
         if (scope === 'town') {
-          return pp === townRoot;
+          // Primary: match by recorder_wwuid (stable, set at export time)
+          const rw = (session['recorder_wwuid'] as string) || '';
+          if (rw && townWwuid) return rw === townWwuid;
+          // Fallback: project_path match for records pre-dating recorder_wwuid
+          return (session['project_path'] as string) === townRoot;
         }
         if (scope === 'county') {
           const root = filterPath ?? countyRoot;
+          const pp = (session['project_path'] as string) || '';
           return root !== null && (pp === root || pp.startsWith(root + path.sep));
         }
         return true; // territory
@@ -421,13 +426,15 @@ export class SidePanelProvider
       if (!fs.existsSync(indexPath)) return {};
       const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
       const townRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
-      const { scope, filterPath } = this.readRegistryScope();
+      const { scope, filterPath, wwuid: townWwuid } = this.readRegistryScope();
       const scopeFilter = (session: Record<string, unknown>): boolean => {
-        const pp = (session['project_path'] as string) || '';
         if (scope === 'town') {
-          return pp === townRoot;
+          const rw = (session['recorder_wwuid'] as string) || '';
+          if (rw && townWwuid) return rw === townWwuid;
+          return (session['project_path'] as string) === townRoot;
         }
         if (scope === 'county') {
+          const pp = (session['project_path'] as string) || '';
           return filterPath !== null && (pp === filterPath || pp.startsWith(filterPath + path.sep));
         }
         return true;

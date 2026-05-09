@@ -85,6 +85,7 @@ export interface SessionRecord {
   author: string;
   device_id: string;
   session_type: 'chat' | 'edit'; // 'edit' reserved for copilot-edits (future)
+  recorder_wwuid: string; // wwuid of the town registry that recorded this session
   project_path: string;
   created_at: string; // ISO 8601 UTC
   last_turn_at: string; // ISO 8601 UTC
@@ -107,6 +108,7 @@ export interface IndexEntry {
   author: string;
   device_id: string;
   session_type: 'chat' | 'edit';
+  recorder_wwuid: string; // wwuid of the town registry that recorded this session
   project_path: string;
   created_at: string; // ISO 8601 UTC
   last_turn_at: string; // ISO 8601 UTC
