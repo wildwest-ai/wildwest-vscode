@@ -275,22 +275,21 @@ export class SidePanelProvider
       if (info.scope === 'town') {
         if (info.wwuid) {
           if (scopeRefs.length > 0) {
-            // Session belongs to this town if:
-            //   1. Raw signals: any signal_count > 0 means the session actively used this town's workspace.
-            //      We don't require being the primary — multi-workspace sessions should show in all
-            //      towns where the user did meaningful work.
-            //   2. Editorial override (null signal_count from session-map): accept only if no other town
-            //      has raw signals, to avoid seeded overrides appearing for sessions that are clearly
-            //      attributed to a different primary town by raw evidence.
+            // Session belongs to this town if it has raw signal evidence (signal_count > 0)
+            // and was recorded at town level (not county or territory).
+            //
+            // County/territory sessions don't belong in individual town views even if they
+            // incidentally referenced town files — they belong in the county/territory view.
+            //
+            // Null signal_count means the workspace was present in the session but had no
+            // raw signal hits. This is too weak to claim the session — reject.
             const townRefs = scopeRefs.filter((ref) => ref.scope === 'town');
             const thisRef = townRefs.find((ref) => ref.wwuid === info.wwuid);
             if (!thisRef) return false;
             const sc = thisRef.signal_count;
-            if (sc == null) {
-              // Editorial override — only accept if no competing town has raw signal presence
-              return !townRefs.some((r) => r.wwuid !== info.wwuid && (r.signal_count ?? 0) > 0);
-            }
-            return sc > 0;
+            if (sc == null || sc <= 0) return false;
+            if (recorderScope === 'county' || recorderScope === 'territory') return false;
+            return true;
           }
           if (recorderScope) return recorderScope === 'town' && recorderWwuid === info.wwuid;
           if (workspaceWwuids.includes(info.wwuid) || recorderWwuid === info.wwuid) return true;
