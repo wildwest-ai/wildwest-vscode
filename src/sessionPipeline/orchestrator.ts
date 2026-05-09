@@ -223,19 +223,29 @@ export class SessionExportPipeline {
 
   /**
    * Infer project_path for a Copilot session that lacks a workspaceFolder field.
-   * Scans all requests' contentReferences for fsPath values; if any file lives
-   * inside workspaceRoot, returns workspaceRoot. Otherwise returns ''.
+   * Checks (in order):
+   *   1. contentReferences[].reference.fsPath — attached file/folder references
+   *   2. response[].toolSpecificData.cwd      — tool invocation working directory
+   * Returns workspaceRoot if any evidence points there, otherwise ''.
    */
   private inferCptProjectPath(rawSession: unknown, workspaceRoot: string): string {
     const session = rawSession as Record<string, unknown>;
     const requests = (session['requests'] as Record<string, unknown>[]) ?? [];
-    const prefix = workspaceRoot.endsWith(path.sep) ? workspaceRoot : workspaceRoot + path.sep;
+    const prefix = workspaceRoot + path.sep;
     for (const req of requests) {
+      // 1. contentReferences
       const refs = (req['contentReferences'] as Record<string, unknown>[]) ?? [];
       for (const ref of refs) {
-        const reference = (ref['reference'] as Record<string, unknown>) ?? {};
-        const fsPath = (reference['fsPath'] as string) ?? '';
+        const fsPath = ((ref['reference'] as Record<string, unknown>)?.['fsPath'] as string) ?? '';
         if (fsPath && (fsPath === workspaceRoot || fsPath.startsWith(prefix))) {
+          return workspaceRoot;
+        }
+      }
+      // 2. toolSpecificData.cwd in response items
+      const response = (req['response'] as Record<string, unknown>[]) ?? [];
+      for (const item of response) {
+        const cwd = ((item['toolSpecificData'] as Record<string, unknown>)?.['cwd'] as string) ?? '';
+        if (cwd && (cwd === workspaceRoot || cwd.startsWith(prefix))) {
           return workspaceRoot;
         }
       }

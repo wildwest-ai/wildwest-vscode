@@ -231,8 +231,8 @@ export class PipelineAdapter {
           }
         }
 
-        // cpt: patch empty project_path using contentReferences (Copilot sessions have
-        // no workspaceFolder field; infer workspace from referenced file paths instead).
+        // cpt: patch empty project_path by scanning contentReferences and
+        // toolSpecificData.cwd in response items (Copilot has no workspaceFolder field).
         if (record['tool'] === 'cpt' && !record['project_path'] && workspaceRoot) {
           const sid = record['tool_sid'] as string;
           const rawPath = path.join(rawDir, 'github-copilot', `${sid}.json`);
@@ -242,11 +242,21 @@ export class PipelineAdapter {
               const requests = (raw['requests'] as Record<string, unknown>[]) ?? [];
               const prefix = workspaceRoot + path.sep;
               outer: for (const req of requests) {
+                // 1. contentReferences
                 const refs = (req['contentReferences'] as Record<string, unknown>[]) ?? [];
                 for (const ref of refs) {
-                  const reference = (ref['reference'] as Record<string, unknown>) ?? {};
-                  const fsPath = (reference['fsPath'] as string) ?? '';
+                  const fsPath = ((ref['reference'] as Record<string, unknown>)?.['fsPath'] as string) ?? '';
                   if (fsPath && (fsPath === workspaceRoot || fsPath.startsWith(prefix))) {
+                    record['project_path'] = workspaceRoot;
+                    dirty = true;
+                    break outer;
+                  }
+                }
+                // 2. toolSpecificData.cwd in response items
+                const response = (req['response'] as Record<string, unknown>[]) ?? [];
+                for (const item of response) {
+                  const cwd = ((item['toolSpecificData'] as Record<string, unknown>)?.['cwd'] as string) ?? '';
+                  if (cwd && (cwd === workspaceRoot || cwd.startsWith(prefix))) {
                     record['project_path'] = workspaceRoot;
                     dirty = true;
                     break outer;

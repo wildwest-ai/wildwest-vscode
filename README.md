@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.52
+**Current version:** 0.31.53
 
 ---
 
 ## What's New
+
+**v0.31.54** — Copilot workspace inference: also scan `response[].toolSpecificData.cwd` (in addition to `contentReferences`) to attribute Copilot sessions. Fixes older sessions that used tool invocations (e.g. terminal commands) as the only workspace evidence. Applies to both live pipeline and `rebuildIndex`.
 
 **v0.31.53** — Fix Copilot sessions missing from town panel. v0.31.51 removed the `project_path` fallback entirely, leaving all `cpt` sessions with an empty path. Now the orchestrator infers `project_path` from `contentReferences` `fsPath` values — if any referenced file lives in the current workspace, the session is attributed to it. `rebuildIndex` also patches existing empty-path `cpt` records. Town-scope filter reverted to exact-match only.
 
