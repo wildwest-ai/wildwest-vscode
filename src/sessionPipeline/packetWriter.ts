@@ -244,6 +244,20 @@ export class PacketWriter {
     this.updateIndex(record);
   }
 
+  patchIndexEntry(wwuid: string, projectPath: string, recorderWwuid: string): void {
+    const indexPath = path.join(this.stagedDir, 'storage', 'index.json');
+    if (!fs.existsSync(indexPath)) return;
+    try {
+      const index = JSON.parse(fs.readFileSync(indexPath, 'utf8')) as { sessions: Record<string, unknown>[] };
+      const entry = index.sessions.find((s) => s['wwuid'] === wwuid);
+      if (entry && !entry['recorder_wwuid'] && !entry['project_path']) {
+        entry['recorder_wwuid'] = recorderWwuid;
+        entry['project_path'] = projectPath;
+        fs.writeFileSync(indexPath, JSON.stringify(index, null, 2), 'utf8');
+      }
+    } catch { /* skip */ }
+  }
+
   private updateIndex(record: SessionRecord): void {
     const indexPath = path.join(this.stagedDir, 'storage', 'index.json');
 

@@ -121,7 +121,18 @@ export class SessionExportPipeline {
     const newTurns = this.filterNewTurns(wwuid, filteredTurns);
 
     if (newTurns.length === 0 && !closed) {
-      // No new turns and not closed — skip packet
+      // No new turns — but try to patch attribution on the existing record if this
+      // window can claim it (recorder_wwuid or project_path not yet set).
+      if (this.recorderWwuid || this.projectPath) {
+        let resolvedProjectPath = metadata.project_path;
+        if (!resolvedProjectPath && tool === 'cpt' && this.projectPath) {
+          resolvedProjectPath = this.inferCptProjectPath(rawSession, this.projectPath);
+        }
+        const isOwnSession = this.recorderWwuid && this.projectPath && resolvedProjectPath === this.projectPath;
+        if (isOwnSession) {
+          this.patchAttribution(wwuid, resolvedProjectPath, this.recorderWwuid);
+        }
+      }
       return;
     }
 
@@ -203,6 +214,26 @@ export class SessionExportPipeline {
 
     // Return turns after max existing
     return allTurns.filter((t) => t.turn_index > maxExisting);
+  }
+
+  /**
+   * Patch recorder_wwuid and project_path on an existing record when the current
+   * window can claim it but the record was written with empty attribution by another
+   * window that processed it first.
+   */
+  private patchAttribution(wwuid: string, projectPath: string, recorderWwuid: string): void {
+    const recordPath = path.join(this.stagedDir, 'storage', 'sessions', `${wwuid}.json`);
+    if (!fs.existsSync(recordPath)) return;
+    try {
+      const record = JSON.parse(fs.readFileSync(recordPath, 'utf8')) as Record<string, unknown>;
+      // Only patch if not already claimed by this or another workspace
+      if (record['recorder_wwuid'] || record['project_path']) return;
+      record['recorder_wwuid'] = recorderWwuid;
+      record['project_path'] = projectPath;
+      fs.writeFileSync(recordPath, JSON.stringify(record, null, 2), 'utf8');
+      // Also update the index entry
+      this.packetWriter.patchIndexEntry(wwuid, projectPath, recorderWwuid);
+    } catch { /* skip */ }
   }
 
   /**
