@@ -126,6 +126,7 @@ export class SidePanelProvider
       case 'history':   return this.memoItems(this.collectTelegraphFiles('history'));
       case 'board':     return this.boardChildren();
       case 'receipts':       return this.receiptsChildren();
+      case 'sessions:recent':  return this.sessionRecentChildren();
       case 'sessions:today':    return this.sessionBucketChildren('today');
       case 'sessions:yesterday': return this.sessionBucketChildren('yesterday');
       case 'sessions:last7d':   return this.sessionLast7dChildren();
@@ -319,18 +320,15 @@ export class SidePanelProvider
 
     const recentTotal = counts.today + counts.yesterday + counts.last7d;
     const allTotal = recentTotal + counts.older;
-    const totalItem = new SidePanelItem(`Recent   ${recentTotal}  /  All   ${allTotal}`, vscode.TreeItemCollapsibleState.None);
-    totalItem.iconPath = new vscode.ThemeIcon('pulse');
-    totalItem.tooltip = `Recent (last 8 days): Today (${counts.today}) + Yesterday (${counts.yesterday}) + Last 7 days (${counts.last7d})\nAll time: ${allTotal}`;
+    const recentItem = new SidePanelItem(`Recent   ${recentTotal}  /  All   ${allTotal}`, vscode.TreeItemCollapsibleState.Collapsed, 'sessions:recent');
+    recentItem.iconPath = new vscode.ThemeIcon('pulse');
+    recentItem.tooltip = `Recent (last 8 days): Today (${counts.today}) + Yesterday (${counts.yesterday}) + Last 7 days (${counts.last7d})\nAll time: ${allTotal}`;
 
     return [
       watcherItem,
       sortItem,
       scopeDisplay,
-      totalItem,
-      makeBucket('Today', 'sessions:today', counts.today),
-      makeBucket('Yesterday', 'sessions:yesterday', counts.yesterday),
-      makeBucket('Last 7 days', 'sessions:last7d', counts.last7d),
+      recentItem,
       makeBucket('Older', 'sessions:older', counts.older),
       ...toolRows,
     ];
@@ -340,6 +338,23 @@ export class SidePanelProvider
   private localDateStr(ts: string): string {
     const d = new Date(ts);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  private sessionRecentChildren(): SidePanelItem[] {
+    const counts = this.countStagedSessions(this.sessionSortBy);
+    const makeBucket = (lbl: string, sectionId: string, count: number): SidePanelItem => {
+      const state = count > 0
+        ? vscode.TreeItemCollapsibleState.Collapsed
+        : vscode.TreeItemCollapsibleState.None;
+      const item = new SidePanelItem(`${lbl}   ${count}`, state, sectionId);
+      item.iconPath = new vscode.ThemeIcon('history');
+      return item;
+    };
+    return [
+      makeBucket('Today', 'sessions:today', counts.today),
+      makeBucket('Yesterday', 'sessions:yesterday', counts.yesterday),
+      makeBucket('Last 7 days', 'sessions:last7d', counts.last7d),
+    ];
   }
 
   private sessionBucketChildren(bucket: 'today' | 'yesterday' | 'older'): SidePanelItem[] {
