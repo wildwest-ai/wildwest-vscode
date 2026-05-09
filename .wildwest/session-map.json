@@ -1,0 +1,863 @@
+{
+  "schema_version": "1",
+  "overrides": [
+    {
+      "tool_sid": "008f679c-cc81-4869-b578-80bfd9db3cbe",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-09"
+    },
+    {
+      "tool_sid": "0399c4c7-2ddd-42ee-a7b3-120881b47fe5",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-05"
+    },
+    {
+      "tool_sid": "080b9cc5-7531-48b3-841d-a5ac95f4ab08",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-05"
+    },
+    {
+      "tool_sid": "10431aa1-1162-4b06-beae-7c82b9ef45de",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-06"
+    },
+    {
+      "tool_sid": "12a834f1-1fae-487c-bef6-41787be96131",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-04-30"
+    },
+    {
+      "tool_sid": "1d66bf50-ee9a-498a-88cb-5d403fecbb73",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-01"
+    },
+    {
+      "tool_sid": "1d75d1ae-3d86-40ba-ae64-4416a80a5e58",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-09"
+    },
+    {
+      "tool_sid": "23c001a8-e2ce-4fd3-a1d5-d04a955de878",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-04-30, content-path"
+    },
+    {
+      "tool_sid": "27848317-0840-4090-9ff5-47fc8160d616",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-08"
+    },
+    {
+      "tool_sid": "2797d6d1-49f3-4f92-8b52-3e6851699ba8",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-06, content-path"
+    },
+    {
+      "tool_sid": "29d1a218-d92e-421b-bb2b-81d805d28d87",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-05, content-path"
+    },
+    {
+      "tool_sid": "2f32b1bd-36ce-4507-a433-54fd58cc0454",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-04-28"
+    },
+    {
+      "tool_sid": "330a9cda-285b-48c9-bf17-b01e39c2cbcb",
+      "tool": "cld",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: content-path"
+    },
+    {
+      "tool_sid": "393cb2ef-668f-44f3-9781-c2cd86fc3040",
+      "tool": "cld",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: content-path"
+    },
+    {
+      "tool_sid": "394fac29-978d-4194-8544-73a58bdc8a0e",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-09"
+    },
+    {
+      "tool_sid": "396998cf-ba25-4729-a4ef-0bbe51f80e78",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-05"
+    },
+    {
+      "tool_sid": "3dd6b2d5-73dd-4d95-b17b-4988779a9978",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-08"
+    },
+    {
+      "tool_sid": "48fb7d22-c78a-4923-b747-3ca463d52606",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-05, content-path"
+    },
+    {
+      "tool_sid": "49e079bb-94b9-4cc7-8a57-22bc2ffc7555",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-09"
+    },
+    {
+      "tool_sid": "49e16a3d-813f-4c51-b280-7b46484d5b9a",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-05"
+    },
+    {
+      "tool_sid": "4b3fe288-61b5-4ee4-bf2b-53d03050cb2a",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-04-28"
+    },
+    {
+      "tool_sid": "5302dc7b-cdd7-4809-9d1c-dcb195f857f7",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-05"
+    },
+    {
+      "tool_sid": "533787c5-af3f-4dc7-ad77-602615b2ce83",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-02, content-path"
+    },
+    {
+      "tool_sid": "543c908d-be47-408f-8477-a403c16b8078",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-09"
+    },
+    {
+      "tool_sid": "54f60505-bb99-4837-af59-02c6320f68da",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-01, content-path"
+    },
+    {
+      "tool_sid": "5627f1a1-dc73-4a41-bd8c-59fd94caa849",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-08, content-path"
+    },
+    {
+      "tool_sid": "56af1546-a806-4da2-ac4d-feae1cee6e67",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-05"
+    },
+    {
+      "tool_sid": "5701790d-fc84-40b2-b351-bccf153e9aa7",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-03, content-path"
+    },
+    {
+      "tool_sid": "5b441d21-ab5c-4f24-a766-26c263e8d107",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-04-28"
+    },
+    {
+      "tool_sid": "5d29c09a-d155-477b-ade4-87dd77b0c03e",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-03"
+    },
+    {
+      "tool_sid": "5e1505d3-ce11-46a1-ad8f-8236235b8c97",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-06"
+    },
+    {
+      "tool_sid": "5f60b02c-1231-410d-94ee-0738033bb176",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-09"
+    },
+    {
+      "tool_sid": "6780ffd8-fa30-4fac-bcab-2f81e4f1c482",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-05, content-path"
+    },
+    {
+      "tool_sid": "6ad05acb-8748-47b8-b299-3637810ff7b5",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-01"
+    },
+    {
+      "tool_sid": "6c1e4b71-89b9-4e79-901d-a82bfbd18a5d",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-04-28"
+    },
+    {
+      "tool_sid": "70f9b616-3130-4205-b6ec-0225e51f6ce5",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-03, content-path"
+    },
+    {
+      "tool_sid": "71054e06-29cd-409f-8f2a-1410de19dda4",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-09"
+    },
+    {
+      "tool_sid": "74cd2401-3e7c-4140-a5d2-85a4a92a07b6",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-01"
+    },
+    {
+      "tool_sid": "750540e3-cd74-40c2-9a5e-fef6fcc83a06",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-09"
+    },
+    {
+      "tool_sid": "78bfc473-4235-44ab-b20b-fa67a13905cb",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-01, content-path"
+    },
+    {
+      "tool_sid": "7c64cacb-cdb7-40be-8c3c-a29f9bfd3e13",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-09, content-path"
+    },
+    {
+      "tool_sid": "7e8ecffe-bd7c-4411-a7be-8b40abd50d19",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-06, content-path"
+    },
+    {
+      "tool_sid": "80aa47c2-a50e-4526-828c-504ed321cdd2",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-05"
+    },
+    {
+      "tool_sid": "888c92e8-b429-4785-bed9-51d80e87cfc5",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-04, content-path"
+    },
+    {
+      "tool_sid": "91adb01b-d306-4f3a-8732-022d225d49cb",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-05"
+    },
+    {
+      "tool_sid": "9ba5c53d-4ffb-40fc-bddf-9b3cf9a0eebe",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-09"
+    },
+    {
+      "tool_sid": "9c1cd171-a750-426e-9edd-71603ca69445",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-05, content-path"
+    },
+    {
+      "tool_sid": "9e406ccd-76a5-472f-b1ba-8c23823bf44f",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-09"
+    },
+    {
+      "tool_sid": "a5806c71-9e92-445d-ba8f-0b4b3418b414",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-05"
+    },
+    {
+      "tool_sid": "a8742810-7dcc-4447-9a06-7321f7661abc",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-02"
+    },
+    {
+      "tool_sid": "b4eca633-ddea-4053-8aba-38bb97e72b85",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-06"
+    },
+    {
+      "tool_sid": "b92f2670-400d-4568-b403-3499e4666cc7",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-09"
+    },
+    {
+      "tool_sid": "ba853f5b-a7d0-435b-b072-52db32c3a4b5",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-06"
+    },
+    {
+      "tool_sid": "c5416468-d5ac-4ada-847d-f6d335bf973d",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-03"
+    },
+    {
+      "tool_sid": "c5f04388-474f-4cb5-9ccc-38e865f5be3a",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-03, content-path"
+    },
+    {
+      "tool_sid": "c82d4e73-354a-408b-aa68-c456c51a2048",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-06"
+    },
+    {
+      "tool_sid": "d5ed111c-511a-4a50-82ac-3d8f19161ba0",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-05, content-path"
+    },
+    {
+      "tool_sid": "d708d9f8-3b73-41a5-9acb-5e0a960ef271",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-02"
+    },
+    {
+      "tool_sid": "e2174d6a-9155-48de-8102-a4da196bd2d4",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-08"
+    },
+    {
+      "tool_sid": "e589305c-aae5-4e29-a1e0-1ccca8c96774",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-04-30"
+    },
+    {
+      "tool_sid": "eac1be2e-937a-4853-a457-2aee665b9d07",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-04-30"
+    },
+    {
+      "tool_sid": "ed3e77ad-9057-4aa1-9e1f-ff0ed3c26f51",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-01"
+    },
+    {
+      "tool_sid": "f76f409d-704f-46e8-ad0d-818751811d14",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-08"
+    },
+    {
+      "tool_sid": "f882000a-25b0-4653-b99b-fb7551b5803a",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-04-28"
+    },
+    {
+      "tool_sid": "f8a9de35-a537-4f25-8aa0-aedae54745d0",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-09"
+    },
+    {
+      "tool_sid": "fd53bc87-0336-4150-9cce-b1df846cacd1",
+      "tool": "cpt",
+      "inject_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2",
+          "alias": "wildwest-vscode",
+          "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
+        }
+      ],
+      "note": "seeded: git-day:2026-05-08"
+    }
+  ]
+}

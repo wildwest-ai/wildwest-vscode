@@ -2,11 +2,15 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.68
+**Current version:** 0.31.70
 
 ---
 
 ## What's New
+
+**v0.31.70** — Fix town sidebar over-matching. Town scope filter now only shows sessions where this town is the **primary** attribution (highest `signal_count` among all town `scope_refs`). Fixes Older showing sessions that merely mention the town as a secondary workspace but belong to another town.
+
+**v0.31.69** — Add `SessionMapService` + `SessionMapSeeder` for editorial session attribution overrides. `.wildwest/session-map.json` files inject `scope_refs` for sessions that predate automatic attribution (stale paths, pre-migration). New sidebar Utilities button: **Seed Session Map** — uses git log temporal matching + content path signals to backfill historical sessions. Seed before Rebuild Index to apply overrides.
 
 **v0.31.68** — Fix CPT session attribution for multi-workspace sessions. `resolveAttribution` now collects `scope_refs` for ALL workspaces with signals (not just the primary winner). Secondary towns like `wildwest-vscode` (143 signals) that lose the attribution battle to another town (495 signals) are now included in `scope_refs`, so town/county sidebar filters find them. Run Rebuild Index after installing to backfill older sessions.
 

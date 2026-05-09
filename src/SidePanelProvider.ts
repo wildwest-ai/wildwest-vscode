@@ -38,6 +38,7 @@ interface SidebarScopeInfo {
 interface SidebarScopeRef {
   scope?: string;
   wwuid?: string;
+  signal_count?: number;
 }
 
 export class SidePanelProvider
@@ -273,7 +274,14 @@ export class SidePanelProvider
 
       if (info.scope === 'town') {
         if (info.wwuid) {
-          if (scopeRefs.length > 0) return hasScopeRef('town', info.wwuid);
+          if (scopeRefs.length > 0) {
+            // Session belongs to this town only if it's the primary (highest signal_count among town refs)
+            const townRefs = scopeRefs.filter((ref) => ref.scope === 'town');
+            const thisRef = townRefs.find((ref) => ref.wwuid === info.wwuid);
+            if (!thisRef) return false;
+            const maxSignal = Math.max(...townRefs.map((ref) => ref.signal_count ?? 0));
+            return (thisRef.signal_count ?? 0) >= maxSignal;
+          }
           if (recorderScope) return recorderScope === 'town' && recorderWwuid === info.wwuid;
           if (workspaceWwuids.includes(info.wwuid) || recorderWwuid === info.wwuid) return true;
         }
