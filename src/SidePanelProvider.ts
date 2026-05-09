@@ -27,6 +27,19 @@ export class SidePanelItem extends vscode.TreeItem {
 
 const REFRESH_INTERVAL_MS = 10_000;
 
+interface SidebarScopeInfo {
+  scope: string;
+  label: string;
+  filterPath: string | null;
+  alias: string;
+  wwuid: string;
+}
+
+interface SidebarScopeRef {
+  scope?: string;
+  wwuid?: string;
+}
+
 export class SidePanelProvider
   implements vscode.TreeDataProvider<SidePanelItem>, vscode.Disposable
 {
@@ -199,7 +212,7 @@ export class SidePanelProvider
    * Returns { scope, label, filterPath, alias } where filterPath is the prefix to match
    * against session.project_path (for county), alias is the town/county name.
    */
-  private readRegistryScope(): { scope: string; label: string; filterPath: string | null; alias: string; wwuid: string } {
+  private readRegistryScope(): SidebarScopeInfo {
     const townRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
     const fallback = { scope: 'territory', label: 'Territory', filterPath: null, alias: '', wwuid: '' };
     if (!townRoot) return fallback;
@@ -220,6 +233,69 @@ export class SidePanelProvider
     } catch {
       return fallback;
     }
+  }
+
+  private pathContains(root: string | null, candidate: string): boolean {
+    if (!root || !candidate) return false;
+    return candidate === root || candidate.startsWith(root + path.sep);
+  }
+
+  private collectTownWwuidsInCounty(countyRoot: string | null): Set<string> {
+    const ids = new Set<string>();
+    if (!countyRoot) return ids;
+    try {
+      for (const entry of fs.readdirSync(countyRoot, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const regPath = path.join(countyRoot, entry.name, '.wildwest', 'registry.json');
+        if (!fs.existsSync(regPath)) continue;
+        const reg = JSON.parse(fs.readFileSync(regPath, 'utf8')) as Record<string, unknown>;
+        if (reg['scope'] !== 'town') continue;
+        const wwuid = (reg['wwuid'] as string) || '';
+        if (wwuid) ids.add(wwuid);
+      }
+    } catch { /* ignore unreadable county children */ }
+    return ids;
+  }
+
+  private buildSessionScopeFilter(): (session: Record<string, unknown>) => boolean {
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+    const info = this.readRegistryScope();
+    const countyRoot = info.scope === 'county' ? (info.filterPath ?? this.findCountyRoot(workspaceRoot)) : null;
+    const countyTownWwuids = info.scope === 'county' ? this.collectTownWwuidsInCounty(countyRoot) : new Set<string>();
+
+    return (session: Record<string, unknown>): boolean => {
+      const projectPath = (session['project_path'] as string) || '';
+      const workspaceWwuids = Array.isArray(session['workspace_wwuids'])
+        ? session['workspace_wwuids'] as string[]
+        : [];
+      const recorderWwuid = (session['recorder_wwuid'] as string) || '';
+      const scopeRefs = Array.isArray(session['scope_refs'])
+        ? session['scope_refs'] as SidebarScopeRef[]
+        : [];
+      const hasScopeRef = (scope: string, wwuid: string): boolean =>
+        scopeRefs.some((ref) => ref.scope === scope && ref.wwuid === wwuid);
+
+      if (info.scope === 'town') {
+        if (info.wwuid) {
+          if (hasScopeRef('town', info.wwuid)) return true;
+          if (workspaceWwuids.includes(info.wwuid) || recorderWwuid === info.wwuid) return true;
+        }
+        return this.pathContains(info.filterPath ?? workspaceRoot, projectPath);
+      }
+
+      if (info.scope === 'county') {
+        if (info.wwuid) {
+          if (hasScopeRef('county', info.wwuid)) return true;
+          if (workspaceWwuids.includes(info.wwuid) || recorderWwuid === info.wwuid) return true;
+        }
+        if (scopeRefs.some((ref) => ref.scope === 'town' && ref.wwuid && countyTownWwuids.has(ref.wwuid))) return true;
+        if (recorderWwuid && countyTownWwuids.has(recorderWwuid)) return true;
+        if (workspaceWwuids.some((wwuid) => countyTownWwuids.has(wwuid))) return true;
+        return this.pathContains(countyRoot, projectPath);
+      }
+
+      return true; // territory
+    };
   }
 
   /**
@@ -260,25 +336,7 @@ export class SidePanelProvider
       const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
 
       // ── Scope filter ──────────────────────────────────────────────────────
-      const townRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
-      const { scope, filterPath, wwuid: townWwuid } = this.readRegistryScope();
-      const countyRoot: string | null = scope === 'county' ? this.findCountyRoot(townRoot) : null;
-      const scopeFilter = (session: S): boolean => {
-        if (scope === 'town') {
-          if (!townWwuid) return (session['project_path'] as string) === townRoot;
-          const ww = (session['workspace_wwuids'] as string[]) || [];
-          if (ww.length > 0) return ww.includes(townWwuid);
-          const rw = (session['recorder_wwuid'] as string) || '';
-          if (rw) return rw === townWwuid;
-          return (session['project_path'] as string) === townRoot;
-        }
-        if (scope === 'county') {
-          const root = filterPath ?? countyRoot;
-          const pp = (session['project_path'] as string) || '';
-          return root !== null && (pp === root || pp.startsWith(root + path.sep));
-        }
-        return true; // territory
-      };
+      const scopeFilter = this.buildSessionScopeFilter();
       const dayMs = 86_400_000;
       const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
       const todayMs = todayStart.getTime();
@@ -426,23 +484,7 @@ export class SidePanelProvider
     try {
       if (!fs.existsSync(indexPath)) return {};
       const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
-      const townRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
-      const { scope, filterPath, wwuid: townWwuid } = this.readRegistryScope();
-      const scopeFilter = (session: Record<string, unknown>): boolean => {
-        if (scope === 'town') {
-          if (!townWwuid) return (session['project_path'] as string) === townRoot;
-          const ww = (session['workspace_wwuids'] as string[]) || [];
-          if (ww.length > 0) return ww.includes(townWwuid);
-          const rw = (session['recorder_wwuid'] as string) || '';
-          if (rw) return rw === townWwuid;
-          return (session['project_path'] as string) === townRoot;
-        }
-        if (scope === 'county') {
-          const pp = (session['project_path'] as string) || '';
-          return filterPath !== null && (pp === filterPath || pp.startsWith(filterPath + path.sep));
-        }
-        return true;
-      };
+      const scopeFilter = this.buildSessionScopeFilter();
       const dayMs = 86_400_000;
       const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
       const last7dMs = todayStart.getTime() - 7 * dayMs;

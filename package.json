@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
   },
-  "version": "0.31.64",
+  "version": "0.31.65",
   "publisher": "wildwest-ai",
   "engines": {
     "vscode": "^1.90.0"
@@ -336,5 +336,8 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "chokidar": "^3.5.3"
+  },
+  "volta": {
+    "node": "20.19.6"
   }
 }

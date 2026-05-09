@@ -12,7 +12,9 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { SessionExportPipeline } from './orchestrator';
+import { AttributionResult, SessionExportPipeline } from './orchestrator';
+import { getTransformer } from './transformers';
+import { ScopeRef } from './types';
 
 export interface PipelineAdapterOptions {
   sessionsDir: string;
@@ -32,9 +34,12 @@ const TOOL_RAW_DIRS: Record<string, string> = {
   ccx: 'chatgpt-codex',
 };
 
+type SessionTool = 'cld' | 'cpt' | 'ccx';
+
 export class PipelineAdapter {
   private pipeline: SessionExportPipeline;
   private lastProcessedMtime: Map<string, number> = new Map();
+  private attributionMigrationChecked = false;
 
   constructor(options: PipelineAdapterOptions) {
     this.pipeline = new SessionExportPipeline({
@@ -67,6 +72,8 @@ export class PipelineAdapter {
     const indexPath = path.join(this.pipeline.getStagedDir(), 'storage', 'index.json');
     if (!fs.existsSync(indexPath)) {
       this.rebuildIndexFromRecords();
+    } else {
+      this.rebuildIndexIfAttributionMigrationNeeded(indexPath);
     }
 
     for (const toolRawName of Object.values(TOOL_RAW_DIRS)) {
@@ -189,6 +196,78 @@ export class PipelineAdapter {
     return this.pipeline.getStagedDir();
   }
 
+  private mergeWwuids(...sources: Array<string[] | undefined>): string[] {
+    const ids = new Set<string>();
+    for (const source of sources) {
+      for (const id of source ?? []) {
+        if (id) ids.add(id);
+      }
+    }
+    return [...ids];
+  }
+
+  private mergeScopeRefs(...sources: Array<ScopeRef[] | undefined>): ScopeRef[] {
+    const refs = new Map<string, ScopeRef>();
+    for (const source of sources) {
+      for (const ref of source ?? []) {
+        if (!ref.wwuid || !ref.scope) continue;
+        const key = `${ref.scope}:${ref.wwuid}`;
+        const existing = refs.get(key);
+        if (!existing || (ref.signal_count ?? 0) > (existing.signal_count ?? 0)) {
+          refs.set(key, ref);
+        }
+      }
+    }
+    return [...refs.values()];
+  }
+
+  private findRawSessionPath(rawDir: string, tool: string, toolSid: string): string | null {
+    const rawName = TOOL_RAW_DIRS[tool];
+    if (!rawName) return null;
+    const candidates = [
+      path.join(rawDir, rawName, toolSid),
+      path.join(rawDir, rawName, toolSid.endsWith('.json') ? toolSid : `${toolSid}.json`),
+      path.join(rawDir, rawName, toolSid.endsWith('.jsonl') ? toolSid : `${toolSid}.jsonl`),
+    ];
+    return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
+  }
+
+  private resolveRawAttribution(rawDir: string, record: Record<string, unknown>): AttributionResult | null {
+    const tool = record['tool'] as SessionTool | undefined;
+    const toolSid = record['tool_sid'] as string | undefined;
+    if (!tool || !toolSid || !TOOL_RAW_DIRS[tool]) return null;
+    const rawPath = this.findRawSessionPath(rawDir, tool, toolSid);
+    if (!rawPath) return null;
+    try {
+      const transformer = getTransformer(tool);
+      const rawSession = transformer.parseRaw(fs.readFileSync(rawPath, 'utf8'));
+      const metadata = transformer.getSessionMetadata(rawSession);
+      return this.pipeline.resolveAttribution(tool, rawSession, metadata.project_path);
+    } catch {
+      return null;
+    }
+  }
+
+  private rebuildIndexIfAttributionMigrationNeeded(indexPath: string): void {
+    if (this.attributionMigrationChecked) return;
+    this.attributionMigrationChecked = true;
+    try {
+      const index = JSON.parse(fs.readFileSync(indexPath, 'utf8')) as { sessions?: Record<string, unknown>[] };
+      const needsMigration = (index.sessions ?? []).some((session) =>
+        session['tool'] === 'cpt'
+        && (
+          !Array.isArray(session['workspace_wwuids'])
+          || session['workspace_wwuids'].length === 0
+          || !Array.isArray(session['scope_refs'])
+          || session['scope_refs'].length === 0
+        )
+      );
+      if (needsMigration) {
+        this.rebuildIndexFromRecords();
+      }
+    } catch { /* ignore corrupt index; normal processing will surface errors later */ }
+  }
+
   /**
    * Rebuild index.json by scanning staged/storage/sessions/*.json.
    * - Patches cld project_path to the registry-backed workspace root (Claude Code
@@ -214,66 +293,37 @@ export class PipelineAdapter {
         const record = JSON.parse(fs.readFileSync(path.join(sessionsDir, file), 'utf8')) as Record<string, unknown>;
         let dirty = false;
 
-        // ccx: patch project_path from raw session_meta.payload.cwd
-        if (record['tool'] === 'ccx') {
-          // tool_sid may already include extension (legacy records) or may be bare
-          const sid = record['tool_sid'] as string;
-          const rawPath = path.join(rawDir, 'chatgpt-codex', sid.endsWith('.jsonl') ? sid : `${sid}.jsonl`);
-          const rawPathJson = path.join(rawDir, 'chatgpt-codex', sid.endsWith('.json') ? sid : `${sid}.json`);
-          const rp = fs.existsSync(rawPath) ? rawPath : fs.existsSync(rawPathJson) ? rawPathJson : null;
-          if (rp) {
-            const content = fs.readFileSync(rp, 'utf8');
-            const metaLine = content.split('\n').find((l) => {
-              try { return JSON.parse(l)['type'] === 'session_meta'; } catch { return false; }
-            });
-            if (metaLine) {
-              const meta = JSON.parse(metaLine) as Record<string, unknown>;
-              const cwd = ((meta['payload'] as Record<string, unknown> | undefined)?.['cwd'] as string | undefined);
-              if (cwd) { record['project_path'] = cwd; dirty = true; }
-            }
+        const attribution = this.resolveRawAttribution(rawDir, record);
+        if (attribution) {
+          // ccx/cld have authoritative project paths in raw metadata. For cpt,
+          // preserve existing primary attribution but recover workspace_wwuids.
+          if ((record['tool'] !== 'cpt' || !record['project_path']) && attribution.projectPath) {
+            record['project_path'] = attribution.projectPath;
+            dirty = true;
           }
-        }
-
-        // cpt: infer project_path from contentReferences and toolSpecificData.cwd
-        // (Copilot has no workspaceFolder field).
-        // Only patch when project_path is empty — never overwrite an existing attribution
-        // because multi-workspace sessions are common; the first window to process a session
-        // wins attribution and rebuildIndex must not steal it from other workspaces.
-        if (record['tool'] === 'cpt' && !record['project_path'] && workspaceRoot) {
-          const sid = record['tool_sid'] as string;
-          const rawPath = path.join(rawDir, 'github-copilot', `${sid}.json`);
-          if (fs.existsSync(rawPath)) {
-            try {
-              const raw = JSON.parse(fs.readFileSync(rawPath, 'utf8')) as Record<string, unknown>;
-              const requests = (raw['requests'] as Record<string, unknown>[]) ?? [];
-              const prefix = workspaceRoot + path.sep;
-              outer: for (const req of requests) {
-                // 1. contentReferences
-                const refs = (req['contentReferences'] as Record<string, unknown>[]) ?? [];
-                for (const ref of refs) {
-                  const fsPath = ((ref['reference'] as Record<string, unknown>)?.['fsPath'] as string) ?? '';
-                  if (fsPath && (fsPath === workspaceRoot || fsPath.startsWith(prefix))) {
-                    record['project_path'] = workspaceRoot;
-                    dirty = true;
-                    break outer;
-                  }
-                }
-                // 2. toolSpecificData.cwd in response items
-                // cwd may be a plain string or a VSCode URI dict { fsPath?, path, scheme }
-                const response = (req['response'] as Record<string, unknown>[]) ?? [];
-                for (const item of response) {
-                  const cwdRaw = (item['toolSpecificData'] as Record<string, unknown>)?.['cwd'];
-                  const cwdDict = cwdRaw as Record<string, unknown> | undefined;
-                  const cwd = typeof cwdRaw === 'string' ? cwdRaw
-                    : (cwdDict?.['fsPath'] as string) ?? (cwdDict?.['path'] as string) ?? '';
-                  if (cwd && (cwd === workspaceRoot || cwd.startsWith(prefix))) {
-                    record['project_path'] = workspaceRoot;
-                    dirty = true;
-                    break outer;
-                  }
-                }
-              }
-            } catch { /* skip unreadable raw file */ }
+          if (!record['recorder_wwuid'] && attribution.recorderWwuid) {
+            record['recorder_wwuid'] = attribution.recorderWwuid;
+            dirty = true;
+          }
+          if (!record['recorder_scope'] && attribution.recorderScope) {
+            record['recorder_scope'] = attribution.recorderScope;
+            dirty = true;
+          }
+          const existingWwuids = Array.isArray(record['workspace_wwuids'])
+            ? record['workspace_wwuids'] as string[]
+            : [];
+          const mergedWwuids = this.mergeWwuids(existingWwuids, attribution.workspaceWwuids);
+          if (mergedWwuids.length !== existingWwuids.length) {
+            record['workspace_wwuids'] = mergedWwuids;
+            dirty = true;
+          }
+          const existingScopeRefs = Array.isArray(record['scope_refs'])
+            ? record['scope_refs'] as ScopeRef[]
+            : [];
+          const mergedScopeRefs = this.mergeScopeRefs(existingScopeRefs, attribution.scopeRefs);
+          if (mergedScopeRefs.length !== existingScopeRefs.length) {
+            record['scope_refs'] = mergedScopeRefs;
+            dirty = true;
           }
         }
 
@@ -300,7 +350,14 @@ export class PipelineAdapter {
           device_id: record['device_id'],
           session_type: record['session_type'],
           recorder_wwuid: record['recorder_wwuid'] ?? '',
-          workspace_wwuids: record['workspace_wwuids'] ?? (record['recorder_wwuid'] ? [record['recorder_wwuid']] : []),
+          recorder_scope: record['recorder_scope'] ?? '',
+          workspace_wwuids: this.mergeWwuids(
+            Array.isArray(record['workspace_wwuids']) ? record['workspace_wwuids'] as string[] : [],
+            record['recorder_wwuid'] ? [record['recorder_wwuid'] as string] : [],
+          ),
+          scope_refs: this.mergeScopeRefs(
+            Array.isArray(record['scope_refs']) ? record['scope_refs'] as ScopeRef[] : [],
+          ),
           project_path: record['project_path'],
           created_at: record['created_at'],
           last_turn_at: record['last_turn_at'],

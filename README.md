@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.64
+**Current version:** 0.31.65
 
 ---
 
 ## What's New
+
+**v0.31.65** — Session sidebar scope filtering now uses staged absolute scope metadata. Session records and index entries store `recorder_scope` plus `scope_refs[]` (`scope`, `wwuid`, `alias`, `path`, optional signal count), so town/county views filter by exact registry identity instead of path guesses. County view includes all member towns by scanning each town's `.wildwest/registry.json` as the SSOT and supports legacy staged data as fallback.
 
 **v0.31.64** — Multi-workspace session support: add `workspace_wwuids[]` to index entries. Cross-workspace Copilot sessions now appear in every town panel where they have ≥3 signals — primary attribution (most signals) still set as `recorder_wwuid`/`project_path`. Side panel filter checks `workspace_wwuids` membership first.
 

@@ -50,6 +50,16 @@ export interface Cursor {
   value: string | number; // message.id, requestId, or line number
 }
 
+export type WildWestScope = 'town' | 'county' | 'territory';
+
+export interface ScopeRef {
+  scope: WildWestScope;
+  wwuid: string;
+  alias: string;
+  path: string;
+  signal_count?: number;
+}
+
 /**
  * Packet — delta export unit containing a sequence of turns
  * 
@@ -86,6 +96,9 @@ export interface SessionRecord {
   device_id: string;
   session_type: 'chat' | 'edit'; // 'edit' reserved for copilot-edits (future)
   recorder_wwuid: string; // wwuid of the town registry that recorded this session
+  recorder_scope: WildWestScope | '';
+  workspace_wwuids: string[]; // all workspaces with significant signal presence
+  scope_refs: ScopeRef[]; // absolute scope identities used for filtering
   project_path: string;
   created_at: string; // ISO 8601 UTC
   last_turn_at: string; // ISO 8601 UTC
@@ -109,7 +122,9 @@ export interface IndexEntry {
   device_id: string;
   session_type: 'chat' | 'edit';
   recorder_wwuid: string; // primary attribution (workspace with most signals)
+  recorder_scope: WildWestScope | '';
   workspace_wwuids: string[]; // all workspaces with significant signal presence
+  scope_refs: ScopeRef[]; // absolute scope identities used for filtering
   project_path: string;
   created_at: string; // ISO 8601 UTC
   last_turn_at: string; // ISO 8601 UTC

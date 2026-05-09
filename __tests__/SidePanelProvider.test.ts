@@ -75,6 +75,49 @@ describe('SidePanelProvider', () => {
     jest.clearAllMocks();
   });
 
+  function writeRegistry(root: string, scope: string, alias: string, wwuid: string): void {
+    const wwDir = path.join(root, '.wildwest');
+    fs.mkdirSync(wwDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(wwDir, 'registry.json'),
+      JSON.stringify({ scope, alias, wwuid }, null, 2),
+      'utf8',
+    );
+  }
+
+  function writeSessionIndex(exportPath: string, sessions: Record<string, unknown>[]): void {
+    const storageDir = path.join(exportPath, 'staged', 'storage');
+    fs.mkdirSync(storageDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(storageDir, 'index.json'),
+      JSON.stringify({ schema_version: '1', updated_at: new Date().toISOString(), sessions }, null, 2),
+      'utf8',
+    );
+  }
+
+  function makeSession(id: string, overrides: Record<string, unknown>): Record<string, unknown> {
+    const now = new Date().toISOString();
+    return {
+      wwuid: id,
+      wwuid_type: 'session',
+      tool: 'ccx',
+      tool_sid: id,
+      author: 'tester',
+      device_id: 'device-1',
+      session_type: 'chat',
+      recorder_wwuid: '',
+      recorder_scope: '',
+      workspace_wwuids: [],
+      scope_refs: [],
+      project_path: '',
+      created_at: now,
+      last_turn_at: now,
+      closed_at: null,
+      turn_count: 1,
+      ...overrides,
+    };
+  }
+
   it('returns 10 root items with correct sectionIds', () => {
     const provider = new SidePanelProvider(mockMonitor);
     const roots = provider.getChildren();
@@ -220,5 +263,68 @@ describe('SidePanelProvider', () => {
     provider.dispose();
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();
+  });
+
+  it('filters session counts to the current town by path and wwuid', () => {
+    writeRegistry(townRoot, 'town', 'town', 'town-wwuid');
+    const exportPath = path.join(tempDir, 'sessions');
+    const siblingTown = path.join(tempDir, 'sibling-town');
+    writeSessionIndex(exportPath, [
+      makeSession('town-path', { project_path: townRoot, turn_count: 2 }),
+      makeSession('town-descendant', { project_path: path.join(townRoot, 'packages', 'api'), turn_count: 3 }),
+      makeSession('town-wwuid', { workspace_wwuids: ['town-wwuid'], turn_count: 4 }),
+      makeSession('town-scope-ref', { scope_refs: [{ scope: 'town', wwuid: 'town-wwuid', alias: 'town', path: townRoot }], turn_count: 5 }),
+      makeSession('sibling-town', { project_path: siblingTown }),
+      makeSession('county-root', { project_path: tempDir }),
+    ]);
+
+    const provider = new SidePanelProvider(mockMonitor);
+    provider.setExportPath(exportPath);
+    const sessionsSection = provider.getChildren().find((r) => r.sectionId === 'sessions')!;
+    expect(sessionsSection.label).toBe('Sessions (4)');
+
+    const recent = provider.getChildren(sessionsSection).find((r) => r.sectionId === 'sessions:recent')!;
+    expect(recent.label).toContain('Recent   4');
+    const recentChildren = provider.getChildren(recent);
+    expect(recentChildren.find((r) => r.sectionId === 'sessions:today')?.label).toContain('Today   4 (14)');
+    provider.dispose();
+  });
+
+  it('filters county session counts across county root, towns, and wwuid attribution', () => {
+    const countyRoot = path.join(tempDir, 'county');
+    const townA = path.join(countyRoot, 'town-a');
+    const townB = path.join(countyRoot, 'town-b');
+    const outside = path.join(tempDir, 'outside');
+    writeRegistry(countyRoot, 'county', 'county', 'county-wwuid');
+    writeRegistry(townA, 'town', 'town-a', 'town-a-wwuid');
+    writeRegistry(townB, 'town', 'town-b', 'town-b-wwuid');
+    const vscode = require('vscode');
+    (vscode.workspace as unknown as WorkspaceMock).workspaceFolders = [
+      { uri: { fsPath: countyRoot } },
+    ];
+    (mockMonitor.detectScope as jest.Mock).mockReturnValue('county');
+
+    const exportPath = path.join(tempDir, 'sessions');
+    writeSessionIndex(exportPath, [
+      makeSession('county-path', { project_path: countyRoot, turn_count: 2 }),
+      makeSession('town-path', { project_path: path.join(townA, 'src'), turn_count: 3 }),
+      makeSession('town-wwuid', { recorder_wwuid: 'town-b-wwuid', turn_count: 4 }),
+      makeSession('county-wwuid', { workspace_wwuids: ['county-wwuid'], turn_count: 5 }),
+      makeSession('county-scope-ref', { scope_refs: [{ scope: 'county', wwuid: 'county-wwuid', alias: 'county', path: countyRoot }], turn_count: 6 }),
+      makeSession('town-scope-ref', { scope_refs: [{ scope: 'town', wwuid: 'town-a-wwuid', alias: 'town-a', path: townA }], turn_count: 7 }),
+      makeSession('outside-path', { project_path: outside }),
+      makeSession('outside-wwuid', { recorder_wwuid: 'outside-wwuid' }),
+    ]);
+
+    const provider = new SidePanelProvider(mockMonitor);
+    provider.setExportPath(exportPath);
+    const sessionsSection = provider.getChildren().find((r) => r.sectionId === 'sessions')!;
+    expect(sessionsSection.label).toBe('Sessions (6)');
+
+    const recent = provider.getChildren(sessionsSection).find((r) => r.sectionId === 'sessions:recent')!;
+    expect(recent.label).toContain('Recent   6');
+    const recentChildren = provider.getChildren(recent);
+    expect(recentChildren.find((r) => r.sectionId === 'sessions:today')?.label).toContain('Today   6 (27)');
+    provider.dispose();
   });
 });

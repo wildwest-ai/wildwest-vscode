@@ -12,7 +12,7 @@ import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { getTransformer } from './transformers';
 import { PacketWriter } from './packetWriter';
-import { SessionPacket, NormalizedTurn } from './types';
+import { NormalizedTurn, ScopeRef, SessionPacket, WildWestScope } from './types';
 import { generateWwuid, generateDeviceId, getCursorType } from './utils';
 import { redactTurns } from '../PrivacyFilter';
 
@@ -49,6 +49,14 @@ export interface ExportSession {
   tool: 'cld' | 'cpt' | 'ccx';
   tool_sid: string;
   rawPath: string; // Path to raw session file
+}
+
+export interface AttributionResult {
+  projectPath: string;
+  recorderWwuid: string;
+  recorderScope: WildWestScope | '';
+  workspaceWwuids: string[];
+  scopeRefs: ScopeRef[];
 }
 
 /**
@@ -120,7 +128,13 @@ export class SessionExportPipeline {
     // 4. Resolve attribution from session data — deterministic, window-agnostic.
     // cld/ccx: project_path is in the raw file; look up the path's registry for wwuid.
     // cpt: no built-in project field; find workspace with most cwd/ref signals, look up its registry.
-    const { projectPath: resolvedProjectPath, recorderWwuid: resolvedRecorderWwuid, workspaceWwuids: resolvedWorkspaceWwuids } =
+    const {
+      projectPath: resolvedProjectPath,
+      recorderWwuid: resolvedRecorderWwuid,
+      recorderScope: resolvedRecorderScope,
+      workspaceWwuids: resolvedWorkspaceWwuids,
+      scopeRefs: resolvedScopeRefs,
+    } =
       this.resolveAttribution(tool, rawSession, metadata.project_path);
 
     // 5. Check cursor to determine delta
@@ -128,7 +142,14 @@ export class SessionExportPipeline {
 
     if (newTurns.length === 0 && !closed) {
       // No new turns — patch attribution if existing record has none yet
-      this.patchAttribution(wwuid, resolvedProjectPath, resolvedRecorderWwuid, resolvedWorkspaceWwuids);
+      this.patchAttribution(
+        wwuid,
+        resolvedProjectPath,
+        resolvedRecorderWwuid,
+        resolvedRecorderScope,
+        resolvedWorkspaceWwuids,
+        resolvedScopeRefs,
+      );
       return;
     }
 
@@ -167,7 +188,9 @@ export class SessionExportPipeline {
         },
         metadata.created_at,
         resolvedRecorderWwuid || undefined,
-        resolvedWorkspaceWwuids
+        resolvedRecorderScope || undefined,
+        resolvedWorkspaceWwuids,
+        resolvedScopeRefs,
       );
     } catch (error) {
       throw new Error(`Storage update failed: ${error}`);
@@ -206,16 +229,57 @@ export class SessionExportPipeline {
    * window can claim it but the record was written with empty attribution by another
    * window that processed it first.
    */
-  private patchAttribution(wwuid: string, projectPath: string, recorderWwuid: string, workspaceWwuids: string[]): void {
+  private patchAttribution(
+    wwuid: string,
+    projectPath: string,
+    recorderWwuid: string,
+    recorderScope: WildWestScope | '',
+    workspaceWwuids: string[],
+    scopeRefs: ScopeRef[],
+  ): void {
     const recordPath = path.join(this.stagedDir, 'storage', 'sessions', `${wwuid}.json`);
     if (!fs.existsSync(recordPath)) return;
     try {
       const record = JSON.parse(fs.readFileSync(recordPath, 'utf8')) as Record<string, unknown>;
-      if (record['recorder_wwuid'] || record['project_path']) return;
-      record['recorder_wwuid'] = recorderWwuid;
-      record['project_path'] = projectPath;
+      let dirty = false;
+      if (!record['recorder_wwuid'] && recorderWwuid) {
+        record['recorder_wwuid'] = recorderWwuid;
+        dirty = true;
+      }
+      if (!record['recorder_scope'] && recorderScope) {
+        record['recorder_scope'] = recorderScope;
+        dirty = true;
+      }
+      if (!record['project_path'] && projectPath) {
+        record['project_path'] = projectPath;
+        dirty = true;
+      }
+      const existingWwuids = Array.isArray(record['workspace_wwuids'])
+        ? record['workspace_wwuids'] as string[]
+        : [];
+      const mergedWwuids = [...new Set([...existingWwuids, ...workspaceWwuids].filter((wwuid) => wwuid !== ''))];
+      if (mergedWwuids.length !== existingWwuids.length) {
+        record['workspace_wwuids'] = mergedWwuids;
+        dirty = true;
+      }
+      const existingScopeRefs = Array.isArray(record['scope_refs'])
+        ? record['scope_refs'] as ScopeRef[]
+        : [];
+      const mergedScopeRefs = this.mergeScopeRefs(existingScopeRefs, scopeRefs);
+      if (mergedScopeRefs.length !== existingScopeRefs.length) {
+        record['scope_refs'] = mergedScopeRefs;
+        dirty = true;
+      }
+      if (!dirty) return;
       fs.writeFileSync(recordPath, JSON.stringify(record, null, 2), 'utf8');
-      this.packetWriter.patchIndexEntry(wwuid, projectPath, recorderWwuid, workspaceWwuids);
+      this.packetWriter.patchIndexEntry(
+        wwuid,
+        (record['project_path'] as string) || projectPath,
+        (record['recorder_wwuid'] as string) || recorderWwuid,
+        (record['recorder_scope'] as WildWestScope | '') || recorderScope,
+        mergedWwuids,
+        mergedScopeRefs,
+      );
     } catch { /* skip */ }
   }
 
@@ -273,24 +337,28 @@ export class SessionExportPipeline {
   // Minimum signal count for a workspace to be included in workspace_wwuids
   private static readonly SIGNAL_THRESHOLD = 3;
 
-  private resolveAttribution(
+  resolveAttribution(
     tool: string,
     rawSession: unknown,
     metadataProjectPath: string
-  ): { projectPath: string; recorderWwuid: string; workspaceWwuids: string[] } {
+  ): AttributionResult {
     // cld / ccx: project_path is authoritative from raw file
     if (metadataProjectPath) {
-      const recorderWwuid = this.readRegistryWwuid(metadataProjectPath);
+      const workspaceRoot = this.findWorkspaceRoot(metadataProjectPath) || metadataProjectPath;
+      const recorderRef = this.readRegistryScopeRef(workspaceRoot);
+      const scopeRefs = this.collectScopeRefs(workspaceRoot);
       return {
         projectPath: metadataProjectPath,
-        recorderWwuid,
-        workspaceWwuids: recorderWwuid ? [recorderWwuid] : [],
+        recorderWwuid: recorderRef?.wwuid ?? '',
+        recorderScope: recorderRef?.scope ?? '',
+        workspaceWwuids: recorderRef?.wwuid ? [recorderRef.wwuid] : [],
+        scopeRefs,
       };
     }
 
     // cpt: infer from signals across all workspace roots mentioned in the session
     if (tool !== 'cpt') {
-      return { projectPath: '', recorderWwuid: '', workspaceWwuids: [] };
+      return { projectPath: '', recorderWwuid: '', recorderScope: '', workspaceWwuids: [], scopeRefs: [] };
     }
 
     const session = rawSession as Record<string, unknown>;
@@ -317,20 +385,32 @@ export class SessionExportPipeline {
       }
     }
 
-    if (hits.size === 0) return { projectPath: '', recorderWwuid: '', workspaceWwuids: [] };
+    if (hits.size === 0) return { projectPath: '', recorderWwuid: '', recorderScope: '', workspaceWwuids: [], scopeRefs: [] };
 
     // Primary: workspace with the most signals
     const best = [...hits.entries()].reduce((a, b) => b[1] > a[1] ? b : a);
     const projectPath = best[0];
-    const recorderWwuid = this.readRegistryWwuid(projectPath);
+    const recorderRef = this.readRegistryScopeRef(projectPath);
 
     // All workspaces meeting the signal threshold (for multi-workspace sessions)
-    const workspaceWwuids = [...hits.entries()]
-      .filter(([, count]) => count >= SessionExportPipeline.SIGNAL_THRESHOLD)
-      .map(([root]) => this.readRegistryWwuid(root))
-      .filter((w) => w !== '');
+    const significantRoots = [...hits.entries()]
+      .filter(([, count]) => count >= SessionExportPipeline.SIGNAL_THRESHOLD);
+    const workspaceWwuids = [...new Set([
+      recorderRef?.wwuid ?? '',
+      ...significantRoots.map(([root]) => this.readRegistryScopeRef(root)?.wwuid ?? ''),
+    ].filter((wwuid) => wwuid !== ''))];
+    const scopeRefs = this.mergeScopeRefs(
+      this.collectScopeRefs(best[0], best[1]),
+      ...significantRoots.map(([root, count]) => this.collectScopeRefs(root, count)),
+    );
 
-    return { projectPath, recorderWwuid, workspaceWwuids };
+    return {
+      projectPath,
+      recorderWwuid: recorderRef?.wwuid ?? '',
+      recorderScope: recorderRef?.scope ?? '',
+      workspaceWwuids,
+      scopeRefs,
+    };
   }
 
   /**
@@ -352,16 +432,54 @@ export class SessionExportPipeline {
     return '';
   }
 
-  /**
-   * Read wwuid from a workspace's .wildwest/registry.json. Returns '' if absent.
-   */
-  private readRegistryWwuid(workspacePath: string): string {
-    if (!workspacePath) return '';
+  private isWildWestScope(value: unknown): value is WildWestScope {
+    return value === 'town' || value === 'county' || value === 'territory';
+  }
+
+  private readRegistryScopeRef(workspacePath: string, signalCount?: number): ScopeRef | null {
+    if (!workspacePath) return null;
     try {
       const regPath = path.join(workspacePath, '.wildwest', 'registry.json');
-      if (!fs.existsSync(regPath)) return '';
+      if (!fs.existsSync(regPath)) return null;
       const reg = JSON.parse(fs.readFileSync(regPath, 'utf8')) as Record<string, unknown>;
-      return (reg['wwuid'] as string) || '';
-    } catch { return ''; }
+      const scope = reg['scope'];
+      const wwuid = (reg['wwuid'] as string) || '';
+      if (!wwuid || !this.isWildWestScope(scope)) return null;
+      return {
+        scope,
+        wwuid,
+        alias: (reg['alias'] as string) || path.basename(workspacePath),
+        path: workspacePath,
+        ...(signalCount !== undefined ? { signal_count: signalCount } : {}),
+      };
+    } catch { return null; }
+  }
+
+  private collectScopeRefs(workspacePath: string, signalCount?: number): ScopeRef[] {
+    const refs: ScopeRef[] = [];
+    let current = workspacePath;
+    const fsRoot = path.parse(current).root;
+    while (current && current !== fsRoot) {
+      const ref = this.readRegistryScopeRef(current, signalCount);
+      if (ref) refs.push(ref);
+      const parent = path.dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
+    return refs;
+  }
+
+  private mergeScopeRefs(...sources: ScopeRef[][]): ScopeRef[] {
+    const refs = new Map<string, ScopeRef>();
+    for (const source of sources) {
+      for (const ref of source) {
+        const key = `${ref.scope}:${ref.wwuid}`;
+        const existing = refs.get(key);
+        if (!existing || (ref.signal_count ?? 0) > (existing.signal_count ?? 0)) {
+          refs.set(key, ref);
+        }
+      }
+    }
+    return [...refs.values()];
   }
 }

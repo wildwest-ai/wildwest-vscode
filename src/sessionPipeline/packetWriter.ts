@@ -16,6 +16,8 @@ import {
   SessionRecord,
   IndexEntry,
   Cursor,
+  ScopeRef,
+  WildWestScope,
 } from './types';
 import { generatePacketFilename } from './utils';
 
@@ -43,6 +45,31 @@ export class PacketWriter {
 
     // Ensure directories exist
     this.ensureDirectories();
+  }
+
+  private mergeWwuids(...sources: Array<string[] | undefined>): string[] {
+    const ids = new Set<string>();
+    for (const source of sources) {
+      for (const id of source ?? []) {
+        if (id) ids.add(id);
+      }
+    }
+    return [...ids];
+  }
+
+  private mergeScopeRefs(...sources: Array<ScopeRef[] | undefined>): ScopeRef[] {
+    const refs = new Map<string, ScopeRef>();
+    for (const source of sources) {
+      for (const ref of source ?? []) {
+        if (!ref.wwuid || !ref.scope) continue;
+        const key = `${ref.scope}:${ref.wwuid}`;
+        const existing = refs.get(key);
+        if (!existing || (ref.signal_count ?? 0) > (existing.signal_count ?? 0)) {
+          refs.set(key, ref);
+        }
+      }
+    }
+    return [...refs.values()];
   }
 
   private ensureDirectories(): void {
@@ -172,7 +199,9 @@ export class PacketWriter {
     toolCursor?: unknown,
     sessionCreatedAt?: string,
     recorderWwuid?: string,
-    workspaceWwuids?: string[]
+    recorderScope?: WildWestScope,
+    workspaceWwuids?: string[],
+    scopeRefs?: ScopeRef[],
   ): Promise<void> {
     this.ensureDirectories();
     const sessionRecordPath = path.join(
@@ -198,6 +227,9 @@ export class PacketWriter {
         device_id: packet.device_id,
         session_type: sessionType,
         recorder_wwuid: recorderWwuid ?? '',
+        recorder_scope: recorderScope ?? '',
+        workspace_wwuids: workspaceWwuids ?? (recorderWwuid ? [recorderWwuid] : []),
+        scope_refs: scopeRefs ?? [],
         project_path: projectPath,
         created_at: sessionCreatedAt ?? firstTurnTimestamp,
         last_turn_at: lastTurnTimestamp,
@@ -227,6 +259,17 @@ export class PacketWriter {
       // Update metadata
       record.last_turn_at = lastTurnTimestamp;
       record.turn_count = record.turns.length;
+      record.workspace_wwuids = this.mergeWwuids(record.workspace_wwuids, workspaceWwuids);
+      record.scope_refs = this.mergeScopeRefs(record.scope_refs, scopeRefs);
+      if (!record.recorder_wwuid && recorderWwuid) {
+        record.recorder_wwuid = recorderWwuid;
+      }
+      if (!record.recorder_scope && recorderScope) {
+        record.recorder_scope = recorderScope;
+      }
+      if (!record.project_path && projectPath) {
+        record.project_path = projectPath;
+      }
       record.cursor = (toolCursor as Cursor | undefined) || {
         type: this.getCursorType(packet.tool),
         value: this.extractCursorValue(record.turns[record.turns.length - 1]),
@@ -245,16 +288,50 @@ export class PacketWriter {
     this.updateIndex(record, workspaceWwuids);
   }
 
-  patchIndexEntry(wwuid: string, projectPath: string, recorderWwuid: string, workspaceWwuids: string[]): void {
+  patchIndexEntry(
+    wwuid: string,
+    projectPath: string,
+    recorderWwuid: string,
+    recorderScope: WildWestScope | '',
+    workspaceWwuids: string[],
+    scopeRefs: ScopeRef[],
+  ): void {
     const indexPath = path.join(this.stagedDir, 'storage', 'index.json');
     if (!fs.existsSync(indexPath)) return;
     try {
       const index = JSON.parse(fs.readFileSync(indexPath, 'utf8')) as { sessions: Record<string, unknown>[] };
       const entry = index.sessions.find((s) => s['wwuid'] === wwuid);
-      if (entry && !entry['recorder_wwuid'] && !entry['project_path']) {
-        entry['recorder_wwuid'] = recorderWwuid;
-        entry['project_path'] = projectPath;
-        entry['workspace_wwuids'] = workspaceWwuids;
+      if (entry) {
+        let dirty = false;
+        if (!entry['recorder_wwuid'] && recorderWwuid) {
+          entry['recorder_wwuid'] = recorderWwuid;
+          dirty = true;
+        }
+        if (!entry['recorder_scope'] && recorderScope) {
+          entry['recorder_scope'] = recorderScope;
+          dirty = true;
+        }
+        if (!entry['project_path'] && projectPath) {
+          entry['project_path'] = projectPath;
+          dirty = true;
+        }
+        const existingWwuids = Array.isArray(entry['workspace_wwuids'])
+          ? entry['workspace_wwuids'] as string[]
+          : [];
+        const mergedWwuids = this.mergeWwuids(existingWwuids, workspaceWwuids);
+        if (mergedWwuids.length !== existingWwuids.length) {
+          entry['workspace_wwuids'] = mergedWwuids;
+          dirty = true;
+        }
+        const existingScopeRefs = Array.isArray(entry['scope_refs'])
+          ? entry['scope_refs'] as ScopeRef[]
+          : [];
+        const mergedScopeRefs = this.mergeScopeRefs(existingScopeRefs, scopeRefs);
+        if (mergedScopeRefs.length !== existingScopeRefs.length) {
+          entry['scope_refs'] = mergedScopeRefs;
+          dirty = true;
+        }
+        if (!dirty) return;
         fs.writeFileSync(indexPath, JSON.stringify(index, null, 2), 'utf8');
       }
     } catch { /* skip */ }
@@ -270,6 +347,12 @@ export class PacketWriter {
 
     // Upsert session in index
     const existingIdx = index.sessions.findIndex((s: IndexEntry) => s.wwuid === record.wwuid);
+    const workspaceWwuidsForIndex = this.mergeWwuids(
+      record.workspace_wwuids,
+      workspaceWwuids,
+      record.recorder_wwuid ? [record.recorder_wwuid] : [],
+    );
+    const scopeRefsForIndex = this.mergeScopeRefs(record.scope_refs);
     const entry: IndexEntry = {
       wwuid: record.wwuid,
       wwuid_type: 'session',
@@ -279,7 +362,9 @@ export class PacketWriter {
       device_id: record.device_id,
       session_type: record.session_type,
       recorder_wwuid: record.recorder_wwuid ?? '',
-      workspace_wwuids: workspaceWwuids ?? (record.recorder_wwuid ? [record.recorder_wwuid] : []),
+      recorder_scope: record.recorder_scope ?? '',
+      workspace_wwuids: workspaceWwuidsForIndex,
+      scope_refs: scopeRefsForIndex,
       project_path: record.project_path,
       created_at: record.created_at,
       last_turn_at: record.last_turn_at,
