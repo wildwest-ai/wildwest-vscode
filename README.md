@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.79
+**Current version:** v0.32.0
 
 ---
 
 ## What's New
+
+**v0.32.0** — Session preview: clicking a session in the sidebar now opens a read-only markdown view instead of raw JSON. Registry schema v3: `actors` renamed to `identities`, entries use `{ role, dyad }` (`channel` dropped); auto-migrated on heartbeat. Board cleanup: merged branches archived.
 
 **v0.31.79** — Fix town filter for CLD/CCX sessions. `recorder_wwuid` match is now sufficient for `cld`/`ccx` tools (project_path is ground-truth attribution). The `commit_count`/`signal_count` signal gate now only applies to `cpt`, where multiple open workspaces can share the same recorder. Adds 6 CLD/CCX wildwest-vscode sessions previously excluded due to missing signal data.
 

@@ -659,13 +659,12 @@ export class SidePanelProvider
     item.tooltip = new vscode.MarkdownString(
       `**${projectName}**\n\n\`${projectPath}\`\n\nCreated: \`${createdAt}\`  \nLast turn: \`${lastTurnAt}\`  \nTurns: ${turnCount}  \nTool: ${tool}`
     );
-    // Open session JSON on click
+    // Open session as rendered markdown preview on click
     if (wwuid && this.exportPath) {
-      const jsonPath = path.join(this.exportPath, 'staged', 'storage', 'sessions', `${wwuid}.json`);
       item.command = {
-        command: 'vscode.open',
-        title: 'Open Session JSON',
-        arguments: [vscode.Uri.file(jsonPath)],
+        command: 'wildwest.openSessionPreview',
+        title: 'Preview Session',
+        arguments: [wwuid, this.exportPath],
       };
     }
     return item;

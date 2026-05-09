@@ -18,6 +18,7 @@ import { runValidateRegistry } from './RegistryValidator';
 import { SidePanelProvider } from './SidePanelProvider';
 import { getDeliveryReceipts, statusIcon } from './DeliveryReceipts';
 import { getTelegraphDirs } from './TelegraphService';
+import { SessionPreviewProvider, SESSION_PREVIEW_SCHEME } from './SessionPreviewProvider';
 
 // ── Configuration types & helpers ──────────────────────────────────────────
 
@@ -84,6 +85,17 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
   aiToolBridge.start();
+
+  // ── Session preview (virtual document, read-only markdown) ─────────────
+  const sessionPreviewProvider = new SessionPreviewProvider();
+  context.subscriptions.push(
+    vscode.workspace.registerTextDocumentContentProvider(SESSION_PREVIEW_SCHEME, sessionPreviewProvider),
+    vscode.commands.registerCommand('wildwest.openSessionPreview', async (wwuid: string, exportPath: string) => {
+      const uri = SessionPreviewProvider.uriFor(wwuid, exportPath);
+      const doc = await vscode.workspace.openTextDocument(uri);
+      await vscode.window.showTextDocument(doc, { preview: true, preserveFocus: false });
+    }),
+  );
 
   // ── Side panel (TreeView) ─────────────────────────────────────────────────
   sidePanelProvider = new SidePanelProvider(heartbeatMonitor);
