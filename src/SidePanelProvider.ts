@@ -265,11 +265,10 @@ export class SidePanelProvider
       const scopeFilter = (session: S): boolean => {
         const pp = (session['project_path'] as string) || '';
         if (scope === 'town') {
-          // Direct match by alias (basename) — handles reorganized/moved paths
-          if (path.basename(pp) === alias) return true;
-          // Ancestor match — governance is cascading: county/world sessions govern this town too
-          if (pp && townRoot.startsWith(pp + path.sep)) return true;
-          return false;
+          // Exact path match or alias basename match (handles reorganized/moved paths).
+          // Ancestor match intentionally excluded: broad paths (world/county roots) must not
+          // bleed into a town-scoped session list.
+          return pp === townRoot || path.basename(pp) === alias;
         }
         if (scope === 'county') {
           const root = filterPath ?? countyRoot;
