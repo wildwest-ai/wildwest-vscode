@@ -374,6 +374,7 @@ export class SessionExportPipeline {
       let scopeRefs = this.collectScopeRefs(workspaceRoot);
       if (toolSid) {
         scopeRefs = SessionMapService.mergeOverrideInto(scopeRefs, this.sessionMapService.getOverride(toolSid));
+        scopeRefs = SessionMapService.applyExclusionsFrom(scopeRefs, this.sessionMapService.getExclusions(toolSid));
       }
       return {
         projectPath: metadataProjectPath,
@@ -430,6 +431,7 @@ export class SessionExportPipeline {
     const sid = toolSid ?? (rawSessionRecord['sessionId'] as string | undefined) ?? '';
     if (sid) {
       scopeRefs = SessionMapService.mergeOverrideInto(scopeRefs, this.sessionMapService.getOverride(sid));
+      scopeRefs = SessionMapService.applyExclusionsFrom(scopeRefs, this.sessionMapService.getExclusions(sid));
     }
     const workspaceWwuids = [...new Set(scopeRefs.map((ref) => ref.wwuid).filter((wwuid) => wwuid !== ''))];
 

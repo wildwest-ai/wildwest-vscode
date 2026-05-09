@@ -610,7 +610,13 @@
           "path": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode"
         }
       ],
-      "note": "seeded: git-day:2026-05-05, content-path"
+      "note": "seeded: git-day:2026-05-05, content-path; exclude: nx-icouponads primary, vsc signals incidental",
+      "exclude_scope_refs": [
+        {
+          "scope": "town",
+          "wwuid": "83b09a8d-6587-46bb-9e98-880d56db39b2"
+        }
+      ]
     },
     {
       "tool_sid": "9e406ccd-76a5-472f-b1ba-8c23823bf44f",

@@ -30,10 +30,16 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ScopeRef, WildWestScope } from './sessionPipeline/types';
 
+export interface ScopeRefKey {
+  scope: string;
+  wwuid: string;
+}
+
 export interface SessionMapOverride {
   tool_sid: string;
   tool?: string;
-  inject_scope_refs: ScopeRef[];
+  inject_scope_refs?: ScopeRef[];
+  exclude_scope_refs?: ScopeRefKey[];
   note?: string;
 }
 
@@ -45,6 +51,8 @@ export interface SessionMap {
 export class SessionMapService {
   // tool_sid → merged inject_scope_refs from all loaded maps
   private overrideMap = new Map<string, ScopeRef[]>();
+  // tool_sid → scope_refs to remove (set by exclude_scope_refs entries)
+  private excludeMap = new Map<string, ScopeRefKey[]>();
 
   /**
    * Load session-map.json files from all provided directory paths.
@@ -53,6 +61,7 @@ export class SessionMapService {
    */
   loadFromDirs(dirs: string[]): void {
     this.overrideMap.clear();
+    this.excludeMap.clear();
     for (const dir of dirs) {
       const mapPath = path.join(dir, '.wildwest', 'session-map.json');
       if (!fs.existsSync(mapPath)) continue;
@@ -63,11 +72,18 @@ export class SessionMapService {
           const injectRefs = (override.inject_scope_refs ?? []).filter(
             (ref) => ref.scope && ref.wwuid
           );
-          if (injectRefs.length === 0) continue;
-          const existing = this.overrideMap.get(override.tool_sid) ?? [];
-          // Merge by scope:wwuid key — no duplicates
-          const merged = this.mergeRefs([...existing, ...injectRefs]);
-          this.overrideMap.set(override.tool_sid, merged);
+          if (injectRefs.length > 0) {
+            const existing = this.overrideMap.get(override.tool_sid) ?? [];
+            const merged = this.mergeRefs([...existing, ...injectRefs]);
+            this.overrideMap.set(override.tool_sid, merged);
+          }
+          const excludeRefs = (override.exclude_scope_refs ?? []).filter(
+            (ref) => ref.scope && ref.wwuid
+          );
+          if (excludeRefs.length > 0) {
+            const existing = this.excludeMap.get(override.tool_sid) ?? [];
+            this.excludeMap.set(override.tool_sid, [...existing, ...excludeRefs]);
+          }
         }
       } catch { /* skip corrupt files */ }
     }
@@ -82,6 +98,22 @@ export class SessionMapService {
 
   hasAnyOverrides(): boolean {
     return this.overrideMap.size > 0;
+  }
+
+  /**
+   * Get exclude_scope_refs keys for a given tool_sid, or [] if none.
+   */
+  getExclusions(toolSid: string): ScopeRefKey[] {
+    return this.excludeMap.get(toolSid) ?? [];
+  }
+
+  /**
+   * Remove scope_refs that match any exclusion key. Returns filtered array.
+   */
+  static applyExclusionsFrom(scopeRefs: ScopeRef[], exclusions: ScopeRefKey[]): ScopeRef[] {
+    if (exclusions.length === 0) return scopeRefs;
+    const keys = new Set(exclusions.map((e) => `${e.scope}:${e.wwuid}`));
+    return scopeRefs.filter((ref) => !keys.has(`${ref.scope}:${ref.wwuid}`));
   }
 
   private mergeRefs(refs: ScopeRef[]): ScopeRef[] {
