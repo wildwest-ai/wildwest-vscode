@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.42
+**Current version:** 0.31.43
 
 ---
 
 ## What's New
+
+**v0.31.43** — Identity row: restore click-to-edit (input box). contextValue='identity' kept for view/item/inline pencil (requires Developer: Reload Window after install).
 
 **v0.31.42** — Identity row: remove click-to-edit (was opening palette on every click); edit only via hover pencil button. Requires window reload after install for menus contribution to take effect.
 

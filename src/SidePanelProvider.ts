@@ -121,7 +121,8 @@ export class SidePanelProvider
     const idItem = new SidePanelItem(idLabel, vscode.TreeItemCollapsibleState.None);
     idItem.iconPath = new vscode.ThemeIcon('person');
     idItem.contextValue = 'identity';
-    idItem.tooltip = 'Hover for edit button';
+    idItem.tooltip = 'Click to edit identity';
+    idItem.command = { command: 'wildwest.setIdentity', title: 'Set Identity' };
 
     return [
       scopeItem,
