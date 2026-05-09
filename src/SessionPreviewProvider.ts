@@ -92,9 +92,9 @@ function renderSessionMarkdown(s: Record<string, unknown>): string {
   lines.push('', '---', '', '## Conversation', '');
 
   // Collapse consecutive assistant fragments into single blocks (CPT emits many partial turns)
-  type Block = { role: string; text: string; timestamp: string };
+  type Fragment = { kind: 'text' | 'thinking'; text: string };
+  type Block = { role: string; fragments: Fragment[]; timestamp: string };
   const blocks: Block[] = [];
-  let thinkingSkipped = false;
 
   for (const t of turns) {
     const role = (t['role'] as string) || '?';
@@ -102,41 +102,44 @@ function renderSessionMarkdown(s: Record<string, unknown>): string {
     const parts = Array.isArray(t['parts'])
       ? (t['parts'] as Array<Record<string, unknown>>)
       : [];
-    const isPureThinking = parts.length > 0 && parts.every(p => p['kind'] === 'thinking');
 
-    // Track thinking gaps between text fragments
-    if (isPureThinking) {
-      thinkingSkipped = true;
-      continue;
-    }
-
-    // Assemble text: prefer content field, else join text parts
+    const thinkingText = parts
+      .filter(p => p['kind'] === 'thinking')
+      .map(p => (p['content'] as string) || '')
+      .join('');
     const textFromParts = parts
       .filter(p => p['kind'] === 'text' || p['kind'] === 'None')
       .map(p => (p['content'] as string) || '')
       .join('');
     const text = (rawContent || textFromParts).trimEnd();
 
-    // Skip empty turns and lone fence artifacts (e.g. '\n```\n' streaming delimiters)
-    if (!text || text.trim() === '```') {
-      thinkingSkipped = false;
+    const last = blocks[blocks.length - 1];
+
+    // Thinking turn — attach to current assistant block or start one
+    if (thinkingText && !text) {
+      if (last && last.role === role) {
+        last.fragments.push({ kind: 'thinking', text: thinkingText.trim() });
+      } else if (role === 'assistant') {
+        blocks.push({ role, fragments: [{ kind: 'thinking', text: thinkingText.trim() }], timestamp: (t['timestamp'] as string) || '' });
+      }
       continue;
     }
 
+    // Skip empty turns and lone fence artifacts
+    if (!text || text.trim() === '```') continue;
+
     const ts = (t['timestamp'] as string) || '';
 
-    // Merge consecutive assistant fragments; only insert paragraph break if thinking was skipped
-    const last = blocks[blocks.length - 1];
+    // Merge consecutive assistant text fragments into the same block
     if (last && last.role === role && role === 'assistant') {
-      last.text += thinkingSkipped ? '\n\n' + text : text;
+      last.fragments.push({ kind: 'text', text });
     } else {
-      blocks.push({ role, text, timestamp: ts });
+      blocks.push({ role, fragments: [{ kind: 'text', text }], timestamp: ts });
     }
-    thinkingSkipped = false;
   }
 
   for (let i = 0; i < blocks.length; i++) {
-    const { role, text, timestamp } = blocks[i];
+    const { role, fragments, timestamp } = blocks[i];
     const timeStr = timestamp
       ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : '';
@@ -144,7 +147,18 @@ function renderSessionMarkdown(s: Record<string, unknown>): string {
     const timeLabel = timeStr ? `  ·  ${timeStr}` : '';
 
     if (i > 0) lines.push('', '---', '');
-    lines.push(`${heading}${timeLabel}`, '', text);
+    lines.push(`${heading}${timeLabel}`, '');
+
+    for (const frag of fragments) {
+      if (frag.kind === 'thinking') {
+        const quoted = frag.text.split('\n')
+          .map((l, idx) => idx === 0 ? `> 💭 ${l}` : `> ${l}`)
+          .join('\n');
+        lines.push(quoted, '');
+      } else {
+        lines.push(frag.text.trimEnd(), '');
+      }
+    }
   }
 
   return lines.join('\n');

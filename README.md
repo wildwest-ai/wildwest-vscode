@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.32.4
+**Current version:** v0.32.6
 
 ---
 
 ## What's New
+
+**v0.32.6** — Session preview: show thinking turns inline as `> 💭 ...` blockquotes within the assistant block.
 
 **v0.32.5** — Session preview: fix spurious blank code blocks and mid-sentence paragraph breaks in CPT sessions. Lone `` ``` `` streaming artifacts filtered; `\n\n` separator only injected between fragments with a thinking turn between them.
 
