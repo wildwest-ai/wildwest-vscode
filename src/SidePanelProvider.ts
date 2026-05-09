@@ -564,6 +564,7 @@ export class SidePanelProvider
     const createdAt = (s['created_at'] as string) || '';
     const lastTurnAt = (s['last_turn_at'] as string) || '';
     const turnCount = (s['turn_count'] as number) ?? 0;
+    const wwuid = (s['wwuid'] as string) || '';
     const ts = this.sessionSortBy === 'updated' ? (lastTurnAt || createdAt) : (createdAt || lastTurnAt);
     const d = ts ? new Date(ts) : null;
     const timeStr = d ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
@@ -577,6 +578,15 @@ export class SidePanelProvider
     item.tooltip = new vscode.MarkdownString(
       `**${projectName}**\n\n\`${projectPath}\`\n\nCreated: \`${createdAt}\`  \nLast turn: \`${lastTurnAt}\`  \nTurns: ${turnCount}  \nTool: ${tool}`
     );
+    // Open session JSON on click
+    if (wwuid && this.exportPath) {
+      const jsonPath = path.join(this.exportPath, 'staged', 'storage', 'sessions', `${wwuid}.json`);
+      item.command = {
+        command: 'vscode.open',
+        title: 'Open Session JSON',
+        arguments: [vscode.Uri.file(jsonPath)],
+      };
+    }
     return item;
   }
 

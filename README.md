@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.49
+**Current version:** 0.31.50
 
 ---
 
 ## What's New
+
+**v0.31.50** — Sessions: click any session row to open its JSON file (`staged/storage/sessions/<wwuid>.json`) in the editor.
 
 **v0.31.49** — Town-scope filter: remove alias-basename fallback — sessions from any other project that happened to share the same folder name (e.g. an old `wildwest-vscode` checkout) no longer appear. Exact `project_path` match only.
 
