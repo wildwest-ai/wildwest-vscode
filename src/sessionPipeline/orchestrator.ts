@@ -246,8 +246,9 @@ export class SessionExportPipeline {
       const response = (req['response'] as Record<string, unknown>[]) ?? [];
       for (const item of response) {
         const cwdRaw = (item['toolSpecificData'] as Record<string, unknown>)?.['cwd'];
+        const cwdDict = cwdRaw as Record<string, unknown> | undefined;
         const cwd = typeof cwdRaw === 'string' ? cwdRaw
-          : (cwdRaw as Record<string, unknown>)?.['fsPath'] as string ?? '';
+          : (cwdDict?.['fsPath'] as string) ?? (cwdDict?.['path'] as string) ?? '';
         if (cwd && (cwd === workspaceRoot || cwd.startsWith(prefix))) {
           return workspaceRoot;
         }

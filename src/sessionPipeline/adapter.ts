@@ -231,9 +231,10 @@ export class PipelineAdapter {
           }
         }
 
-        // cpt: patch empty project_path by scanning contentReferences and
-        // toolSpecificData.cwd in response items (Copilot has no workspaceFolder field).
-        if (record['tool'] === 'cpt' && !record['project_path'] && workspaceRoot) {
+        // cpt: infer project_path from contentReferences and toolSpecificData.cwd
+        // (Copilot has no workspaceFolder field). Re-attribute if evidence points to
+        // current workspace and the record isn't already attributed here.
+        if (record['tool'] === 'cpt' && record['project_path'] !== workspaceRoot && workspaceRoot) {
           const sid = record['tool_sid'] as string;
           const rawPath = path.join(rawDir, 'github-copilot', `${sid}.json`);
           if (fs.existsSync(rawPath)) {
@@ -256,8 +257,9 @@ export class PipelineAdapter {
                 const response = (req['response'] as Record<string, unknown>[]) ?? [];
                 for (const item of response) {
                   const cwdRaw = (item['toolSpecificData'] as Record<string, unknown>)?.['cwd'];
+                  const cwdDict = cwdRaw as Record<string, unknown> | undefined;
                   const cwd = typeof cwdRaw === 'string' ? cwdRaw
-                    : (cwdRaw as Record<string, unknown>)?.['fsPath'] as string ?? '';
+                    : (cwdDict?.['fsPath'] as string) ?? (cwdDict?.['path'] as string) ?? '';
                   if (cwd && (cwd === workspaceRoot || cwd.startsWith(prefix))) {
                     record['project_path'] = workspaceRoot;
                     dirty = true;

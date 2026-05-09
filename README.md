@@ -2,11 +2,15 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.53
+**Current version:** 0.31.56
 
 ---
 
 ## What's New
+
+**v0.31.56** — Fix `toolSpecificData.cwd` extraction: VSCode URI dicts use `path` key (not always `fsPath`). Fall back to `path` when `fsPath` is absent. `rebuildIndex` now re-attributes all `cpt` sessions (not just empty `project_path`) when the current workspace has evidence — fixes attribution race where another window claimed a session first.
+
+**v0.31.55** — (skipped — incomplete fix)
 
 **v0.31.54** — Copilot workspace inference: also scan `response[].toolSpecificData.cwd` (in addition to `contentReferences`) to attribute Copilot sessions. Fixes older sessions that used tool invocations (e.g. terminal commands) as the only workspace evidence. Applies to both live pipeline and `rebuildIndex`.
 
