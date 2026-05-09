@@ -116,7 +116,7 @@ function renderSessionMarkdown(s: Record<string, unknown>): string {
     // Merge consecutive assistant fragments into one block
     const last = blocks[blocks.length - 1];
     if (last && last.role === role && role === 'assistant') {
-      last.text += text;
+      last.text += '\n\n' + text;
     } else {
       blocks.push({ role, text, timestamp: ts });
     }
