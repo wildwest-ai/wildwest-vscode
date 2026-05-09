@@ -317,10 +317,16 @@ export class SidePanelProvider
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([tool, count]) => toolBadge(`  ${TOOL_LABELS[tool] ?? tool}`, count));
 
+    const recentTotal = counts.today + counts.yesterday + counts.last7d;
+    const totalItem = new SidePanelItem(`Total   ${recentTotal}`, vscode.TreeItemCollapsibleState.None);
+    totalItem.iconPath = new vscode.ThemeIcon('pulse');
+    totalItem.tooltip = `Today (${counts.today}) + Yesterday (${counts.yesterday}) + Last 7 days (${counts.last7d})`;
+
     return [
       watcherItem,
       sortItem,
       scopeDisplay,
+      totalItem,
       makeBucket('Today', 'sessions:today', counts.today),
       makeBucket('Yesterday', 'sessions:yesterday', counts.yesterday),
       makeBucket('Last 7 days', 'sessions:last7d', counts.last7d),
