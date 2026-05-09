@@ -172,6 +172,7 @@ export class SidePanelProvider
       this.sectionItem('Board', 'board', boardFiles.length),
       this.sectionItem('Receipts', 'receipts', receipts.length),
       hbItem,
+      this.makeWatcherItem(),
     ];
   }
 
@@ -423,13 +424,16 @@ export class SidePanelProvider
     };
   }
 
-  private sessionsChildren(): SidePanelItem[] {
+  private makeWatcherItem(): SidePanelItem {
     const watcherLabel = this.isWatching ? '● Watcher: Running' : '○ Watcher: Stopped';
     const watcherCmd = this.isWatching ? 'wildwest.stopWatcher' : 'wildwest.startWatcher';
-    const watcherItem = new SidePanelItem(watcherLabel, vscode.TreeItemCollapsibleState.None);
-    watcherItem.iconPath = new vscode.ThemeIcon(this.isWatching ? 'eye' : 'eye-closed');
-    watcherItem.command = { command: watcherCmd, title: this.isWatching ? 'Stop Watcher' : 'Start Watcher' };
+    const item = new SidePanelItem(watcherLabel, vscode.TreeItemCollapsibleState.None);
+    item.iconPath = new vscode.ThemeIcon(this.isWatching ? 'eye' : 'eye-closed');
+    item.command = { command: watcherCmd, title: this.isWatching ? 'Stop Watcher' : 'Start Watcher' };
+    return item;
+  }
 
+  private sessionsChildren(): SidePanelItem[] {
     const sortLabel = this.sessionSortBy === 'created' ? 'Sort: Created' : 'Sort: Updated';
     const sortItem = new SidePanelItem(sortLabel, vscode.TreeItemCollapsibleState.None);
     sortItem.iconPath = new vscode.ThemeIcon('sort-precedence');
@@ -471,7 +475,6 @@ export class SidePanelProvider
       recentItem,
       makeBucket('Older', 'sessions:older', counts.older, counts.olderTurns),
       ...toolRows,
-      watcherItem,
     ];
   }
 

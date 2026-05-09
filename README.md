@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.32.10
+**Current version:** v0.32.11
 
 ---
 
 ## What's New
+
+**v0.32.11** — Sidebar: Sessions Watcher moved to root level (below Heartbeat); tool rows (Copilot, Claude, Codex) are now expandable to show sessions for that tool.
 
 **v0.32.10** — Fix CCX model capture: model is in `turn_context` lines (not `session_meta`). Corrects v0.32.8 which always wrote `undefined` for Codex sessions.
 
