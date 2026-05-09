@@ -263,14 +263,20 @@ export class SidePanelProvider
 
   private countStagedSessions(sortBy: 'created' | 'updated'): {
     today: number; yesterday: number; last7d: number; older: number;
+    todayTurns: number; yesterdayTurns: number; last7dTurns: number; olderTurns: number;
     byTool: Record<string, number>;
   } {
     const data = this.loadAndBucketSessions(sortBy);
+    const turns = (arr: Record<string, unknown>[]) => arr.reduce((s, x) => s + ((x['turn_count'] as number) || 0), 0);
     return {
       today: data.today.length,
       yesterday: data.yesterday.length,
       last7d: data.last7d.length,
       older: data.older.length,
+      todayTurns: turns(data.today),
+      yesterdayTurns: turns(data.yesterday),
+      last7dTurns: turns(data.last7d),
+      olderTurns: turns(data.older),
       byTool: data.byTool,
     };
   }
@@ -295,11 +301,11 @@ export class SidePanelProvider
     scopeDisplay.iconPath = new vscode.ThemeIcon(SCOPE_ICONS[scope] ?? 'globe');
     scopeDisplay.tooltip = 'Filter set by .wildwest/registry.json scope field';
 
-    const makeBucket = (lbl: string, sectionId: string, count: number): SidePanelItem => {
+    const makeBucket = (lbl: string, sectionId: string, count: number, turns: number): SidePanelItem => {
       const state = count > 0
         ? vscode.TreeItemCollapsibleState.Collapsed
         : vscode.TreeItemCollapsibleState.None;
-      const item = new SidePanelItem(`${lbl}   ${count}`, state, sectionId);
+      const item = new SidePanelItem(`${lbl}   ${count} (${turns})`, state, sectionId);
       item.iconPath = new vscode.ThemeIcon('history');
       return item;
     };
@@ -329,7 +335,7 @@ export class SidePanelProvider
       sortItem,
       scopeDisplay,
       recentItem,
-      makeBucket('Older', 'sessions:older', counts.older),
+      makeBucket('Older', 'sessions:older', counts.older, counts.olderTurns),
       ...toolRows,
     ];
   }
@@ -342,11 +348,11 @@ export class SidePanelProvider
 
   private sessionRecentChildren(): SidePanelItem[] {
     const counts = this.countStagedSessions(this.sessionSortBy);
-    const makeBucket = (lbl: string, sectionId: string, count: number): SidePanelItem => {
+    const makeBucket = (lbl: string, sectionId: string, count: number, turns: number): SidePanelItem => {
       const state = count > 0
         ? vscode.TreeItemCollapsibleState.Collapsed
         : vscode.TreeItemCollapsibleState.None;
-      const item = new SidePanelItem(`${lbl}   ${count}`, state, sectionId);
+      const item = new SidePanelItem(`${lbl}   ${count} (${turns})`, state, sectionId);
       item.iconPath = new vscode.ThemeIcon('history');
       return item;
     };
@@ -361,9 +367,9 @@ export class SidePanelProvider
         return item;
       });
     return [
-      makeBucket('Today', 'sessions:today', counts.today),
-      makeBucket('Yesterday', 'sessions:yesterday', counts.yesterday),
-      makeBucket('Last 7 days', 'sessions:last7d', counts.last7d),
+      makeBucket('Today', 'sessions:today', counts.today, counts.todayTurns),
+      makeBucket('Yesterday', 'sessions:yesterday', counts.yesterday, counts.yesterdayTurns),
+      makeBucket('Last 7 days', 'sessions:last7d', counts.last7d, counts.last7dTurns),
       ...toolRows,
     ];
   }

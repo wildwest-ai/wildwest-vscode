@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.36
+**Current version:** 0.31.37
 
 ---
 
 ## What's New
+
+**v0.31.37** — Session buckets (Today/Yesterday/Last 7 days/Older) now show total turn count in parens: `Today   1 (30)`. Turn sums computed from `turn_count` field per session.
 
 **v0.31.36** — Recent node: add per-tool breakdown rows (Copilot/Claude/Codex) as children, showing only sessions in the recent 8-day window. `countRecentByTool()` applies scope filter + date filter independently.
 
