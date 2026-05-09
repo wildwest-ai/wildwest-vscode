@@ -228,8 +228,8 @@ export class PacketWriter {
         session_type: sessionType,
         recorder_wwuid: recorderWwuid ?? '',
         recorder_scope: recorderScope ?? '',
-        workspace_wwuids: workspaceWwuids ?? (recorderWwuid ? [recorderWwuid] : []),
-        scope_refs: scopeRefs ?? [],
+        workspace_wwuids: this.mergeWwuids(workspaceWwuids, workspaceWwuids?.length ? undefined : (recorderWwuid ? [recorderWwuid] : undefined)),
+        scope_refs: this.mergeScopeRefs(scopeRefs),
         project_path: projectPath,
         created_at: sessionCreatedAt ?? firstTurnTimestamp,
         last_turn_at: lastTurnTimestamp,
@@ -259,8 +259,12 @@ export class PacketWriter {
       // Update metadata
       record.last_turn_at = lastTurnTimestamp;
       record.turn_count = record.turns.length;
-      record.workspace_wwuids = this.mergeWwuids(record.workspace_wwuids, workspaceWwuids);
-      record.scope_refs = this.mergeScopeRefs(record.scope_refs, scopeRefs);
+      if (workspaceWwuids !== undefined) {
+        record.workspace_wwuids = this.mergeWwuids(workspaceWwuids);
+      }
+      if (scopeRefs !== undefined) {
+        record.scope_refs = this.mergeScopeRefs(scopeRefs);
+      }
       if (!record.recorder_wwuid && recorderWwuid) {
         record.recorder_wwuid = recorderWwuid;
       }
@@ -318,17 +322,17 @@ export class PacketWriter {
         const existingWwuids = Array.isArray(entry['workspace_wwuids'])
           ? entry['workspace_wwuids'] as string[]
           : [];
-        const mergedWwuids = this.mergeWwuids(existingWwuids, workspaceWwuids);
-        if (mergedWwuids.length !== existingWwuids.length) {
-          entry['workspace_wwuids'] = mergedWwuids;
+        const nextWwuids = this.mergeWwuids(workspaceWwuids);
+        if (JSON.stringify(nextWwuids) !== JSON.stringify(existingWwuids)) {
+          entry['workspace_wwuids'] = nextWwuids;
           dirty = true;
         }
         const existingScopeRefs = Array.isArray(entry['scope_refs'])
           ? entry['scope_refs'] as ScopeRef[]
           : [];
-        const mergedScopeRefs = this.mergeScopeRefs(existingScopeRefs, scopeRefs);
-        if (mergedScopeRefs.length !== existingScopeRefs.length) {
-          entry['scope_refs'] = mergedScopeRefs;
+        const nextScopeRefs = this.mergeScopeRefs(scopeRefs);
+        if (JSON.stringify(nextScopeRefs) !== JSON.stringify(existingScopeRefs)) {
+          entry['scope_refs'] = nextScopeRefs;
           dirty = true;
         }
         if (!dirty) return;
@@ -337,7 +341,7 @@ export class PacketWriter {
     } catch { /* skip */ }
   }
 
-  private updateIndex(record: SessionRecord, workspaceWwuids?: string[]): void {
+  private updateIndex(record: SessionRecord, _workspaceWwuids?: string[]): void {
     const indexPath = path.join(this.stagedDir, 'storage', 'index.json');
 
     let index: { schema_version: string; updated_at: string; sessions: IndexEntry[] } = { schema_version: '1', updated_at: new Date().toISOString(), sessions: [] };
@@ -347,10 +351,10 @@ export class PacketWriter {
 
     // Upsert session in index
     const existingIdx = index.sessions.findIndex((s: IndexEntry) => s.wwuid === record.wwuid);
+    const recordWorkspaceWwuids = Array.isArray(record.workspace_wwuids) ? record.workspace_wwuids : [];
     const workspaceWwuidsForIndex = this.mergeWwuids(
-      record.workspace_wwuids,
-      workspaceWwuids,
-      record.recorder_wwuid ? [record.recorder_wwuid] : [],
+      recordWorkspaceWwuids,
+      recordWorkspaceWwuids.length === 0 && record.recorder_wwuid ? [record.recorder_wwuid] : undefined,
     );
     const scopeRefsForIndex = this.mergeScopeRefs(record.scope_refs);
     const entry: IndexEntry = {

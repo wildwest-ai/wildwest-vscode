@@ -87,9 +87,14 @@ describe('session pipeline attribution', () => {
     const sessionsDir = path.join(tempDir, 'sessions');
     const countyRoot = path.join(tempDir, 'county');
     const townRoot = path.join(countyRoot, 'town');
+    const otherCountyRoot = path.join(tempDir, 'other-county');
+    const otherTownRoot = path.join(otherCountyRoot, 'other-town');
     writeRegistry(countyRoot, 'county', 'county-wwuid');
     writeRegistry(townRoot, 'town', 'town-wwuid');
+    writeRegistry(otherCountyRoot, 'county', 'other-county-wwuid');
+    writeRegistry(otherTownRoot, 'town', 'other-town-wwuid');
     fs.writeFileSync(path.join(townRoot, 'CLAUDE.md'), '# town\n');
+    fs.writeFileSync(path.join(otherTownRoot, 'CLAUDE.md'), '# other town\n');
 
     const rawDir = path.join(sessionsDir, 'raw', 'github-copilot');
     const storageDir = path.join(sessionsDir, 'staged', 'storage', 'sessions');
@@ -109,6 +114,7 @@ describe('session pipeline attribution', () => {
             message: { text: 'work on town' },
             contentReferences: [
               { reference: { fsPath: path.join(townRoot, 'CLAUDE.md') } },
+              { reference: { fsPath: path.join(otherTownRoot, 'CLAUDE.md') } },
             ],
             response: [
               { value: 'ok', toolSpecificData: { cwd: townRoot } },
@@ -133,6 +139,11 @@ describe('session pipeline attribution', () => {
         session_type: 'chat',
         recorder_wwuid: '',
         recorder_scope: '',
+        workspace_wwuids: ['other-town-wwuid', 'other-county-wwuid'],
+        scope_refs: [
+          { scope: 'town', wwuid: 'other-town-wwuid', alias: 'other-town', path: otherTownRoot },
+          { scope: 'county', wwuid: 'other-county-wwuid', alias: 'other-county', path: otherCountyRoot },
+        ],
         project_path: countyRoot,
         created_at: '2026-05-09T12:00:00.000Z',
         last_turn_at: '2026-05-09T12:00:00.000Z',
@@ -154,15 +165,16 @@ describe('session pipeline attribution', () => {
 
     const record = JSON.parse(fs.readFileSync(path.join(storageDir, 'session-1.json'), 'utf8'));
     const index = JSON.parse(fs.readFileSync(path.join(sessionsDir, 'staged', 'storage', 'index.json'), 'utf8'));
-    expect(record.workspace_wwuids).toContain('town-wwuid');
-    expect(record.scope_refs).toEqual(expect.arrayContaining([
-      expect.objectContaining({ scope: 'town', wwuid: 'town-wwuid', path: townRoot }),
-      expect.objectContaining({ scope: 'county', wwuid: 'county-wwuid', path: countyRoot }),
-    ]));
-    expect(index.sessions[0].workspace_wwuids).toContain('town-wwuid');
-    expect(index.sessions[0].scope_refs).toEqual(expect.arrayContaining([
-      expect.objectContaining({ scope: 'town', wwuid: 'town-wwuid', path: townRoot }),
-      expect.objectContaining({ scope: 'county', wwuid: 'county-wwuid', path: countyRoot }),
-    ]));
+    expect(record.project_path).toBe(townRoot);
+    expect(record.workspace_wwuids).toEqual(['town-wwuid', 'county-wwuid']);
+    expect(record.scope_refs).toEqual([
+      expect.objectContaining({ scope: 'town', wwuid: 'town-wwuid', path: townRoot, signal_count: 3 }),
+      expect.objectContaining({ scope: 'county', wwuid: 'county-wwuid', path: countyRoot, signal_count: 3 }),
+    ]);
+    expect(index.sessions[0].workspace_wwuids).toEqual(['town-wwuid', 'county-wwuid']);
+    expect(index.sessions[0].scope_refs).toEqual([
+      expect.objectContaining({ scope: 'town', wwuid: 'town-wwuid', path: townRoot, signal_count: 3 }),
+      expect.objectContaining({ scope: 'county', wwuid: 'county-wwuid', path: countyRoot, signal_count: 3 }),
+    ]);
   });
 });

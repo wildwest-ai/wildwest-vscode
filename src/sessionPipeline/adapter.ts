@@ -248,19 +248,27 @@ export class PipelineAdapter {
     }
   }
 
+  private needsCptAttributionMigration(session: Record<string, unknown>): boolean {
+    const workspaceWwuids = Array.isArray(session['workspace_wwuids'])
+      ? session['workspace_wwuids'] as string[]
+      : [];
+    const scopeRefs = Array.isArray(session['scope_refs'])
+      ? session['scope_refs'] as ScopeRef[]
+      : [];
+
+    if (workspaceWwuids.length === 0 || scopeRefs.length === 0) return true;
+
+    const scopedWwuids = new Set(scopeRefs.map((ref) => ref.wwuid).filter((wwuid) => wwuid !== ''));
+    return workspaceWwuids.some((wwuid) => wwuid && !scopedWwuids.has(wwuid));
+  }
+
   private rebuildIndexIfAttributionMigrationNeeded(indexPath: string): void {
     if (this.attributionMigrationChecked) return;
     this.attributionMigrationChecked = true;
     try {
       const index = JSON.parse(fs.readFileSync(indexPath, 'utf8')) as { sessions?: Record<string, unknown>[] };
       const needsMigration = (index.sessions ?? []).some((session) =>
-        session['tool'] === 'cpt'
-        && (
-          !Array.isArray(session['workspace_wwuids'])
-          || session['workspace_wwuids'].length === 0
-          || !Array.isArray(session['scope_refs'])
-          || session['scope_refs'].length === 0
-        )
+        session['tool'] === 'cpt' && this.needsCptAttributionMigration(session)
       );
       if (needsMigration) {
         this.rebuildIndexFromRecords();
@@ -295,34 +303,32 @@ export class PipelineAdapter {
 
         const attribution = this.resolveRawAttribution(rawDir, record);
         if (attribution) {
-          // ccx/cld have authoritative project paths in raw metadata. For cpt,
-          // preserve existing primary attribution but recover workspace_wwuids.
-          if ((record['tool'] !== 'cpt' || !record['project_path']) && attribution.projectPath) {
+          if (attribution.projectPath && record['project_path'] !== attribution.projectPath) {
             record['project_path'] = attribution.projectPath;
             dirty = true;
           }
-          if (!record['recorder_wwuid'] && attribution.recorderWwuid) {
+          if (attribution.recorderWwuid && record['recorder_wwuid'] !== attribution.recorderWwuid) {
             record['recorder_wwuid'] = attribution.recorderWwuid;
             dirty = true;
           }
-          if (!record['recorder_scope'] && attribution.recorderScope) {
+          if (attribution.recorderScope && record['recorder_scope'] !== attribution.recorderScope) {
             record['recorder_scope'] = attribution.recorderScope;
             dirty = true;
           }
           const existingWwuids = Array.isArray(record['workspace_wwuids'])
             ? record['workspace_wwuids'] as string[]
             : [];
-          const mergedWwuids = this.mergeWwuids(existingWwuids, attribution.workspaceWwuids);
-          if (mergedWwuids.length !== existingWwuids.length) {
-            record['workspace_wwuids'] = mergedWwuids;
+          const nextWwuids = this.mergeWwuids(attribution.workspaceWwuids);
+          if (JSON.stringify(nextWwuids) !== JSON.stringify(existingWwuids)) {
+            record['workspace_wwuids'] = nextWwuids;
             dirty = true;
           }
           const existingScopeRefs = Array.isArray(record['scope_refs'])
             ? record['scope_refs'] as ScopeRef[]
             : [];
-          const mergedScopeRefs = this.mergeScopeRefs(existingScopeRefs, attribution.scopeRefs);
-          if (mergedScopeRefs.length !== existingScopeRefs.length) {
-            record['scope_refs'] = mergedScopeRefs;
+          const nextScopeRefs = this.mergeScopeRefs(attribution.scopeRefs);
+          if (JSON.stringify(nextScopeRefs) !== JSON.stringify(existingScopeRefs)) {
+            record['scope_refs'] = nextScopeRefs;
             dirty = true;
           }
         }

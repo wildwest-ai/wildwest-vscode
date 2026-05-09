@@ -265,7 +265,7 @@ describe('SidePanelProvider', () => {
     spy.mockRestore();
   });
 
-  it('filters session counts to the current town by path and wwuid', () => {
+  it('filters session counts to the current town by scoped identity before legacy wwuid fallbacks', () => {
     writeRegistry(townRoot, 'town', 'town', 'town-wwuid');
     const exportPath = path.join(tempDir, 'sessions');
     const siblingTown = path.join(tempDir, 'sibling-town');
@@ -274,6 +274,17 @@ describe('SidePanelProvider', () => {
       makeSession('town-descendant', { project_path: path.join(townRoot, 'packages', 'api'), turn_count: 3 }),
       makeSession('town-wwuid', { workspace_wwuids: ['town-wwuid'], turn_count: 4 }),
       makeSession('town-scope-ref', { scope_refs: [{ scope: 'town', wwuid: 'town-wwuid', alias: 'town', path: townRoot }], turn_count: 5 }),
+      makeSession('other-scoped-town', {
+        recorder_wwuid: 'other-town-wwuid',
+        recorder_scope: 'town',
+        workspace_wwuids: ['town-wwuid'],
+        scope_refs: [{ scope: 'town', wwuid: 'other-town-wwuid', alias: 'other', path: siblingTown }],
+      }),
+      makeSession('other-recorder-town', {
+        recorder_wwuid: 'other-town-wwuid',
+        recorder_scope: 'town',
+        workspace_wwuids: ['town-wwuid'],
+      }),
       makeSession('sibling-town', { project_path: siblingTown }),
       makeSession('county-root', { project_path: tempDir }),
     ]);
@@ -290,7 +301,7 @@ describe('SidePanelProvider', () => {
     provider.dispose();
   });
 
-  it('filters county session counts across county root, towns, and wwuid attribution', () => {
+  it('filters county session counts across scoped county and town identities before legacy fallbacks', () => {
     const countyRoot = path.join(tempDir, 'county');
     const townA = path.join(countyRoot, 'town-a');
     const townB = path.join(countyRoot, 'town-b');
@@ -312,6 +323,17 @@ describe('SidePanelProvider', () => {
       makeSession('county-wwuid', { workspace_wwuids: ['county-wwuid'], turn_count: 5 }),
       makeSession('county-scope-ref', { scope_refs: [{ scope: 'county', wwuid: 'county-wwuid', alias: 'county', path: countyRoot }], turn_count: 6 }),
       makeSession('town-scope-ref', { scope_refs: [{ scope: 'town', wwuid: 'town-a-wwuid', alias: 'town-a', path: townA }], turn_count: 7 }),
+      makeSession('other-scoped-town', {
+        recorder_wwuid: 'outside-wwuid',
+        recorder_scope: 'town',
+        workspace_wwuids: ['county-wwuid', 'town-a-wwuid'],
+        scope_refs: [{ scope: 'town', wwuid: 'outside-wwuid', alias: 'outside', path: outside }],
+      }),
+      makeSession('other-recorder-town', {
+        recorder_wwuid: 'outside-wwuid',
+        recorder_scope: 'town',
+        workspace_wwuids: ['county-wwuid', 'town-a-wwuid'],
+      }),
       makeSession('outside-path', { project_path: outside }),
       makeSession('outside-wwuid', { recorder_wwuid: 'outside-wwuid' }),
     ]);

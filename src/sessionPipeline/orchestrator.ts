@@ -242,32 +242,32 @@ export class SessionExportPipeline {
     try {
       const record = JSON.parse(fs.readFileSync(recordPath, 'utf8')) as Record<string, unknown>;
       let dirty = false;
-      if (!record['recorder_wwuid'] && recorderWwuid) {
+      if (recorderWwuid && record['recorder_wwuid'] !== recorderWwuid) {
         record['recorder_wwuid'] = recorderWwuid;
         dirty = true;
       }
-      if (!record['recorder_scope'] && recorderScope) {
+      if (recorderScope && record['recorder_scope'] !== recorderScope) {
         record['recorder_scope'] = recorderScope;
         dirty = true;
       }
-      if (!record['project_path'] && projectPath) {
+      if (projectPath && record['project_path'] !== projectPath) {
         record['project_path'] = projectPath;
         dirty = true;
       }
       const existingWwuids = Array.isArray(record['workspace_wwuids'])
         ? record['workspace_wwuids'] as string[]
         : [];
-      const mergedWwuids = [...new Set([...existingWwuids, ...workspaceWwuids].filter((wwuid) => wwuid !== ''))];
-      if (mergedWwuids.length !== existingWwuids.length) {
-        record['workspace_wwuids'] = mergedWwuids;
+      const nextWwuids = [...new Set(workspaceWwuids.filter((wwuid) => wwuid !== ''))];
+      if (JSON.stringify(nextWwuids) !== JSON.stringify(existingWwuids)) {
+        record['workspace_wwuids'] = nextWwuids;
         dirty = true;
       }
       const existingScopeRefs = Array.isArray(record['scope_refs'])
         ? record['scope_refs'] as ScopeRef[]
         : [];
-      const mergedScopeRefs = this.mergeScopeRefs(existingScopeRefs, scopeRefs);
-      if (mergedScopeRefs.length !== existingScopeRefs.length) {
-        record['scope_refs'] = mergedScopeRefs;
+      const nextScopeRefs = this.mergeScopeRefs(scopeRefs);
+      if (JSON.stringify(nextScopeRefs) !== JSON.stringify(existingScopeRefs)) {
+        record['scope_refs'] = nextScopeRefs;
         dirty = true;
       }
       if (!dirty) return;
@@ -277,8 +277,8 @@ export class SessionExportPipeline {
         (record['project_path'] as string) || projectPath,
         (record['recorder_wwuid'] as string) || recorderWwuid,
         (record['recorder_scope'] as WildWestScope | '') || recorderScope,
-        mergedWwuids,
-        mergedScopeRefs,
+        nextWwuids,
+        nextScopeRefs,
       );
     } catch { /* skip */ }
   }
@@ -334,9 +334,6 @@ export class SessionExportPipeline {
    *
    * Returns { projectPath, recorderWwuid } — both may be empty if no evidence found.
    */
-  // Minimum signal count for a workspace to be included in workspace_wwuids
-  private static readonly SIGNAL_THRESHOLD = 3;
-
   resolveAttribution(
     tool: string,
     rawSession: unknown,
@@ -351,7 +348,7 @@ export class SessionExportPipeline {
         projectPath: metadataProjectPath,
         recorderWwuid: recorderRef?.wwuid ?? '',
         recorderScope: recorderRef?.scope ?? '',
-        workspaceWwuids: recorderRef?.wwuid ? [recorderRef.wwuid] : [],
+        workspaceWwuids: [...new Set(scopeRefs.map((ref) => ref.wwuid).filter((wwuid) => wwuid !== ''))],
         scopeRefs,
       };
     }
@@ -392,17 +389,8 @@ export class SessionExportPipeline {
     const projectPath = best[0];
     const recorderRef = this.readRegistryScopeRef(projectPath);
 
-    // All workspaces meeting the signal threshold (for multi-workspace sessions)
-    const significantRoots = [...hits.entries()]
-      .filter(([, count]) => count >= SessionExportPipeline.SIGNAL_THRESHOLD);
-    const workspaceWwuids = [...new Set([
-      recorderRef?.wwuid ?? '',
-      ...significantRoots.map(([root]) => this.readRegistryScopeRef(root)?.wwuid ?? ''),
-    ].filter((wwuid) => wwuid !== ''))];
-    const scopeRefs = this.mergeScopeRefs(
-      this.collectScopeRefs(best[0], best[1]),
-      ...significantRoots.map(([root, count]) => this.collectScopeRefs(root, count)),
-    );
+    const scopeRefs = this.collectScopeRefs(best[0], best[1]);
+    const workspaceWwuids = [...new Set(scopeRefs.map((ref) => ref.wwuid).filter((wwuid) => wwuid !== ''))];
 
     return {
       projectPath,

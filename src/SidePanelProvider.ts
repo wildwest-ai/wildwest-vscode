@@ -269,6 +269,7 @@ export class SidePanelProvider
         ? session['workspace_wwuids'] as string[]
         : [];
       const recorderWwuid = (session['recorder_wwuid'] as string) || '';
+      const recorderScope = (session['recorder_scope'] as string) || '';
       const scopeRefs = Array.isArray(session['scope_refs'])
         ? session['scope_refs'] as SidebarScopeRef[]
         : [];
@@ -277,7 +278,8 @@ export class SidePanelProvider
 
       if (info.scope === 'town') {
         if (info.wwuid) {
-          if (hasScopeRef('town', info.wwuid)) return true;
+          if (scopeRefs.length > 0) return hasScopeRef('town', info.wwuid);
+          if (recorderScope) return recorderScope === 'town' && recorderWwuid === info.wwuid;
           if (workspaceWwuids.includes(info.wwuid) || recorderWwuid === info.wwuid) return true;
         }
         return this.pathContains(info.filterPath ?? workspaceRoot, projectPath);
@@ -285,10 +287,16 @@ export class SidePanelProvider
 
       if (info.scope === 'county') {
         if (info.wwuid) {
-          if (hasScopeRef('county', info.wwuid)) return true;
+          if (scopeRefs.length > 0) {
+            return hasScopeRef('county', info.wwuid)
+              || scopeRefs.some((ref) => ref.scope === 'town' && ref.wwuid && countyTownWwuids.has(ref.wwuid));
+          }
+          if (recorderScope) {
+            return (recorderScope === 'county' && recorderWwuid === info.wwuid)
+              || (recorderScope === 'town' && recorderWwuid !== '' && countyTownWwuids.has(recorderWwuid));
+          }
           if (workspaceWwuids.includes(info.wwuid) || recorderWwuid === info.wwuid) return true;
         }
-        if (scopeRefs.some((ref) => ref.scope === 'town' && ref.wwuid && countyTownWwuids.has(ref.wwuid))) return true;
         if (recorderWwuid && countyTownWwuids.has(recorderWwuid)) return true;
         if (workspaceWwuids.some((wwuid) => countyTownWwuids.has(wwuid))) return true;
         return this.pathContains(countyRoot, projectPath);

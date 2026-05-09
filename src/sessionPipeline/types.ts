@@ -97,7 +97,7 @@ export interface SessionRecord {
   session_type: 'chat' | 'edit'; // 'edit' reserved for copilot-edits (future)
   recorder_wwuid: string; // wwuid of the town registry that recorded this session
   recorder_scope: WildWestScope | '';
-  workspace_wwuids: string[]; // all workspaces with significant signal presence
+  workspace_wwuids: string[]; // primary scope lineage wwuid values
   scope_refs: ScopeRef[]; // absolute scope identities used for filtering
   project_path: string;
   created_at: string; // ISO 8601 UTC
@@ -123,7 +123,7 @@ export interface IndexEntry {
   session_type: 'chat' | 'edit';
   recorder_wwuid: string; // primary attribution (workspace with most signals)
   recorder_scope: WildWestScope | '';
-  workspace_wwuids: string[]; // all workspaces with significant signal presence
+  workspace_wwuids: string[]; // primary scope lineage wwuid values
   scope_refs: ScopeRef[]; // absolute scope identities used for filtering
   project_path: string;
   created_at: string; // ISO 8601 UTC
