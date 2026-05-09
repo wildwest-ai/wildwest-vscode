@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.63
+**Current version:** 0.31.64
 
 ---
 
 ## What's New
+
+**v0.31.64** — Multi-workspace session support: add `workspace_wwuids[]` to index entries. Cross-workspace Copilot sessions now appear in every town panel where they have ≥3 signals — primary attribution (most signals) still set as `recorder_wwuid`/`project_path`. Side panel filter checks `workspace_wwuids` membership first.
 
 **v0.31.63** — Attribution is now fully window-agnostic. `resolveAttribution()` replaces all window-context inference: for `cld`/`ccx` reads `project_path` from raw file then looks up that path's `.wildwest/registry.json` for `recorder_wwuid`; for `cpt` counts all cwd/contentRef signals per workspace root (walking up to find `.wildwest/registry.json`), picks the workspace with the most hits. Same result from any window — no need to run Export Now from every town.
 

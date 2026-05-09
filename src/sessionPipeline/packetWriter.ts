@@ -171,7 +171,8 @@ export class PacketWriter {
     sessionType: 'chat' | 'edit',
     toolCursor?: unknown,
     sessionCreatedAt?: string,
-    recorderWwuid?: string
+    recorderWwuid?: string,
+    workspaceWwuids?: string[]
   ): Promise<void> {
     this.ensureDirectories();
     const sessionRecordPath = path.join(
@@ -241,10 +242,10 @@ export class PacketWriter {
     fs.writeFileSync(sessionRecordPath, JSON.stringify(record, null, 2), 'utf8');
 
     // Update index
-    this.updateIndex(record);
+    this.updateIndex(record, workspaceWwuids);
   }
 
-  patchIndexEntry(wwuid: string, projectPath: string, recorderWwuid: string): void {
+  patchIndexEntry(wwuid: string, projectPath: string, recorderWwuid: string, workspaceWwuids: string[]): void {
     const indexPath = path.join(this.stagedDir, 'storage', 'index.json');
     if (!fs.existsSync(indexPath)) return;
     try {
@@ -253,12 +254,13 @@ export class PacketWriter {
       if (entry && !entry['recorder_wwuid'] && !entry['project_path']) {
         entry['recorder_wwuid'] = recorderWwuid;
         entry['project_path'] = projectPath;
+        entry['workspace_wwuids'] = workspaceWwuids;
         fs.writeFileSync(indexPath, JSON.stringify(index, null, 2), 'utf8');
       }
     } catch { /* skip */ }
   }
 
-  private updateIndex(record: SessionRecord): void {
+  private updateIndex(record: SessionRecord, workspaceWwuids?: string[]): void {
     const indexPath = path.join(this.stagedDir, 'storage', 'index.json');
 
     let index: { schema_version: string; updated_at: string; sessions: IndexEntry[] } = { schema_version: '1', updated_at: new Date().toISOString(), sessions: [] };
@@ -277,6 +279,7 @@ export class PacketWriter {
       device_id: record.device_id,
       session_type: record.session_type,
       recorder_wwuid: record.recorder_wwuid ?? '',
+      workspace_wwuids: workspaceWwuids ?? (record.recorder_wwuid ? [record.recorder_wwuid] : []),
       project_path: record.project_path,
       created_at: record.created_at,
       last_turn_at: record.last_turn_at,

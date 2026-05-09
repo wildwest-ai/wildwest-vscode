@@ -300,6 +300,7 @@ export class PipelineAdapter {
           device_id: record['device_id'],
           session_type: record['session_type'],
           recorder_wwuid: record['recorder_wwuid'] ?? '',
+          workspace_wwuids: record['workspace_wwuids'] ?? (record['recorder_wwuid'] ? [record['recorder_wwuid']] : []),
           project_path: record['project_path'],
           created_at: record['created_at'],
           last_turn_at: record['last_turn_at'],

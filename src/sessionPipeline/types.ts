@@ -108,7 +108,8 @@ export interface IndexEntry {
   author: string;
   device_id: string;
   session_type: 'chat' | 'edit';
-  recorder_wwuid: string; // wwuid of the town registry that recorded this session
+  recorder_wwuid: string; // primary attribution (workspace with most signals)
+  workspace_wwuids: string[]; // all workspaces with significant signal presence
   project_path: string;
   created_at: string; // ISO 8601 UTC
   last_turn_at: string; // ISO 8601 UTC

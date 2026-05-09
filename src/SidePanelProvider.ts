@@ -265,10 +265,11 @@ export class SidePanelProvider
       const countyRoot: string | null = scope === 'county' ? this.findCountyRoot(townRoot) : null;
       const scopeFilter = (session: S): boolean => {
         if (scope === 'town') {
-          // Primary: match by recorder_wwuid (stable, set at export time)
+          if (!townWwuid) return (session['project_path'] as string) === townRoot;
+          const ww = (session['workspace_wwuids'] as string[]) || [];
+          if (ww.length > 0) return ww.includes(townWwuid);
           const rw = (session['recorder_wwuid'] as string) || '';
-          if (rw && townWwuid) return rw === townWwuid;
-          // Fallback: project_path match for records pre-dating recorder_wwuid
+          if (rw) return rw === townWwuid;
           return (session['project_path'] as string) === townRoot;
         }
         if (scope === 'county') {
@@ -429,8 +430,11 @@ export class SidePanelProvider
       const { scope, filterPath, wwuid: townWwuid } = this.readRegistryScope();
       const scopeFilter = (session: Record<string, unknown>): boolean => {
         if (scope === 'town') {
+          if (!townWwuid) return (session['project_path'] as string) === townRoot;
+          const ww = (session['workspace_wwuids'] as string[]) || [];
+          if (ww.length > 0) return ww.includes(townWwuid);
           const rw = (session['recorder_wwuid'] as string) || '';
-          if (rw && townWwuid) return rw === townWwuid;
+          if (rw) return rw === townWwuid;
           return (session['project_path'] as string) === townRoot;
         }
         if (scope === 'county') {

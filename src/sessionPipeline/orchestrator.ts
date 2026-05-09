@@ -120,7 +120,7 @@ export class SessionExportPipeline {
     // 4. Resolve attribution from session data — deterministic, window-agnostic.
     // cld/ccx: project_path is in the raw file; look up the path's registry for wwuid.
     // cpt: no built-in project field; find workspace with most cwd/ref signals, look up its registry.
-    const { projectPath: resolvedProjectPath, recorderWwuid: resolvedRecorderWwuid } =
+    const { projectPath: resolvedProjectPath, recorderWwuid: resolvedRecorderWwuid, workspaceWwuids: resolvedWorkspaceWwuids } =
       this.resolveAttribution(tool, rawSession, metadata.project_path);
 
     // 5. Check cursor to determine delta
@@ -128,7 +128,7 @@ export class SessionExportPipeline {
 
     if (newTurns.length === 0 && !closed) {
       // No new turns — patch attribution if existing record has none yet
-      this.patchAttribution(wwuid, resolvedProjectPath, resolvedRecorderWwuid);
+      this.patchAttribution(wwuid, resolvedProjectPath, resolvedRecorderWwuid, resolvedWorkspaceWwuids);
       return;
     }
 
@@ -166,7 +166,8 @@ export class SessionExportPipeline {
           value: turnsForPacket[turnsForPacket.length - 1].meta?.tool_cursor_value || turnsForPacket[turnsForPacket.length - 1].turn_index,
         },
         metadata.created_at,
-        resolvedRecorderWwuid || undefined
+        resolvedRecorderWwuid || undefined,
+        resolvedWorkspaceWwuids
       );
     } catch (error) {
       throw new Error(`Storage update failed: ${error}`);
@@ -205,18 +206,16 @@ export class SessionExportPipeline {
    * window can claim it but the record was written with empty attribution by another
    * window that processed it first.
    */
-  private patchAttribution(wwuid: string, projectPath: string, recorderWwuid: string): void {
+  private patchAttribution(wwuid: string, projectPath: string, recorderWwuid: string, workspaceWwuids: string[]): void {
     const recordPath = path.join(this.stagedDir, 'storage', 'sessions', `${wwuid}.json`);
     if (!fs.existsSync(recordPath)) return;
     try {
       const record = JSON.parse(fs.readFileSync(recordPath, 'utf8')) as Record<string, unknown>;
-      // Only patch if not already claimed by this or another workspace
       if (record['recorder_wwuid'] || record['project_path']) return;
       record['recorder_wwuid'] = recorderWwuid;
       record['project_path'] = projectPath;
       fs.writeFileSync(recordPath, JSON.stringify(record, null, 2), 'utf8');
-      // Also update the index entry
-      this.packetWriter.patchIndexEntry(wwuid, projectPath, recorderWwuid);
+      this.packetWriter.patchIndexEntry(wwuid, projectPath, recorderWwuid, workspaceWwuids);
     } catch { /* skip */ }
   }
 
@@ -271,22 +270,27 @@ export class SessionExportPipeline {
    *
    * Returns { projectPath, recorderWwuid } — both may be empty if no evidence found.
    */
+  // Minimum signal count for a workspace to be included in workspace_wwuids
+  private static readonly SIGNAL_THRESHOLD = 3;
+
   private resolveAttribution(
     tool: string,
     rawSession: unknown,
     metadataProjectPath: string
-  ): { projectPath: string; recorderWwuid: string } {
+  ): { projectPath: string; recorderWwuid: string; workspaceWwuids: string[] } {
     // cld / ccx: project_path is authoritative from raw file
     if (metadataProjectPath) {
+      const recorderWwuid = this.readRegistryWwuid(metadataProjectPath);
       return {
         projectPath: metadataProjectPath,
-        recorderWwuid: this.readRegistryWwuid(metadataProjectPath),
+        recorderWwuid,
+        workspaceWwuids: recorderWwuid ? [recorderWwuid] : [],
       };
     }
 
     // cpt: infer from signals across all workspace roots mentioned in the session
     if (tool !== 'cpt') {
-      return { projectPath: '', recorderWwuid: '' };
+      return { projectPath: '', recorderWwuid: '', workspaceWwuids: [] };
     }
 
     const session = rawSession as Record<string, unknown>;
@@ -313,12 +317,20 @@ export class SessionExportPipeline {
       }
     }
 
-    if (hits.size === 0) return { projectPath: '', recorderWwuid: '' };
+    if (hits.size === 0) return { projectPath: '', recorderWwuid: '', workspaceWwuids: [] };
 
-    // Pick the workspace with the most signals
+    // Primary: workspace with the most signals
     const best = [...hits.entries()].reduce((a, b) => b[1] > a[1] ? b : a);
     const projectPath = best[0];
-    return { projectPath, recorderWwuid: this.readRegistryWwuid(projectPath) };
+    const recorderWwuid = this.readRegistryWwuid(projectPath);
+
+    // All workspaces meeting the signal threshold (for multi-workspace sessions)
+    const workspaceWwuids = [...hits.entries()]
+      .filter(([, count]) => count >= SessionExportPipeline.SIGNAL_THRESHOLD)
+      .map(([root]) => this.readRegistryWwuid(root))
+      .filter((w) => w !== '');
+
+    return { projectPath, recorderWwuid, workspaceWwuids };
   }
 
   /**
