@@ -92,8 +92,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.workspace.registerTextDocumentContentProvider(SESSION_PREVIEW_SCHEME, sessionPreviewProvider),
     vscode.commands.registerCommand('wildwest.openSessionPreview', async (wwuid: string, exportPath: string) => {
       const uri = SessionPreviewProvider.uriFor(wwuid, exportPath);
-      const doc = await vscode.workspace.openTextDocument(uri);
-      await vscode.window.showTextDocument(doc, { preview: true, preserveFocus: false });
+      await vscode.commands.executeCommand('markdown.showPreview', uri);
     }),
   );
 

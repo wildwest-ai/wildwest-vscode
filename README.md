@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.32.0
+**Current version:** v0.32.1
 
 ---
 
 ## What's New
+
+**v0.32.1** — Session preview now opens as rendered markdown (via `markdown.showPreview`) instead of plain text.
 
 **v0.32.0** — Session preview: clicking a session in the sidebar now opens a read-only markdown view instead of raw JSON. Registry schema v3: `actors` renamed to `identities`, entries use `{ role, dyad }` (`channel` dropped); auto-migrated on heartbeat. Board cleanup: merged branches archived.
 
