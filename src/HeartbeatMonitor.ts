@@ -83,14 +83,53 @@ function migrateRegistry(rootPath: string, reg: Record<string, unknown>): Record
   return updated;
 }
 
-function scopeOf(rootPath: string): WildWestScope | null {
+/**
+ * Migrate a v2 registry to v3.
+ * Renames actors → identities; within each entry: actor → dyad, drops channel.
+ */
+function migrateToV3(rootPath: string, reg: Record<string, unknown>): Record<string, unknown> {
+  const p = path.join(rootPath, '.wildwest', 'registry.json');
+  const updated = { ...reg };
+
+  if (Array.isArray(updated['actors'])) {
+    updated['identities'] = (updated['actors'] as Array<Record<string, unknown>>).map(a => {
+      const entry: Record<string, unknown> = {};
+      if (a['role']) entry['role'] = a['role'];
+      if (a['actor']) entry['dyad'] = a['actor'];
+      else if (a['identity']) entry['dyad'] = a['identity'];
+      return entry;
+    });
+    delete updated['actors'];
+  } else if (!('identities' in updated)) {
+    updated['identities'] = [];
+  }
+
+  updated['schema_version'] = '3';
+
+  try {
+    fs.writeFileSync(p, JSON.stringify(updated, null, 2) + '\n', 'utf8');
+  } catch {
+    // Migration write failed — proceed with in-memory result
+  }
+
+  return updated;
+}
+
+function readMigratedRegistry(rootPath: string): Record<string, unknown> | null {
   let reg = readRegistry(rootPath);
   if (!reg) return null;
-
-  // Auto-migrate if schema_version is missing
   if (!reg['schema_version']) {
     reg = migrateRegistry(rootPath, reg);
   }
+  if (reg['schema_version'] === '2') {
+    reg = migrateToV3(rootPath, reg);
+  }
+  return reg;
+}
+
+function scopeOf(rootPath: string): WildWestScope | null {
+  const reg = readMigratedRegistry(rootPath);
+  if (!reg) return null;
 
   const s = reg['scope'];
   if (s === 'town' || s === 'county' || s === 'territory') return s;
@@ -795,17 +834,34 @@ function beatTown(
     );
   }
 
-  // Validate declared identity role against scope
+  // Validate declared identity role against scope and roster
   const scopeCheck = scopeOf(rootPath);
   if (scopeCheck === 'town') {
     const identitySetting = vscode.workspace.getConfiguration('wildwest').get<string>('identity', '');
     if (identitySetting) {
-      // Extract just the role part (before any parentheses, e.g. "TM" from "TM(RHk)")
       const roleMatch = identitySetting.match(/^([A-Za-z]+)/);
+      const dyadMatch = identitySetting.match(/\(([^)]+)\)/);
       if (roleMatch) {
         const role = roleMatch[1];
         if (!isValidRoleForScope(role, 'town')) {
           outputChannel.appendLine(`[HeartbeatMonitor] WARNING: Identity role "${role}" is not valid for scope "town". Valid roles: ${SCOPE_ROLES['town'].join(', ')}`);
+        }
+        // Roster check: warn if identity not declared in identities array (when non-empty)
+        if (dyadMatch) {
+          const dyad = dyadMatch[1];
+          const reg = readMigratedRegistry(rootPath);
+          if (reg) {
+            const identities = reg['identities'] as Array<{ role?: string; dyad?: string }> | undefined;
+            if (Array.isArray(identities) && identities.length > 0) {
+              const inRoster = identities.some(i => i.role === role && i.dyad === dyad);
+              if (!inRoster) {
+                outputChannel.appendLine(
+                  `[HeartbeatMonitor] WARNING: Identity "${identitySetting}" is not in the town identities roster. ` +
+                  `Declared: ${identities.map(i => `${i.role}(${i.dyad})`).join(', ')}`,
+                );
+              }
+            }
+          }
         }
       }
     }

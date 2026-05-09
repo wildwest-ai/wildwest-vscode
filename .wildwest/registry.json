@@ -9,6 +9,7 @@
   "actors": [],
   "active_branches": {
     "feat-actor-scope-display": "merged/feat/actor-scope-display",
-    "feat-telegraph-delivery": "feat/telegraph-delivery"
+    "feat-telegraph-delivery": "merged/feat/telegraph-delivery",
+    "feat-session-export-pipeline": "merged/feat/session-export-pipeline"
   }
 }

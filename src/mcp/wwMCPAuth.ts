@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 
 /**
  * Checks whether the connecting identity is registered in the identity registry.
- * For v0.21: permissive — if no `actors` array exists in registry.json,
+ * For v0.21: permissive — if no `identities` array exists in registry.json,
  * access is allowed (with a warning) to avoid blocking all MCP use before
  * the registry schema is finalized.
  */
@@ -21,16 +21,16 @@ export function checkActorAccess(
     return { allowed: false, reason: 'registry.json unreadable or missing' };
   }
 
-  // No actors array → permissive (v0.21 interim behavior)
-  if (!Array.isArray(registry['actors'])) {
+  // No identities array → permissive (v0.21 interim behavior)
+  if (!Array.isArray(registry['identities'])) {
     outputChannel.appendLine(
-      '[wwMCP] WARNING: No actors array in registry.json — access allowed (permissive mode, v0.21). ' +
-      'Add actors array to enforce registration.',
+      '[wwMCP] WARNING: No identities array in registry.json — access allowed (permissive mode, v0.21). ' +
+      'Add identities array to enforce registration.',
     );
     return { allowed: true };
   }
 
-  // TODO: v1.0+ — match connection identity against actors array
-  // For now, any registered registry with an actors field is treated as authorized
+  // TODO: v1.0+ — match connection identity against identities array
+  // For now, any registered registry with an identities field is treated as authorized
   return { allowed: true };
 }

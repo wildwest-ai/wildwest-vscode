@@ -413,12 +413,13 @@ export async function initTown(outputChannel: vscode.OutputChannel): Promise<voi
         } catch { /* no remote set */ }
 
         const registry = {
-          schema_version: '2',
+          schema_version: '3',
           scope: 'town',
           wwuid,
           alias: repoName,
           remote: remote || null,
           mcp: null,
+          identities: [],
           createdAt: new Date().toISOString(),
         };
 
@@ -561,7 +562,7 @@ export async function initCounty(outputChannel: vscode.OutputChannel): Promise<v
 
         const registry = {
           scope: 'county',
-          schema_version: '2',
+          schema_version: '3',
           wwuid,
           alias: repoName,
           remote: remote || null,
@@ -670,7 +671,7 @@ export async function initTerritory(outputChannel: vscode.OutputChannel): Promis
 
         const registry = {
           scope: 'territory',
-          schema_version: '2',
+          schema_version: '3',
           wwuid,
           alias: repoName,
           remote: null,

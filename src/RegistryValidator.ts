@@ -87,27 +87,27 @@ export function validateRegistryData(data: Record<string, unknown>): RegistryVal
     issues.push({ severity: 'warn', field: 'mcp', message: 'expected an object or null' });
   }
 
-  // ── actors ────────────────────────────────────────────────────────────────
-  if (data['actors'] !== undefined) {
-    if (!Array.isArray(data['actors'])) {
-      issues.push({ severity: 'error', field: 'actors', message: 'must be an array' });
+  // ── identities (schema v3+) ───────────────────────────────────────────────
+  if (data['identities'] !== undefined) {
+    if (!Array.isArray(data['identities'])) {
+      issues.push({ severity: 'error', field: 'identities', message: 'must be an array' });
     } else {
       const validRoles: string[] | null =
         typeof scope === 'string' && VALID_SCOPES.includes(scope as Scope)
           ? SCOPE_ROLES[scope as Scope]
           : null;
 
-      (data['actors'] as unknown[]).forEach((entry, i) => {
+      (data['identities'] as unknown[]).forEach((entry, i) => {
         if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
-          issues.push({ severity: 'error', field: `actors[${i}]`, message: 'must be an object' });
+          issues.push({ severity: 'error', field: `identities[${i}]`, message: 'must be an object' });
           return;
         }
         const a = entry as Record<string, unknown>;
-        for (const f of ['role', 'identity', 'channel'] as const) {
+        for (const f of ['role', 'dyad'] as const) {
           if (typeof a[f] !== 'string' || (a[f] as string).trim() === '') {
             issues.push({
               severity: 'error',
-              field: `actors[${i}].${f}`,
+              field: `identities[${i}].${f}`,
               message: 'required string field missing or empty',
             });
           }
@@ -115,7 +115,7 @@ export function validateRegistryData(data: Record<string, unknown>): RegistryVal
         if (validRoles && typeof a['role'] === 'string' && !validRoles.includes(a['role'])) {
           issues.push({
             severity: 'warn',
-            field: `actors[${i}].role`,
+            field: `identities[${i}].role`,
             message: `"${a['role']}" is not a valid role for scope "${scope}" — valid roles: ${validRoles.join(', ')}`,
           });
         }
