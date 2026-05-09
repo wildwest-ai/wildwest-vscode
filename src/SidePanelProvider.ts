@@ -350,11 +350,59 @@ export class SidePanelProvider
       item.iconPath = new vscode.ThemeIcon('history');
       return item;
     };
+    const TOOL_LABELS: Record<string, string> = { cpt: 'Copilot', cld: 'Claude', ccx: 'Codex' };
+    const TOOL_ICONS: Record<string, string> = { cpt: 'github', cld: 'comment-discussion', ccx: 'circuit-board' };
+    const recentByTool = this.countRecentByTool();
+    const toolRows = Object.entries(recentByTool)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([tool, count]) => {
+        const item = new SidePanelItem(`  ${TOOL_LABELS[tool] ?? tool}   ${count}`, vscode.TreeItemCollapsibleState.None);
+        item.iconPath = new vscode.ThemeIcon(TOOL_ICONS[tool] ?? 'robot');
+        return item;
+      });
     return [
       makeBucket('Today', 'sessions:today', counts.today),
       makeBucket('Yesterday', 'sessions:yesterday', counts.yesterday),
       makeBucket('Last 7 days', 'sessions:last7d', counts.last7d),
+      ...toolRows,
     ];
+  }
+
+  private countRecentByTool(): Record<string, number> {
+    if (!this.exportPath) return {};
+    const indexPath = path.join(this.exportPath, 'staged', 'storage', 'index.json');
+    try {
+      if (!fs.existsSync(indexPath)) return {};
+      const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+      const { scope, filterPath, alias } = this.readRegistryScope();
+      const townRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+      const scopeFilter = (session: Record<string, unknown>): boolean => {
+        const pp = (session['project_path'] as string) || '';
+        if (scope === 'town') {
+          if (path.basename(pp) === alias) return true;
+          if (pp && townRoot.startsWith(pp + path.sep)) return true;
+          return false;
+        }
+        if (scope === 'county') {
+          return filterPath !== null && (pp === filterPath || pp.startsWith(filterPath + path.sep));
+        }
+        return true;
+      };
+      const dayMs = 86_400_000;
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+      const last7dMs = todayStart.getTime() - 7 * dayMs;
+      const result: Record<string, number> = {};
+      for (const session of (index.sessions ?? [])) {
+        if (!scopeFilter(session)) continue;
+        const ts = this.sessionSortBy === 'updated'
+          ? (session.last_turn_at ?? session.created_at)
+          : (session.created_at ?? session.last_turn_at);
+        if (!ts || new Date(ts).getTime() < last7dMs) continue;
+        const tool = (session.tool as string) || 'unknown';
+        result[tool] = (result[tool] ?? 0) + 1;
+      }
+      return result;
+    } catch { return {}; }
   }
 
   private sessionBucketChildren(bucket: 'today' | 'yesterday' | 'older'): SidePanelItem[] {

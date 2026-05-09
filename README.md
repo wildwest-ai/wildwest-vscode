@@ -2,11 +2,15 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.34
+**Current version:** 0.31.36
 
 ---
 
 ## What's New
+
+**v0.31.36** — Recent node: add per-tool breakdown rows (Copilot/Claude/Codex) as children, showing only sessions in the recent 8-day window. `countRecentByTool()` applies scope filter + date filter independently.
+
+**v0.31.35** — Recent becomes a collapsible parent node; Today/Yesterday/Last 7 days are its children. Older stays at top level.
 
 **v0.31.34** — Sessions section: rename `Total` row to `Recent  N  /  All  N` — shows recent (last 8 days) and all-time counts side by side. Tooltip breaks down recent as Today + Yesterday + Last 7 days.
 

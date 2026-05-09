@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
   },
-  "version": "0.31.35",
+  "version": "0.31.36",
   "publisher": "wildwest-ai",
   "engines": {
     "vscode": "^1.90.0"
