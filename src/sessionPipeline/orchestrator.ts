@@ -389,7 +389,11 @@ export class SessionExportPipeline {
     const projectPath = best[0];
     const recorderRef = this.readRegistryScopeRef(projectPath);
 
-    const scopeRefs = this.collectScopeRefs(best[0], best[1]);
+    // Collect scope_refs for ALL workspaces with signals — not just the winner.
+    // project_path/recorder_wwuid stay as the primary; secondary workspaces are
+    // preserved in scope_refs so town/county filters can find multi-workspace sessions.
+    const allScopeRefArrays = [...hits.entries()].map(([root, count]) => this.collectScopeRefs(root, count));
+    const scopeRefs = this.mergeScopeRefs(...allScopeRefArrays);
     const workspaceWwuids = [...new Set(scopeRefs.map((ref) => ref.wwuid).filter((wwuid) => wwuid !== ''))];
 
     return {

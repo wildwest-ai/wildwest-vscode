@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** 0.31.67
+**Current version:** 0.31.68
 
 ---
 
 ## What's New
+
+**v0.31.68** — Fix CPT session attribution for multi-workspace sessions. `resolveAttribution` now collects `scope_refs` for ALL workspaces with signals (not just the primary winner). Secondary towns like `wildwest-vscode` (143 signals) that lose the attribution battle to another town (495 signals) are now included in `scope_refs`, so town/county sidebar filters find them. Run Rebuild Index after installing to backfill older sessions.
 
 **v0.31.67** — Remove legacy path-based session scope filter. Town and county views no longer fall back to `project_path` prefix matching for sessions missing `scope_refs`/`recorder_wwuid`; those unattributed records return false. Eliminates false 0-count for Older bucket after a clean sessions/ rebuild.
 
