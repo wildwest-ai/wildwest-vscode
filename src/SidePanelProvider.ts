@@ -702,7 +702,7 @@ export class SidePanelProvider
     };
     const analytics = this.promptIndexService?.getAnalytics();
     const promptLabel = analytics
-      ? `Regenerate Prompts (${analytics.total_prompts.toLocaleString()})`
+      ? `Regenerate Prompts (${analytics.unique_total.toLocaleString()} unique / ${analytics.raw_total.toLocaleString()} raw)`
       : 'Regenerate Prompts';
     return [
       action('Export Now', 'wildwest.exportNow', 'sync'),

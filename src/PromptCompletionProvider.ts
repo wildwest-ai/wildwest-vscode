@@ -32,15 +32,15 @@ export class PromptCompletionProvider implements vscode.CompletionItemProvider {
     return results.map((p, i) => {
       const label = p.content.length > 72 ? p.content.slice(0, 72) + '…' : p.content;
       const item = new vscode.CompletionItem(label, vscode.CompletionItemKind.Text);
-      item.detail = `${p.tool} · ${p.scope_alias || p.recorder_scope} · ${p.timestamp.slice(0, 10)}`;
+      const freqTag = p.frequency > 1 ? ` ×${p.frequency}` : '';
+      item.detail = `score ${p.score.toFixed(2)}${freqTag} · ${p.tool} · ${p.scope_alias || p.recorder_scope} · ${p.last_used.slice(0, 10)}`;
       item.documentation = new vscode.MarkdownString(
-        `**Session:** \`${p.session_wwuid.slice(0, 8)}…\`  \n` +
-        `**Turn:** ${p.turn_index}  \n` +
+        `**Score:** ${p.score.toFixed(3)}  \n` +
+        `**Used:** ${p.frequency}×  (${p.first_used.slice(0, 10)} – ${p.last_used.slice(0, 10)})  \n` +
         `**Chars:** ${p.char_count}\n\n` +
         '```\n' + p.content + '\n```'
       );
       item.insertText = p.content;
-      // Sort newest-first — use zero-padded index so VSCode preserves order
       item.sortText = String(i).padStart(4, '0');
       item.filterText = p.content;
       return item;

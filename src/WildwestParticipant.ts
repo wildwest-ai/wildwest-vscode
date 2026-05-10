@@ -385,7 +385,7 @@ async function handlePrompts(
       .join(', ');
 
     stream.markdown(
-      `**Prompt Index** — ${a.total_prompts.toLocaleString()} prompts\n\n` +
+      `**Prompt Index** — ${a.unique_total.toLocaleString()} unique · ${a.raw_total.toLocaleString()} raw · ${a.filtered_noise.toLocaleString()} noise filtered\n\n` +
       `| Dimension | Breakdown |\n|---|---|\n` +
       `| By tool | ${byTool} |\n` +
       `| By scope | ${byScope} |\n` +
@@ -415,10 +415,10 @@ async function handlePrompts(
   );
   for (const p of results) {
     const preview = p.content.length > 120 ? p.content.slice(0, 120) + '…' : p.content;
+    const freqTag = p.frequency > 1 ? ` · ×${p.frequency}` : '';
     stream.markdown(
-      `**${p.timestamp.slice(0, 10)}** · ${p.tool} · \`${p.scope_alias || p.recorder_scope}\`\n` +
-      `> ${preview.replace(/\n/g, ' ')}\n\n` +
-      `_Session: \`${p.session_wwuid.slice(0, 8)}…\` · Turn ${p.turn_index}_\n\n---\n\n`,
+      `**score ${p.score.toFixed(2)}${freqTag}** · ${p.tool} · \`${p.scope_alias || p.recorder_scope}\` · ${p.last_used.slice(0, 10)}\n` +
+      `> ${preview.replace(/\n/g, ' ')}\n\n---\n\n`,
     );
   }
 }

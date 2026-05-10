@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.35.0
+**Current version:** v0.35.1
 
 ---
 
 ## What's New
+
+**v0.35.1** — Prompt index two-stage pipeline: raw scan → `raw.json` (6,871 entries), then dedup + noise filter + score → `index.json` (4,871 unique). Score = 50% frequency + 35% recency + 15% length. Noise filters: `<tag>`, continuation headers, compaction notices, `[Request interrupted]`, tool output headers. MIN_CHAR raised to 20. Schema v2 adds `frequency`, `score`, `last_used`, `first_used`, `occurrences` per entry.
 
 **v0.35.0** — Prompt index: scans all session turns and builds `sessions/reneyap/prompts/index.json` (6,869 prompts across cld/cpt/ccx, tagged by tool + recorder_scope + scope_alias). IntelliSense surfaces: "Regenerate Prompts" in wwSidebar Utilities (shows count); `@wildwest prompts` for analytics + search (supports `scope:<alias>` filter); prompt autocomplete dropdown in Telegraph compose drawer body field; VSCode completion provider for `.md` files. Throttled auto-rebuild on pipeline activity.
 
