@@ -127,6 +127,27 @@ function readMigratedRegistry(rootPath: string): Record<string, unknown> | null 
   return reg;
 }
 
+function updateFlatWireDeliveryStatus(worldRoot: string, memoFile: string, outputChannel: vscode.OutputChannel): void {
+  if (!memoFile.endsWith('.json')) return;
+
+  const flatDir = path.join(worldRoot, 'telegraph', 'flat');
+  const flatPath = path.join(flatDir, memoFile);
+  if (!fs.existsSync(flatPath)) return;
+
+  try {
+    const wire = JSON.parse(fs.readFileSync(flatPath, 'utf8')) as Record<string, unknown>;
+    wire['status'] = 'delivered';
+    wire['delivered_at'] = wire['delivered_at'] || new Date().toISOString();
+    const transitions = Array.isArray(wire['status_transitions']) ? wire['status_transitions'] as Array<Record<string, unknown>> : [];
+    transitions.push({ status: 'delivered', timestamp: wire['delivered_at'], repos: ['vscode'] });
+    wire['status_transitions'] = transitions;
+    fs.writeFileSync(flatPath, JSON.stringify(wire, null, 2), 'utf8');
+    outputChannel.appendLine(`[HeartbeatMonitor] flat wire updated: ${memoFile} set to delivered`);
+  } catch (err) {
+    outputChannel.appendLine(`[HeartbeatMonitor] failed to update flat wire status for ${memoFile}: ${err}`);
+  }
+}
+
 function scopeOf(rootPath: string): WildWestScope | null {
   const reg = readMigratedRegistry(rootPath);
   if (!reg) return null;
@@ -763,6 +784,9 @@ function deliverPendingOutbox(
           }
         }
 
+        // Update the flat/ SSOT wire status so UI panels reflect the delivered result.
+        updateFlatWireDeliveryStatus(worldRoot, memoFile, outputChannel);
+
         // Move to outbox/history/
         const historyDir = path.join(outboxDir, 'history');
         if (!fs.existsSync(historyDir)) {
@@ -850,11 +874,18 @@ function beatTown(
   // Run telegraph delivery operator
   const scope = scopeOf(rootPath);
   if (scope === 'town') {
-    deliverPendingOutbox(rootPath, scope, outputChannel, worldRoot, countiesDir);
+    const townDelivery = deliverPendingOutbox(rootPath, scope, outputChannel, worldRoot, countiesDir);
+    let refreshNeeded = townDelivery.delivered > 0;
+
     // Also deliver county outbox if we can find the county root
     const countyRoot = findCountyRoot(rootPath);
     if (countyRoot) {
-      deliverPendingOutbox(countyRoot, 'county', outputChannel, worldRoot, countiesDir);
+      const countyDelivery = deliverPendingOutbox(countyRoot, 'county', outputChannel, worldRoot, countiesDir);
+      refreshNeeded = refreshNeeded || countyDelivery.delivered > 0;
+    }
+
+    if (refreshNeeded) {
+      void Promise.resolve(vscode.commands.executeCommand('wildwest.refreshTelegraphPanel')).catch(() => undefined);
     }
   }
 
@@ -944,10 +975,17 @@ function beatCounty(
   }
 
   // Process county and town outboxes when a county scope is active.
-  deliverPendingOutbox(rootPath, 'county', outputChannel, worldRoot, countiesDir);
+  let refreshNeeded = false;
+  const countyDelivery = deliverPendingOutbox(rootPath, 'county', outputChannel, worldRoot, countiesDir);
+  refreshNeeded = refreshNeeded || countyDelivery.delivered > 0;
   const towns = listTownsInCounty(rootPath);
   for (const townInfo of towns) {
-    deliverPendingOutbox(townInfo.path, 'town', outputChannel, worldRoot, countiesDir);
+    const townDelivery = deliverPendingOutbox(townInfo.path, 'town', outputChannel, worldRoot, countiesDir);
+    refreshNeeded = refreshNeeded || townDelivery.delivered > 0;
+  }
+
+  if (refreshNeeded) {
+    void Promise.resolve(vscode.commands.executeCommand('wildwest.refreshTelegraphPanel')).catch(() => undefined);
   }
 
   return ok ? 'alive' : 'flagged';
@@ -1077,10 +1115,15 @@ export class HeartbeatMonitor {
     const town = this.scopes.find((s) => s.scope === 'town');
     if (town) {
       this.outputChannel.appendLine('[HeartbeatMonitor] outbox delivery triggered by new memo');
-      deliverPendingOutbox(town.rootPath, town.scope, this.outputChannel, this.worldRoot, this.countiesDir);
+      const townDelivery = deliverPendingOutbox(town.rootPath, town.scope, this.outputChannel, this.worldRoot, this.countiesDir);
+      let refreshNeeded = townDelivery.delivered > 0;
       const countyRoot = findCountyRoot(town.rootPath);
       if (countyRoot) {
-        deliverPendingOutbox(countyRoot, 'county', this.outputChannel, this.worldRoot, this.countiesDir);
+        const countyDelivery = deliverPendingOutbox(countyRoot, 'county', this.outputChannel, this.worldRoot, this.countiesDir);
+        refreshNeeded = refreshNeeded || countyDelivery.delivered > 0;
+      }
+      if (refreshNeeded) {
+        void Promise.resolve(vscode.commands.executeCommand('wildwest.refreshTelegraphPanel')).catch(() => undefined);
       }
       return;
     }

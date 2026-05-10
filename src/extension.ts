@@ -287,6 +287,9 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('wildwest.openTelegraphPanel', () => {
       TelegraphPanel.open(exporter.getExportPath(), promptIndexService);
     }),
+    vscode.commands.registerCommand('wildwest.refreshTelegraphPanel', () => {
+      TelegraphPanel.refresh();
+    }),
     vscode.commands.registerCommand('wildwest.showReceipts', async () => {
       const allReceipts = getTelegraphDirs().flatMap((dir) => getDeliveryReceipts(dir));
       if (allReceipts.length === 0) {

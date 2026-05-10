@@ -135,6 +135,10 @@ export class TelegraphPanel {
     this.panel.webview.postMessage({ type: 'wires', inbox, outbox, all, alias, flatAvailable });
   }
 
+  static refresh(): void {
+    TelegraphPanel.instance?.sendWires();
+  }
+
   // ── Inbound from webview ──────────────────────────────────────────────────
 
   private async onMessage(msg: Record<string, unknown>): Promise<void> {
