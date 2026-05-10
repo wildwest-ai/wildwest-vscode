@@ -39,24 +39,24 @@ export class TelegraphInbox {
   }
 
   /**
-   * Return all pending (unacked, un-archived) memos across all telegraph inboxes.
-   * Also scans the bus root as a migration fallback for pre-v2 flat memos.
+   * Return all pending (unacked, un-archived) wires across all telegraph inboxes.
+   * Also scans the bus root as a migration fallback for pre-v2 flat wires.
    */
-  getPendingMemos(): Array<{ dir: string; filename: string }> {
+  getPendingWires(): Array<{ dir: string; filename: string }> {
     const result: Array<{ dir: string; filename: string }> = [];
     for (const telegraphDir of this.getTelegraphDirs()) {
       const inboxDir = path.join(telegraphDir, 'inbox');
       if (fs.existsSync(inboxDir)) {
-        result.push(...this.listPendingMemos(inboxDir));
+        result.push(...this.listPendingWires(inboxDir));
       }
 
-      // Migration fallback: pre-v2 flat memos may still live in telegraph root.
-      result.push(...this.listPendingMemos(telegraphDir));
+      // Migration fallback: pre-v2 flat wires may still live in telegraph root.
+      result.push(...this.listPendingWires(telegraphDir));
     }
     return result;
   }
 
-  private listPendingMemos(dir: string): Array<{ dir: string; filename: string }> {
+  private listPendingWires(dir: string): Array<{ dir: string; filename: string }> {
     const result: Array<{ dir: string; filename: string }> = [];
     let entries: string[];
     try {
@@ -65,14 +65,14 @@ export class TelegraphInbox {
       return result;
     }
     for (const f of entries.sort()) {
-      if (this.isPendingMemoFilename(f)) {
+      if (this.isPendingWireFilename(f)) {
         result.push({ dir, filename: f });
       }
     }
     return result;
   }
 
-  private isPendingMemoFilename(filename: string): boolean {
+  private isPendingWireFilename(filename: string): boolean {
     if (!filename.endsWith('.md')) return false;
     if (filename.startsWith('.') || filename.startsWith('!')) return false;
     if (SKIP_RE.test(filename)) return false;
@@ -85,13 +85,13 @@ export class TelegraphInbox {
    * memos are processed.
    */
   async processInbox(): Promise<void> {
-    const pending = this.getPendingMemos();
+    const pending = this.getPendingWires();
     if (pending.length === 0) {
-      vscode.window.showInformationMessage('Wild West: inbox clear — no pending memos.');
+      vscode.window.showInformationMessage('Wild West: inbox clear — no pending wires.');
       return;
     }
 
-    this.outputChannel.appendLine(`[TelegraphInbox] ${pending.length} pending memo(s)`);
+    this.outputChannel.appendLine(`[TelegraphInbox] ${pending.length} pending wire(s)`);
 
     for (const { dir, filename } of pending) {
       const cont = await this.processMemo(dir, filename);
@@ -222,7 +222,7 @@ export class TelegraphInbox {
     const replyFilename = `${ts}-to-${fromIdentity}-from-${toIdentity}--${reSubject}.md`;
 
     const isoNow = new Date().toISOString();
-    const replyWwuid = generateWwuid('memo', toIdentity, fromIdentity, isoNow, reSubject);
+    const replyWwuid = generateWwuid('wire', toIdentity, fromIdentity, isoNow, reSubject);
     const replyBody = [
       `---`,
       `wwuid: ${replyWwuid}`,
@@ -295,7 +295,7 @@ export class TelegraphInbox {
       ackFilename = `${ts}-to-${fromIdentity}-from-${toIdentity}--ack-${status}--${subject}.md`;
 
       const isoNow = new Date().toISOString();
-      const ackWwuid = generateWwuid('memo', toIdentity, fromIdentity, isoNow, `ack-${status}--${subject}`);
+      const ackWwuid = generateWwuid('wire', toIdentity, fromIdentity, isoNow, `ack-${status}--${subject}`);
       const lines = [
         `---`,
         `wwuid: ${ackWwuid}`,

@@ -290,7 +290,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('wildwest.showReceipts', async () => {
       const allReceipts = getTelegraphDirs().flatMap((dir) => getDeliveryReceipts(dir));
       if (allReceipts.length === 0) {
-        vscode.window.showInformationMessage('Wild West: no sent memos found.');
+        vscode.window.showInformationMessage('Wild West: no sent wires found.');
         return;
       }
       const items = allReceipts.map((r) => ({
@@ -299,7 +299,7 @@ export function activate(context: vscode.ExtensionContext) {
         receipt: r,
       }));
       const pick = await vscode.window.showQuickPick(items, {
-        placeHolder: 'Delivery receipts — select to open memo',
+        placeHolder: 'Delivery receipts — select to open wire',
         matchOnDescription: true,
       });
       if (pick) {

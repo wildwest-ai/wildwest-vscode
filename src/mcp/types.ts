@@ -27,7 +27,7 @@ export interface StatusOutput {
   state: string;
 }
 
-export interface MemoSummary {
+export interface WireSummary {
   filename: string;
   subject: string;
   from: string;
@@ -39,7 +39,7 @@ export interface InboxInput {
 }
 
 export interface InboxOutput {
-  memos: MemoSummary[];
+  wires: WireSummary[];
   total: number;
 }
 

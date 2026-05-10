@@ -16,7 +16,7 @@ import * as vscode from 'vscode';
 // Timestamp helpers
 // ---------------------------------------------------------------------------
 
-/** UTC timestamp in Wild West memo filename format: YYYYMMDD-HHMMz */
+/** UTC timestamp in Wild West wire filename format: YYYYMMDD-HHMMz */
 export function telegraphTimestamp(d: Date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return (
@@ -49,7 +49,7 @@ export function outboxPath(telegraphDir: string): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Parse YAML frontmatter from a memo file.
+ * Parse YAML frontmatter from a wire file.
  * Returns a flat string→string map of the frontmatter keys.
  * Returns {} on any parse error.
  */
@@ -77,7 +77,7 @@ export function parseFrontmatter(filePath: string): Record<string, string> {
 // ---------------------------------------------------------------------------
 
 /**
- * Move a memo from its current location to `historyDir/<filename>`.
+ * Move a wire from its current location to `historyDir/<filename>`.
  * Creates `historyDir` (and parents) if necessary.
  * Throws on rename failure — callers should catch if needed.
  */

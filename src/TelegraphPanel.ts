@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { Memo, MemoStorageService } from './MemoStorageService';
+import { Wire, WireStorageService } from './WireStorageService';
 import { generateWwuid } from './sessionPipeline/utils';
 import { telegraphTimestamp, telegraphISOTimestamp, readRegistryAlias } from './TelegraphService';
 import { getTelegraphDirs } from './TelegraphService';
@@ -12,7 +12,7 @@ export class TelegraphPanel {
   private static instance: TelegraphPanel | undefined;
 
   private readonly panel: vscode.WebviewPanel;
-  private readonly memoStorage: MemoStorageService;
+  private readonly wireStorage: WireStorageService;
   private disposables: vscode.Disposable[] = [];
 
   static open(exportPath: string, promptIndex?: PromptIndexService): void {
@@ -35,10 +35,10 @@ export class TelegraphPanel {
     private readonly promptIndex?: PromptIndexService,
   ) {
     this.panel = panel;
-    this.memoStorage = new MemoStorageService(exportPath);
+    this.wireStorage = new WireStorageService(exportPath);
 
     this.panel.webview.html = this.buildHtml();
-    this.sendMemos();
+    this.sendWires();
 
     this.panel.webview.onDidReceiveMessage((msg) => this.onMessage(msg), null, this.disposables);
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
@@ -46,22 +46,22 @@ export class TelegraphPanel {
 
   // ── Outbound to webview ───────────────────────────────────────────────────
 
-  private sendMemos(): void {
-    const inbox = this.collectFileMemos('inbox');
-    const outbox = this.collectFileMemos('outbox');
-    this.panel.webview.postMessage({ type: 'memos', inbox, outbox });
+  private sendWires(): void {
+    const inbox = this.collectFileWires('inbox');
+    const outbox = this.collectFileWires('outbox');
+    this.panel.webview.postMessage({ type: 'wires', inbox, outbox });
   }
 
-  private collectFileMemos(section: 'inbox' | 'outbox'): Memo[] {
-    const results: Memo[] = [];
+  private collectFileWires(section: 'inbox' | 'outbox'): Wire[] {
+    const results: Wire[] = [];
     for (const telegraphDir of getTelegraphDirs()) {
       const dir = path.join(telegraphDir, section);
       if (!fs.existsSync(dir)) continue;
       for (const f of fs.readdirSync(dir)) {
         if (!f.endsWith('.json') || f.startsWith('.')) continue;
         try {
-          const memo = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) as Memo;
-          results.push(memo);
+          const wire = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) as Wire;
+          results.push(wire);
         } catch { /* skip corrupt */ }
       }
     }
@@ -74,7 +74,7 @@ export class TelegraphPanel {
   private async onMessage(msg: Record<string, unknown>): Promise<void> {
     switch (msg['type']) {
       case 'refresh':
-        this.sendMemos();
+        this.sendWires();
         break;
       case 'send':
         await this.handleSend(msg);
@@ -101,7 +101,7 @@ export class TelegraphPanel {
 
   private async handleSend(msg: Record<string, unknown>): Promise<void> {
     const to = (msg['to'] as string ?? '').trim();
-    const type = (msg['memoType'] as string ?? 'status-update').trim();
+    const type = (msg['wireType'] as string ?? 'status-update').trim();
     const subject = (msg['subject'] as string ?? '').trim();
     const body = (msg['body'] as string ?? '').trim();
 
@@ -126,12 +126,12 @@ export class TelegraphPanel {
     const timestamp = telegraphTimestamp();
     const isoTimestamp = telegraphISOTimestamp();
     const fileName = `${timestamp}-to-${to}-from-${fromActor}--${subject}.json`;
-    const wwuid = generateWwuid('memo', fromActor, to, isoTimestamp, subject);
+    const wwuid = generateWwuid('wire', fromActor, to, isoTimestamp, subject);
 
-    const memo: Memo = {
+    const wire: Wire = {
       schema_version: '1',
       wwuid,
-      wwuid_type: 'memo',
+      wwuid_type: 'wire',
       from: fromActor,
       to,
       type,
@@ -144,11 +144,11 @@ export class TelegraphPanel {
 
     const outboxDir = path.join(telegraphDir, 'outbox');
     fs.mkdirSync(outboxDir, { recursive: true });
-    fs.writeFileSync(path.join(outboxDir, fileName), JSON.stringify(memo, null, 2), 'utf8');
-    this.memoStorage.write(memo);
+    fs.writeFileSync(path.join(outboxDir, fileName), JSON.stringify(wire, null, 2), 'utf8');
+    this.wireStorage.write(wire);
 
-    this.panel.webview.postMessage({ type: 'sent', memo });
-    this.sendMemos();
+    this.panel.webview.postMessage({ type: 'sent', wire });
+    this.sendWires();
   }
 
   private async pushToCopilot(formatted: string): Promise<void> {
@@ -218,24 +218,24 @@ export class TelegraphPanel {
   /* ── Main layout ── */
   .main { display: flex; flex: 1; overflow: hidden; }
 
-  /* ── Memo list ── */
+  /* ── Wire list ── */
   .list-pane { width: 220px; flex-shrink: 0; border-right: 1px solid var(--vscode-panel-border); overflow-y: auto; display: flex; flex-direction: column; }
   .list-section { padding: 6px 8px 2px; font-size: 11px; font-weight: 600; color: var(--vscode-descriptionForeground); text-transform: uppercase; letter-spacing: 0.05em; }
-  .memo-row { padding: 6px 10px; cursor: pointer; border-left: 2px solid transparent; }
-  .memo-row:hover { background: var(--vscode-list-hoverBackground); }
-  .memo-row.active { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); border-left-color: var(--vscode-focusBorder); }
-  .memo-row .subject { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .memo-row .meta { font-size: 10px; color: var(--vscode-descriptionForeground); margin-top: 2px; }
-  .memo-row.active .meta { color: var(--vscode-list-activeSelectionForeground); opacity: 0.8; }
+  .wire-row { padding: 6px 10px; cursor: pointer; border-left: 2px solid transparent; }
+  .wire-row:hover { background: var(--vscode-list-hoverBackground); }
+  .wire-row.active { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); border-left-color: var(--vscode-focusBorder); }
+  .wire-row .subject { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wire-row .meta { font-size: 10px; color: var(--vscode-descriptionForeground); margin-top: 2px; }
+  .wire-row.active .meta { color: var(--vscode-list-activeSelectionForeground); opacity: 0.8; }
   .empty-list { padding: 12px 10px; font-size: 12px; color: var(--vscode-descriptionForeground); }
 
-  /* ── Memo detail ── */
+  /* ── Wire detail ── */
   .detail-pane { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
   .detail-pane.empty-detail { align-items: center; justify-content: center; color: var(--vscode-descriptionForeground); font-size: 12px; }
-  .memo-header table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .memo-header td { padding: 3px 8px; }
-  .memo-header td:first-child { font-weight: 600; color: var(--vscode-descriptionForeground); width: 70px; }
-  .memo-body { font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+  .wire-header table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .wire-header td { padding: 3px 8px; }
+  .wire-header td:first-child { font-weight: 600; color: var(--vscode-descriptionForeground); width: 70px; }
+  .wire-body { font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
   .push-bar { display: flex; gap: 8px; flex-wrap: wrap; }
   .push-bar .btn { font-size: 11px; padding: 3px 8px; }
 
@@ -264,7 +264,7 @@ export class TelegraphPanel {
 <div class="main">
   <div class="list-pane" id="listPane"></div>
   <div class="detail-pane empty-detail" id="detailPane">
-    <span>Select a memo to read</span>
+    <span>Select a wire to read</span>
   </div>
 </div>
 
@@ -282,7 +282,7 @@ export class TelegraphPanel {
     </div>
     <div class="compose-row"><label>Subject</label><input id="cSubject" placeholder="my-topic-slug" /></div>
     <div style="position:relative">
-      <textarea class="compose-body" id="cBody" placeholder="Memo body… (type 3+ chars to see past prompts)" autocomplete="off"></textarea>
+      <textarea class="compose-body" id="cBody" placeholder="Wire body… (type 3+ chars to see past prompts)" autocomplete="off"></textarea>
       <div id="promptDropdown" style="display:none;position:absolute;bottom:100%;left:0;right:0;max-height:160px;overflow-y:auto;background:var(--vscode-editorSuggestWidget-background,var(--vscode-input-background));border:1px solid var(--vscode-editorSuggestWidget-border,#555);z-index:100;font-size:11px;"></div>
     </div>
     <div class="compose-footer">
@@ -295,18 +295,18 @@ export class TelegraphPanel {
 
 <script>
   const vscode = acquireVsCodeApi();
-  let memos = { inbox: [], outbox: [] };
+  let wires = { inbox: [], outbox: [] };
   let selectedWwuid = null;
   let pendingFormatted = '';
 
   document.getElementById('btnRefresh').addEventListener('click', () => refresh());
   document.getElementById('btnCompose').addEventListener('click', () => toggleCompose());
   document.getElementById('btnCancel').addEventListener('click', () => toggleCompose(false));
-  document.getElementById('btnSend').addEventListener('click', () => sendMemo());
+  document.getElementById('btnSend').addEventListener('click', () => sendWire());
 
   document.getElementById('listPane').addEventListener('click', (e) => {
-    const row = e.target.closest('.memo-row');
-    if (row && row.dataset.wwuid) selectMemo(row.dataset.wwuid);
+    const row = e.target.closest('.wire-row');
+    if (row && row.dataset.wwuid) selectWire(row.dataset.wwuid);
   });
 
   document.getElementById('detailPane').addEventListener('click', (e) => {
@@ -315,8 +315,8 @@ export class TelegraphPanel {
   });
 
   window.addEventListener('message', ({ data }) => {
-    if (data.type === 'memos') {
-      memos = data;
+    if (data.type === 'wires') {
+      wires = data;
       renderList();
       if (selectedWwuid) renderDetail(selectedWwuid);
     }
@@ -375,53 +375,53 @@ export class TelegraphPanel {
   function renderList() {
     const pane = document.getElementById('listPane');
     let html = '';
-    if (memos.inbox.length) {
-      html += '<div class="list-section">Inbox (' + memos.inbox.length + ')</div>';
-      html += memos.inbox.map(m => memoRow(m)).join('');
+    if (wires.inbox.length) {
+      html += '<div class="list-section">Inbox (' + wires.inbox.length + ')</div>';
+      html += wires.inbox.map(w => wireRow(w)).join('');
     }
-    if (memos.outbox.length) {
-      html += '<div class="list-section">Outbox (' + memos.outbox.length + ')</div>';
-      html += memos.outbox.map(m => memoRow(m)).join('');
+    if (wires.outbox.length) {
+      html += '<div class="list-section">Outbox (' + wires.outbox.length + ')</div>';
+      html += wires.outbox.map(w => wireRow(w)).join('');
     }
-    if (!memos.inbox.length && !memos.outbox.length) {
-      html = '<div class="empty-list">No memos</div>';
+    if (!wires.inbox.length && !wires.outbox.length) {
+      html = '<div class="empty-list">No wires</div>';
     }
     pane.innerHTML = html;
   }
 
-  function memoRow(m) {
-    const active = m.wwuid === selectedWwuid ? ' active' : '';
-    const dateStr = m.date ? new Date(m.date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
-    return '<div class="memo-row' + active + '" data-wwuid="' + esc(m.wwuid) + '">'
-      + '<div class="subject">' + esc(m.subject || m.filename || '—') + '</div>'
-      + '<div class="meta">' + esc(m.from || '') + ' · ' + dateStr + '</div>'
+  function wireRow(w) {
+    const active = w.wwuid === selectedWwuid ? ' active' : '';
+    const dateStr = w.date ? new Date(w.date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
+    return '<div class="wire-row' + active + '" data-wwuid="' + esc(w.wwuid) + '">'
+      + '<div class="subject">' + esc(w.subject || w.filename || '—') + '</div>'
+      + '<div class="meta">' + esc(w.from || '') + ' · ' + dateStr + '</div>'
       + '</div>';
   }
 
-  function selectMemo(wwuid) {
+  function selectWire(wwuid) {
     selectedWwuid = wwuid;
     renderList();
     renderDetail(wwuid);
   }
 
   function renderDetail(wwuid) {
-    const all = [...(memos.inbox || []), ...(memos.outbox || [])];
-    const m = all.find(x => x.wwuid === wwuid);
+    const all = [...(wires.inbox || []), ...(wires.outbox || [])];
+    const w = all.find(x => x.wwuid === wwuid);
     const pane = document.getElementById('detailPane');
-    if (!m) {
+    if (!w) {
       pane.className = 'detail-pane empty-detail';
-      pane.innerHTML = '<span>Select a memo to read</span>';
+      pane.innerHTML = '<span>Select a wire to read</span>';
       return;
     }
     pane.className = 'detail-pane';
-    const dateStr = m.date ? new Date(m.date).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
-    pendingFormatted = '📬 [from ' + (m.from||'') + ' | ' + (m.subject||'') + ' | ' + (m.date||'') + ']\\n\\n' + (m.body||'');
+    const dateStr = w.date ? new Date(w.date).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+    pendingFormatted = '📬 [from ' + (w.from||'') + ' | ' + (w.subject||'') + ' | ' + (w.date||'') + ']\\n\\n' + (w.body||'');
     pane.innerHTML =
-      '<div class="memo-header"><table>'
-      + row('From', m.from) + row('To', m.to) + row('Date', dateStr)
-      + row('Subject', m.subject) + row('Type', m.type) + row('Status', m.status)
+      '<div class="wire-header"><table>'
+      + row('From', w.from) + row('To', w.to) + row('Date', dateStr)
+      + row('Subject', w.subject) + row('Type', w.type) + row('Status', w.status)
       + '</table></div>'
-      + '<div class="memo-body">' + esc(m.body || '') + '</div>'
+      + '<div class="wire-body">' + esc(w.body || '') + '</div>'
       + '<div class="push-bar">'
       + '<button class="btn" data-push="copilot">→ Copilot</button>'
       + '<button class="btn btn-secondary" data-push="claude">→ Claude</button>'
@@ -458,12 +458,12 @@ export class TelegraphPanel {
     document.getElementById('composeError').textContent = '';
   }
 
-  function sendMemo() {
+  function sendWire() {
     document.getElementById('composeError').textContent = '';
     vscode.postMessage({
       type: 'send',
       to: document.getElementById('cTo').value,
-      memoType: document.getElementById('cType').value,
+      wireType: document.getElementById('cType').value,
       subject: document.getElementById('cSubject').value,
       body: document.getElementById('cBody').value,
     });

@@ -167,16 +167,16 @@ function checkInbox(wwDir: string): CheckResult {
   if (!fs.existsSync(inboxDir)) {
     return { label: 'Inbox', status: 'info', detail: 'inbox/ does not exist' };
   }
-  const memos = fs.readdirSync(inboxDir).filter(
+  const wires = fs.readdirSync(inboxDir).filter(
     (f) => f.endsWith('.md') && !f.startsWith('.') && f !== '.gitkeep',
   );
-  if (memos.length === 0) {
+  if (wires.length === 0) {
     return { label: 'Inbox', status: 'ok', detail: 'empty' };
   }
   return {
     label: 'Inbox',
     status: 'warn',
-    detail: `${memos.length} unresolved memo${memos.length > 1 ? 's' : ''}`,
+    detail: `${wires.length} unresolved wire${wires.length > 1 ? 's' : ''}`,
   };
 }
 

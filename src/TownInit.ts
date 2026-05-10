@@ -49,8 +49,8 @@ Every new Copilot window must:
 
 1. **Read this file** ✓
 2. **Read county law** — *(set county CLAUDE.md path)*
-3. **Send session-open memo** — \`.wildwest/telegraph/\`
-4. **Process telegraph inbox** — resolve unprocessed memos
+3. **Send session-open wire** — \`.wildwest/telegraph/\`
+4. **Process telegraph inbox** — resolve unprocessed wires
 5. **Check git status** — \`git status\` and \`git log --oneline -5\`
 6. **Review TODO.md** — open work and blockers
 
@@ -61,7 +61,7 @@ Every new Copilot window must:
 | Path | Purpose |
 |---|---|
 | \`.wildwest/registry.json\` | Town identity + scope declaration |
-| \`.wildwest/telegraph/\` | Inbox — memos, requests, notifications |
+| \`.wildwest/telegraph/\` | Inbox — wires, requests, notifications |
 | \`.wildwest/board/branches/\` | Branch lifecycle tracker |
 | \`TODO.md\` | Open work and blockers |
 | \`DONE.md\` | Completed work log |
@@ -72,7 +72,7 @@ Every new Copilot window must:
 
 Every telegraph inbox must be processed before session end.
 
-### Memo Naming Convention
+### Wire Naming Convention
 
 - **Inbound:** \`YYYYMMDD-HHMMz-to-<role>-from-<role>--subject.md\`
 - **Outbound (response):** \`YYYYMMDD-HHMMz-to-<role>-from-<role>--subject-resolved.md\`
@@ -138,8 +138,8 @@ Every new Copilot window must:
 
 1. **Read this file** ✓
 2. **Read territory law** — *(set territory CLAUDE.md path)*
-3. **Send session-open memo** — \`.wildwest/telegraph/\`
-4. **Process telegraph inbox** — resolve unprocessed memos
+3. **Send session-open wire** — \`.wildwest/telegraph/\`
+4. **Process telegraph inbox** — resolve unprocessed wires
 5. **Check git status** — \`git status\` and \`git log --oneline -5\`
 6. **Review TODO.md** — open work and blockers
 
@@ -150,7 +150,7 @@ Every new Copilot window must:
 | Path | Purpose |
 |---|---|
 | \`.wildwest/registry.json\` | County identity + scope declaration |
-| \`.wildwest/telegraph/\` | Inbox — memos, requests, notifications |
+| \`.wildwest/telegraph/\` | Inbox — wires, requests, notifications |
 | \`TODO.md\` | Open work and blockers |
 | \`DONE.md\` | Completed work log |
 
@@ -160,7 +160,7 @@ Every new Copilot window must:
 
 Every telegraph inbox must be processed before session end.
 
-### Memo Naming Convention
+### Wire Naming Convention
 
 - **Inbound:** \`YYYYMMDD-HHMMz-to-<role>-from-<role>--subject.md\`
 - **Outbound:** \`YYYYMMDD-HHMMz-to-<role>-from-<role>--subject-resolved.md\`
@@ -221,8 +221,8 @@ export function generateTerritoryClaudeMd({ alias, wwuid, remote }: ClaudeMdVars
 Every new Copilot window must:
 
 1. **Read this file** ✓
-2. **Send session-open memo** — \`.wildwest/telegraph/\`
-3. **Process telegraph inbox** — resolve unprocessed memos
+2. **Send session-open wire** — \`.wildwest/telegraph/\`
+3. **Process telegraph inbox** — resolve unprocessed wires
 4. **Check git status** — \`git status\` and \`git log --oneline -5\`
 5. **Review TODO.md** — open work and blockers
 
@@ -233,7 +233,7 @@ Every new Copilot window must:
 | Path | Purpose |
 |---|---|
 | \`.wildwest/registry.json\` | Territory identity + scope declaration |
-| \`.wildwest/telegraph/\` | Inbox — memos, requests, notifications |
+| \`.wildwest/telegraph/\` | Inbox — wires, requests, notifications |
 | \`TODO.md\` | Open work and blockers |
 | \`DONE.md\` | Completed work log |
 
@@ -243,7 +243,7 @@ Every new Copilot window must:
 
 Every telegraph inbox must be processed before session end.
 
-### Memo Naming Convention
+### Wire Naming Convention
 
 - **Inbound:** \`YYYYMMDD-HHMMz-to-<role>-from-<role>--subject.md\`
 - **Outbound:** \`YYYYMMDD-HHMMz-to-<role>-from-<role>--subject-resolved.md\`

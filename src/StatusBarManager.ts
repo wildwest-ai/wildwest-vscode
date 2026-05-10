@@ -101,17 +101,17 @@ export class StatusBarManager {
       if (wwRoot) {
         const inboxDir = path.join(wwRoot, '.wildwest', 'telegraph', 'inbox');
         try {
-          const memos = fs.readdirSync(inboxDir)
+          const wires = fs.readdirSync(inboxDir)
             .filter(f => f.endsWith('.md') && !f.startsWith('.') && f !== '.gitkeep');
-          if (memos.length > 0) {
-            tooltip.appendMarkdown(`**⚑ Unprocessed inbox (${memos.length})**\n\n`);
-            for (const memo of memos.slice(0, 5)) {
+          if (wires.length > 0) {
+            tooltip.appendMarkdown(`**⚑ Unprocessed inbox (${wires.length})**\n\n`);
+            for (const wire of wires.slice(0, 5)) {
               // Strip timestamp prefix for readability: YYYYMMDD-HHMMz-to-...-from-...--.subject.md
-              const subject = memo.replace(/^\d{8}-\d{4}Z?-/, '').replace(/\.md$/, '');
+              const subject = wire.replace(/^\d{8}-\d{4}Z?-/, '').replace(/\.md$/, '');
               tooltip.appendMarkdown(`- ${subject}\n`);
             }
-            if (memos.length > 5) {
-              tooltip.appendMarkdown(`- …and ${memos.length - 5} more\n`);
+            if (wires.length > 5) {
+              tooltip.appendMarkdown(`- …and ${wires.length - 5} more\n`);
             }
             tooltip.appendMarkdown('\n');
           }

@@ -7,7 +7,7 @@ import {
   InboxInput,
   InboxOutput,
   MCPScopeContext,
-  MemoSummary,
+  WireSummary,
   StatusOutput,
   TelegraphCheckOutput,
 } from './types';
@@ -45,7 +45,7 @@ export function toolInbox(ctx: MCPScopeContext, input: InboxInput): InboxOutput 
   const inboxDir = path.join(ctx.rootPath, '.wildwest', 'telegraph', 'inbox');
 
   if (!fs.existsSync(inboxDir)) {
-    return { memos: [], total: 0 };
+    return { wires: [], total: 0 };
   }
 
   const files = fs
@@ -54,12 +54,12 @@ export function toolInbox(ctx: MCPScopeContext, input: InboxInput): InboxOutput 
     .sort()
     .slice(0, limit);
 
-  const memos: MemoSummary[] = files.map((filename) => {
+  const wires: WireSummary[] = files.map((filename) => {
     const filePath = path.join(inboxDir, filename);
-    return parseMemoSummary(filePath, filename);
+    return parseWireSummary(filePath, filename);
   });
 
-  return { memos, total: memos.length };
+  return { wires, total: wires.length };
 }
 
 // ── wildwest_board ──────────────────────────────────────────────────────────
@@ -106,12 +106,12 @@ export function toolTelegraphCheck(ctx: MCPScopeContext): TelegraphCheckOutput {
   const inboxDir = path.join(telegraphDir, 'inbox');
   const outboxDir = path.join(telegraphDir, 'outbox');
   const historyDir = path.join(telegraphDir, 'history');
-  const isMemo = (f: string) => (f.endsWith('.json') || f.endsWith('.md')) && !f.startsWith('.');
+  const isWire = (f: string) => (f.endsWith('.json') || f.endsWith('.md')) && !f.startsWith('.');
 
   return {
-    inbox: count(inboxDir, (f) => isMemo(f) && !f.startsWith('!')),
-    outbox: count(outboxDir, (f) => isMemo(f) && !f.startsWith('!')),
-    history: count(historyDir, isMemo),
+    inbox: count(inboxDir, (f) => isWire(f) && !f.startsWith('!')),
+    outbox: count(outboxDir, (f) => isWire(f) && !f.startsWith('!')),
+    history: count(historyDir, isWire),
     deadLetter: count(inboxDir, (f) => f.startsWith('!')) +
                 count(outboxDir, (f) => f.startsWith('!')),
   };
@@ -119,7 +119,7 @@ export function toolTelegraphCheck(ctx: MCPScopeContext): TelegraphCheckOutput {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function parseMemoSummary(filePath: string, filename: string): MemoSummary {
+function parseWireSummary(filePath: string, filename: string): WireSummary {
   let subject = '';
   let from = '';
   let date = '';
@@ -127,10 +127,10 @@ function parseMemoSummary(filePath: string, filename: string): MemoSummary {
   try {
     const content = fs.readFileSync(filePath, 'utf8');
     if (filename.endsWith('.json')) {
-      const memo = JSON.parse(content) as Record<string, string>;
-      subject = memo['subject'] ?? '';
-      from = memo['from'] ?? '';
-      date = memo['date'] ?? '';
+      const wire = JSON.parse(content) as Record<string, string>;
+      subject = wire['subject'] ?? '';
+      from = wire['from'] ?? '';
+      date = wire['date'] ?? '';
     } else {
       const subjectMatch = content.match(/^subject:\s*(.+)$/m);
       const fromMatch = content.match(/^from:\s*(.+)$/m);

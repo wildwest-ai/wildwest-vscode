@@ -17,13 +17,13 @@ import { PromptIndexService } from './PromptIndexService';
  * same scope rules as existing wildwest.* commands. Telegraph protocol is not bypassed.
  *
  * Commands:
- *   @wildwest inbox                — town inbox only (scope-enforced); per-memo [Archive] button
- *   @wildwest send <role> "<msg>"  — draft memo → preview → [Confirm Send] button
+ *   @wildwest inbox                — town inbox only (scope-enforced); per-wire [Archive] button
+ *   @wildwest send <role> "<msg>"  — draft wire → preview → [Confirm Send] button
  *   @wildwest ack <timestamp>      — generate ack for that timestamp → [Send Ack] button
- *   @wildwest archive <filename>   — move memo from inbox to inbox/history
+ *   @wildwest archive <filename>   — move wire from inbox to inbox/history
  *   @wildwest telegraph check      — 4-dir sweep (inbox, outbox, history, dead-letter)
  *   @wildwest board                — active branches
- *   @wildwest status               — identity, heartbeat, open memo count
+ *   @wildwest status               — identity, heartbeat, open wire count
  *   @wildwest help                 — command reference
  */
 
@@ -31,7 +31,7 @@ const PARTICIPANT_ID = 'wildwest.participant';
 
 // Companion command IDs (registered in registerChatParticipant)
 const CMD_CONFIRM_SEND = 'wildwest.participant.confirmSend';
-const CMD_ARCHIVE_MEMO = 'wildwest.participant.archiveMemo';
+const CMD_ARCHIVE_WIRE = 'wildwest.participant.archiveMemo';
 const CMD_CONFIRM_ACK  = 'wildwest.participant.confirmAck';
 
 export function registerChatParticipant(
@@ -48,20 +48,20 @@ export function registerChatParticipant(
       try {
         fs.mkdirSync(args.outboxDir, { recursive: true });
         fs.writeFileSync(path.join(args.outboxDir, args.filename), args.content, 'utf8');
-        vscode.window.showInformationMessage(`Wild West: memo sent → ${args.filename}`);
-        outputChannel.appendLine(`[WildwestParticipant] sent memo: ${args.filename}`);
+        vscode.window.showInformationMessage(`Wild West: wire sent → ${args.filename}`);
+        outputChannel.appendLine(`[WildwestParticipant] sent wire: ${args.filename}`);
       } catch (err) {
         vscode.window.showErrorMessage(`Wild West: send failed — ${err}`);
       }
     }),
 
-    vscode.commands.registerCommand(CMD_ARCHIVE_MEMO, async (args: {
+    vscode.commands.registerCommand(CMD_ARCHIVE_WIRE, async (args: {
       inboxDir: string; filename: string;
     }) => {
       try {
         archiveMemo(path.join(args.inboxDir, args.filename), path.join(args.inboxDir, 'history'));
         vscode.window.showInformationMessage(`Wild West: archived → ${args.filename}`);
-        outputChannel.appendLine(`[WildwestParticipant] archived memo: ${args.filename}`);
+        outputChannel.appendLine(`[WildwestParticipant] archived wire: ${args.filename}`);
       } catch (err) {
         vscode.window.showErrorMessage(`Wild West: archive failed — ${err}`);
       }
@@ -150,40 +150,40 @@ async function handleInbox(wwRoot: string, stream: vscode.ChatResponseStream): P
     workspaceScope = (reg['scope'] as string) ?? null;
   } catch { /* registry unreadable — default to town-only */ }
 
-  const townMemos = listMemos(townInboxDir);
+  const townWires = listWires(townInboxDir);
 
   if (workspaceScope !== 'town') {
     // Non-town workspace: also sweep county inbox
     const countyRoot = findCountyRootFromWwDir(wwRoot);
     const countyInboxDir = countyRoot ? path.join(countyRoot, '.wildwest', 'telegraph', 'inbox') : null;
-    const countyMemos = countyInboxDir ? listMemos(countyInboxDir) : [];
+    const countyWires = countyInboxDir ? listWires(countyInboxDir) : [];
 
-    const total = townMemos.length + countyMemos.length;
+    const total = townWires.length + countyWires.length;
     if (total === 0) {
       stream.markdown('**All inboxes empty.** Nothing to process.');
       return;
     }
 
-    if (countyMemos.length > 0) {
-      stream.markdown(`**County inbox** — ${countyMemos.length} memo(s):\n\n`);
-      for (const memo of countyMemos) {
-        const subject = extractSubject(path.join(countyInboxDir!, memo), memo);
-        stream.markdown(`- \`${memo}\`  \n  ${subject}\n`);
-        stream.button({ command: CMD_ARCHIVE_MEMO, title: 'Archive', arguments: [{ inboxDir: countyInboxDir!, filename: memo }] });
+    if (countyWires.length > 0) {
+      stream.markdown(`**County inbox** — ${countyWires.length} wire(s):\n\n`);
+      for (const wire of countyWires) {
+        const subject = extractSubject(path.join(countyInboxDir!, wire), wire);
+        stream.markdown(`- \`${wire}\`  \n  ${subject}\n`);
+        stream.button({ command: CMD_ARCHIVE_WIRE, title: 'Archive', arguments: [{ inboxDir: countyInboxDir!, filename: wire }] });
         stream.markdown('\n');
       }
     }
-  } else if (townMemos.length === 0) {
+  } else if (townWires.length === 0) {
     stream.markdown('**Inbox empty.** Nothing to process.');
     return;
   }
 
-  if (townMemos.length > 0) {
-    stream.markdown(`**Town inbox** — ${townMemos.length} memo(s):\n\n`);
-    for (const memo of townMemos) {
-      const subject = extractSubject(path.join(townInboxDir, memo), memo);
-      stream.markdown(`- \`${memo}\`  \n  ${subject}\n`);
-      stream.button({ command: CMD_ARCHIVE_MEMO, title: 'Archive', arguments: [{ inboxDir: townInboxDir, filename: memo }] });
+  if (townWires.length > 0) {
+    stream.markdown(`**Town inbox** — ${townWires.length} wire(s):\n\n`);
+    for (const wire of townWires) {
+      const subject = extractSubject(path.join(townInboxDir, wire), wire);
+      stream.markdown(`- \`${wire}\`  \n  ${subject}\n`);
+      stream.button({ command: CMD_ARCHIVE_WIRE, title: 'Archive', arguments: [{ inboxDir: townInboxDir, filename: wire }] });
       stream.markdown('\n');
     }
   }
@@ -194,7 +194,7 @@ async function handleSend(wwRoot: string, rawPrompt: string, stream: vscode.Chat
   const match = rawPrompt.match(/^send\s+(\S+)\s+"([^"]+)"/i)
     ?? rawPrompt.match(/^send\s+(\S+)\s+(.+)/i);
   if (!match) {
-    stream.markdown('Usage: `@wildwest send <role> "<message>"`\n\nExample: `@wildwest send CD "ack 1507Z memo — resolved"`');
+    stream.markdown('Usage: `@wildwest send <role> "<message>"`\n\nExample: `@wildwest send CD "ack 1507Z wire — resolved"`');
     return;
   }
 
@@ -214,7 +214,7 @@ async function handleSend(wwRoot: string, rawPrompt: string, stream: vscode.Chat
   const content =
     `---\nto: ${toRole}\nfrom: ${senderAlias}\ndate: ${now.toISOString().slice(0, 16)}Z\nsubject: ${subject}\n---\n\n${body}\n\n${senderAlias}\n`;
 
-  stream.markdown(`**Draft memo** — preview before sending:\n\n`);
+  stream.markdown(`**Draft wire** — preview before sending:\n\n`);
   stream.markdown('```\n' + content + '```\n\n');
   stream.markdown(`Filename: \`${filename}\`\n\n`);
   stream.button({ command: CMD_CONFIRM_SEND, title: 'Confirm Send', arguments: [{ outboxDir, filename, content }] });
@@ -226,13 +226,13 @@ async function handleAck(wwRoot: string, timestampArg: string, stream: vscode.Ch
     return;
   }
 
-  // Find memo matching the timestamp in town inbox
+  // Find wire matching the timestamp in town inbox
   const inboxDir = path.join(wwRoot, 'telegraph', 'inbox');
-  const memos = listMemos(inboxDir);
-  const matched = memos.find((f) => f.includes(timestampArg));
+  const wires = listWires(inboxDir);
+  const matched = wires.find((f) => f.includes(timestampArg));
 
   if (!matched) {
-    stream.markdown(`No memo found matching \`${timestampArg}\` in inbox.`);
+    stream.markdown(`No wire found matching \`${timestampArg}\` in inbox.`);
     return;
   }
 
@@ -253,25 +253,25 @@ async function handleAck(wwRoot: string, timestampArg: string, stream: vscode.Ch
   const filename = `${ts}-to-${originalFrom}-from-${senderAlias}--${ackSubject}.md`;
   const content =
     `---\nto: ${originalFrom}\nfrom: ${senderAlias}\ndate: ${now.toISOString().slice(0, 16)}Z\nsubject: ${ackSubject}\n---\n\n` +
-    `Ack — your ${timestampArg} memo (${originalSubject}) received and processed.\n\n${senderAlias}\n`;
+    `Ack — your ${timestampArg} wire (${originalSubject}) received and processed.\n\n${senderAlias}\n`;
 
-  stream.markdown(`**Ack memo** — \`${matched}\`:\n\n`);
+  stream.markdown(`**Ack wire** — \`${matched}\`:\n\n`);
   stream.markdown('```\n' + content + '```\n\n');
   stream.button({ command: CMD_CONFIRM_ACK, title: 'Send Ack', arguments: [{ outboxDir, filename, content }] });
 }
 
 async function handleArchive(wwRoot: string, filenameArg: string, stream: vscode.ChatResponseStream): Promise<void> {
   const inboxDir = path.join(wwRoot, 'telegraph', 'inbox');
-  const memos = listMemos(inboxDir);
-  const matched = memos.find((f) => f === filenameArg || f.includes(filenameArg));
+  const wires = listWires(inboxDir);
+  const matched = wires.find((f) => f === filenameArg || f.includes(filenameArg));
 
   if (!matched) {
-    stream.markdown(`No memo found matching \`${filenameArg}\` in inbox.\n\nUsage: \`@wildwest archive <filename-or-partial>\``);
+    stream.markdown(`No wire found matching \`${filenameArg}\` in inbox.\n\nUsage: \`@wildwest archive <filename-or-partial>\``);
     return;
   }
 
   stream.markdown(`Archive \`${matched}\`?\n\n`);
-  stream.button({ command: CMD_ARCHIVE_MEMO, title: 'Archive', arguments: [{ inboxDir, filename: matched }] });
+  stream.button({ command: CMD_ARCHIVE_WIRE, title: 'Archive', arguments: [{ inboxDir, filename: matched }] });
 }
 
 async function handleTelegraphCheck(wwRoot: string, stream: vscode.ChatResponseStream): Promise<void> {
@@ -335,7 +335,7 @@ async function handleStatus(wwRoot: string, stream: vscode.ChatResponseStream): 
     const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
     const beatPath = path.join(wwRoot, 'telegraph', '.last-beat');
     const lastBeat = fs.existsSync(beatPath) ? fs.readFileSync(beatPath, 'utf8').trim() : 'unknown';
-    const inboxCount = listMemos(path.join(wwRoot, 'telegraph', 'inbox')).length;
+    const inboxCount = listWires(path.join(wwRoot, 'telegraph', 'inbox')).length;
     const boardDir = path.join(wwRoot, 'board', 'branches');
     const boardCount = fs.existsSync(boardDir)
       ? fs.readdirSync(boardDir).filter((f) => f.endsWith('.json')).length : 0;
@@ -443,13 +443,13 @@ async function handleHelp(stream: vscode.ChatResponseStream): Promise<void> {
   stream.markdown(
     '**@wildwest** — Wild West governance\n\n' +
     '| Command | Description |\n|---|---|\n' +
-    '| `@wildwest inbox` | County + town inbox sweep; [Archive] per memo |\n' +
-    '| `@wildwest send <role> "<msg>"` | Draft memo → preview → [Confirm Send] |\n' +
-    '| `@wildwest ack <timestamp>` | Generate ack for that memo → [Send Ack] |\n' +
-    '| `@wildwest archive <filename>` | Move inbox memo to history |\n' +
+    '| `@wildwest inbox` | County + town inbox sweep; [Archive] per wire |\n' +
+    '| `@wildwest send <role> "<msg>"` | Draft wire → preview → [Confirm Send] |\n' +
+    '| `@wildwest ack <timestamp>` | Generate ack for that wire → [Send Ack] |\n' +
+    '| `@wildwest archive <filename>` | Move inbox wire to history |\n' +
     '| `@wildwest telegraph check` | 4-dir sweep: inbox, outbox, history, dead-letter |\n' +
     '| `@wildwest board` | Active branches from .wildwest/board/ |\n' +
-    '| `@wildwest status` | Identity, heartbeat, open memo count |\n' +
+    '| `@wildwest status` | Identity, heartbeat, open wire count |\n' +
     '| `@wildwest prompts` | Prompt index analytics |\n' +
     '| `@wildwest prompts <query>` | Search past prompts; supports `scope:<alias>` prefix |\n' +
     '| `@wildwest help` | Show this help |\n',
@@ -468,7 +468,7 @@ function resolveWildwestDir(): string | null {
   return null;
 }
 
-function listMemos(dir: string): string[] {
+function listWires(dir: string): string[] {
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir).filter(
     (f) => f.endsWith('.md') && !f.startsWith('.') && !f.startsWith('!') && f !== 'history',

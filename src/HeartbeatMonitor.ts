@@ -258,7 +258,7 @@ function writeSentinel(sentinelFile: string, outputChannel: vscode.OutputChannel
 // ---------------------------------------------------------------------------
 
 /**
- * Scan telegraphDir for resolved memo pairs (ack-done/ack-deferred + original).
+ * Scan telegraphDir for resolved wire pairs (ack-done/ack-deferred + original).
  * Move pairs to history/ (create if needed). Leave ack-blocked/ack-question in place.
  * Returns { archived, open }.
  */
@@ -328,7 +328,7 @@ function cleanupTelegraph(
 }
 
 /**
- * Parse YAML frontmatter from a memo file.
+ * Parse YAML frontmatter from a wire file.
  * Returns { to: string | null, ... other fields }.
  */
 function parseMemoFrontmatter(
@@ -551,7 +551,7 @@ function resolveScopePath(
 }
 
 /**
- * Mark a memo as permanently failed by:
+ * Mark a wire as permanently failed by:
  * 1. Injecting (!) into the 'to:' field so the problem is self-documenting
  * 2. Renaming the file with a '!' prefix so it's skipped on future beats
  */
@@ -580,12 +580,12 @@ function markMemoFailed(
 }
 
 /**
- * Deliver pending memos from outbox/ to remote inboxes.
+ * Deliver pending wires from outbox/ to remote inboxes.
  * Called on every heartbeat tick.
- * 
+ *
  * Algorithm:
- * 1. Scan outbox/ for memos
- * 2. For each memo: parse 'to:' field
+ * 1. Scan outbox/ for wires
+ * 2. For each wire: parse 'to:' field
  * 3. Extract role and optional town pattern
  * 4. Resolve destination scope (role → scope → path, with pattern for towns)
  * 5. Write delivered copy to destination inbox/
@@ -625,7 +625,7 @@ function deliverPendingOutbox(
         const toField = frontmatter['to'] as string | undefined;
         const fromField = (frontmatter['from'] as string | undefined) ?? '';
 
-        // Fix 2: warn if from: is bare role with no town specifier in multi-town county
+        // Warn if from: is bare role with no town specifier in multi-town county
         if (scope === 'county' && /^TM$/i.test(fromField.trim())) {
           const towns = listTownsInCounty(rootPath);
           if (towns.length > 1) {
@@ -763,7 +763,7 @@ function deliverPendingOutbox(
   return { delivered, failed };
 }
 
-function isActionableMemoFile(filename: string): boolean {
+function isActionableWireFile(filename: string): boolean {
   return (
     filename.endsWith('.md') &&
     !filename.startsWith('.') &&
@@ -777,26 +777,26 @@ function hasActionableTelegraphFiles(telegraphDir: string): boolean {
     if (!fs.existsSync(telegraphDir)) return false;
 
     const rootEntries = fs.readdirSync(telegraphDir);
-    const hasLegacyRootMemo = rootEntries.some((e) =>
+    const hasLegacyRootWire = rootEntries.some((e) =>
       e !== 'history' &&
       e !== 'inbox' &&
       e !== 'outbox' &&
-      isActionableMemoFile(e)
+      isActionableWireFile(e)
     );
-    if (hasLegacyRootMemo) return true;
+    if (hasLegacyRootWire) return true;
 
     const inboxDir = path.join(telegraphDir, 'inbox');
     if (fs.existsSync(inboxDir)) {
-      const hasInboxMemo = fs.readdirSync(inboxDir).some((e) => isActionableMemoFile(e));
-      if (hasInboxMemo) return true;
+      const hasInboxWire = fs.readdirSync(inboxDir).some((e) => isActionableWireFile(e));
+      if (hasInboxWire) return true;
     }
 
     const outboxDir = path.join(telegraphDir, 'outbox');
     if (fs.existsSync(outboxDir)) {
-      const hasFailedOutboxMemo = fs.readdirSync(outboxDir).some((e) =>
+      const hasFailedOutboxWire = fs.readdirSync(outboxDir).some((e) =>
         e.startsWith('!') && e.endsWith('.md')
       );
-      if (hasFailedOutboxMemo) return true;
+      if (hasFailedOutboxWire) return true;
     }
   } catch {
     return false;

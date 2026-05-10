@@ -63,11 +63,11 @@ export class wwMCPServer {
         },
         {
           name: TOOL_INBOX,
-          description: 'List unprocessed memos from the identity inbox (scope-filtered).',
+          description: 'List unprocessed wires from the identity inbox (scope-filtered).',
           inputSchema: {
             type: 'object',
             properties: {
-              limit: { type: 'number', description: 'Max memos to return (default 20)' },
+              limit: { type: 'number', description: 'Max wires to return (default 20)' },
             },
           },
         },
@@ -87,7 +87,7 @@ export class wwMCPServer {
         },
         {
           name: TOOL_TELEGRAPH_CHECK,
-          description: 'Return memo counts for inbox, outbox, history, and dead-letter.',
+          description: 'Return wire counts for inbox, outbox, history, and dead-letter.',
           inputSchema: { type: 'object', properties: {} },
         },
       ],

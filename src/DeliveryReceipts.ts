@@ -1,5 +1,5 @@
 /**
- * DeliveryReceipts — compute delivery status per outbound memo.
+ * DeliveryReceipts — compute delivery status per outbound wire.
  *
  * Status lifecycle:
  *   pending      outbox/*.md (queued, not yet delivered)
@@ -14,26 +14,26 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-export type MemoStatus = 'pending' | 'delivered' | 'acknowledged' | 'failed' | 'blocked';
+export type WireStatus = 'pending' | 'delivered' | 'acknowledged' | 'failed' | 'blocked';
 
 export interface DeliveryReceipt {
-  filename: string;     // canonical memo filename (no ! prefix)
+  filename: string;     // canonical wire filename (no ! prefix)
   subject: string;      // extracted from filename (last --<subject> segment)
-  status: MemoStatus;
+  status: WireStatus;
   filePath: string;     // absolute path to the file on disk
   deliveredAt?: string; // ISO timestamp from delivered_at frontmatter field
 }
 
-// Matches standard memo filenames: YYYYMMDD-HHMMz-to-<to>-from-<from>--<subject>.md
-const MEMO_FILENAME_RE = /^(?:\d{8}-\d{4}Z-)?to-.+-from-.+--(.+)\.md$/;
+// Matches standard wire filenames: YYYYMMDD-HHMMz-to-<to>-from-<from>--<subject>.md
+const WIRE_FILENAME_RE = /^(?:\d{8}-\d{4}Z-)?to-.+-from-.+--(.+)\.md$/;
 
 export function extractSubject(filename: string): string | null {
   const bare = filename.startsWith('!') ? filename.slice(1) : filename;
-  const m = bare.match(MEMO_FILENAME_RE);
+  const m = bare.match(WIRE_FILENAME_RE);
   return m ? m[1] : null;
 }
 
-export function statusIcon(status: MemoStatus): string {
+export function statusIcon(status: WireStatus): string {
   switch (status) {
     case 'pending':      return '○';
     case 'delivered':    return '✓';
@@ -85,7 +85,7 @@ function findAckStatus(
 }
 
 /**
- * Compute delivery receipts for all memos sent from the given telegraph directory.
+ * Compute delivery receipts for all wires sent from the given telegraph directory.
  * Scans outbox/, outbox/!* (failed), and outbox/history/ (delivered/acked).
  */
 export function getDeliveryReceipts(telegraphDir: string): DeliveryReceipt[] {
@@ -129,7 +129,7 @@ export function getDeliveryReceipts(telegraphDir: string): DeliveryReceipt[] {
     if (!subject) continue;
     const ackStatus = findAckStatus(telegraphDir, subject);
     const deliveredAt = readDeliveredAt(path.join(outboxHistoryDir, file));
-    const status: MemoStatus =
+    const status: WireStatus =
       ackStatus === 'acknowledged' ? 'acknowledged' :
       ackStatus === 'blocked' ? 'blocked' :
       'delivered';

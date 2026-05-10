@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { HeartbeatMonitor } from './HeartbeatMonitor';
-import { Memo, MemoStorageService } from './MemoStorageService';
+import { Wire, WireStorageService } from './WireStorageService';
 import { generateWwuid } from './sessionPipeline/utils';
 import {
   telegraphTimestamp,
@@ -15,13 +15,13 @@ import {
 export class TelegraphCommands {
   private outputChannel: vscode.OutputChannel;
   private heartbeatMonitor: HeartbeatMonitor;
-  private memoStorage: MemoStorageService | null = null;
+  private wireStorage: WireStorageService | null = null;
 
   constructor(outputChannel: vscode.OutputChannel, heartbeatMonitor?: HeartbeatMonitor, exportPath?: string) {
     this.outputChannel = outputChannel;
     this.heartbeatMonitor = heartbeatMonitor || ({} as HeartbeatMonitor);
     if (exportPath) {
-      this.memoStorage = new MemoStorageService(exportPath);
+      this.wireStorage = new WireStorageService(exportPath);
     }
   }
 
@@ -108,23 +108,23 @@ export class TelegraphCommands {
     }
 
     const files = fs.readdirSync(inboxDir);
-    const inboundMemos = files.filter((f) => {
+    const inboundWires = files.filter((f) => {
       if (f.startsWith('.') || f.includes('ack-')) return false;
       return f.includes('-to-') && (f.endsWith('.json') || f.endsWith('.md'));
     });
 
-    if (inboundMemos.length === 0) {
-      vscode.window.showInformationMessage('No unacked memos found in inbox');
+    if (inboundWires.length === 0) {
+      vscode.window.showInformationMessage('No unacked wires found in inbox');
       return;
     }
 
-    // Quick pick memo
+    // Quick pick wire
     const selection = await vscode.window.showQuickPick(
-      inboundMemos.map((f) => ({
+      inboundWires.map((f) => ({
         label: f,
         description: f.split('--').slice(-1)[0].replace(/\.(json|md)$/, ''),
       })),
-      { placeHolder: 'Select memo to ack' }
+      { placeHolder: 'Select wire to ack' }
     );
 
     if (!selection) return;
@@ -132,18 +132,18 @@ export class TelegraphCommands {
     const originalFileName = selection.label;
     const originalPath = path.join(inboxDir, originalFileName);
 
-    // Parse memo — JSON or legacy MD frontmatter
+    // Parse wire — JSON or legacy MD frontmatter
     let fromActor: string;
     let toActor: string;
     let originalWwuid: string | undefined;
     if (originalFileName.endsWith('.json')) {
       try {
-        const memo = JSON.parse(fs.readFileSync(originalPath, 'utf8')) as Partial<Memo>;
-        fromActor = memo.from ?? '';
-        toActor = memo.to ?? '';
-        originalWwuid = memo.wwuid;
+        const wire = JSON.parse(fs.readFileSync(originalPath, 'utf8')) as Partial<Wire>;
+        fromActor = wire.from ?? '';
+        toActor = wire.to ?? '';
+        originalWwuid = wire.wwuid;
       } catch {
-        vscode.window.showErrorMessage('Could not parse memo JSON');
+        vscode.window.showErrorMessage('Could not parse wire JSON');
         return;
       }
     } else {
@@ -153,7 +153,7 @@ export class TelegraphCommands {
     }
 
     if (!fromActor || !toActor) {
-      vscode.window.showErrorMessage('Could not parse memo sender/recipient');
+      vscode.window.showErrorMessage('Could not parse wire sender/recipient');
       return;
     }
 
@@ -186,7 +186,7 @@ export class TelegraphCommands {
     fs.mkdirSync(outboxDir, { recursive: true });
     const ackPath = path.join(outboxDir, ackFileName);
 
-    const wwuid = generateWwuid('memo', toActor, fromActor, isoTimestamp, `ack-${status}--${subject}`);
+    const wwuid = generateWwuid('wire', toActor, fromActor, isoTimestamp, `ack-${status}--${subject}`);
 
     let body = '';
     if (status === 'question') {
@@ -199,10 +199,10 @@ export class TelegraphCommands {
       body = `Acknowledged: ${status}`;
     }
 
-    const ackMemo: Memo = {
+    const ackWire: Wire = {
       schema_version: '1',
       wwuid,
-      wwuid_type: 'memo',
+      wwuid_type: 'wire',
       from: toActor,
       to: fromActor,
       type: 'ack',
@@ -212,16 +212,16 @@ export class TelegraphCommands {
       body,
       filename: ackFileName,
       ack_status: status,
-      original_memo: originalFileName,
+      original_wire: originalFileName,
     };
 
-    fs.writeFileSync(ackPath, JSON.stringify(ackMemo, null, 2), 'utf8');
+    fs.writeFileSync(ackPath, JSON.stringify(ackWire, null, 2), 'utf8');
 
     // Persist to storage and mark original as acked
-    if (this.memoStorage) {
-      this.memoStorage.write(ackMemo);
+    if (this.wireStorage) {
+      this.wireStorage.write(ackWire);
       if (originalWwuid) {
-        this.memoStorage.updateStatus(originalWwuid, 'acked', status);
+        this.wireStorage.updateStatus(originalWwuid, 'acked', status);
       }
     }
 
@@ -268,10 +268,10 @@ export class TelegraphCommands {
 
     if (!subject) return;
 
-    // Open untitled editor for memo body
+    // Open untitled editor for wire body
     const untitled = await vscode.workspace.openTextDocument({
       language: 'markdown',
-      content: `# Memo: ${subject}\n\n(Write memo body here)`,
+      content: `# Wire: ${subject}\n\n(Write wire body here)`,
     });
 
     await vscode.window.showTextDocument(untitled);
@@ -280,7 +280,7 @@ export class TelegraphCommands {
     const saveWatcher = vscode.workspace.onDidSaveTextDocument((doc) => {
       if (doc === untitled) {
         saveWatcher.dispose();
-        this.finalizeMemo(telegraphDir, toActor, type, subject, doc.getText());
+        this.finalizeWire(telegraphDir, toActor, type, subject, doc.getText());
       }
     });
 
@@ -294,9 +294,9 @@ export class TelegraphCommands {
   }
 
   /**
-   * Finalize memo creation
+   * Finalize wire creation
    */
-  private finalizeMemo(
+  private finalizeWire(
     telegraphDir: string,
     toActor: string,
     type: string,
@@ -322,18 +322,18 @@ export class TelegraphCommands {
     fs.mkdirSync(outboxDir, { recursive: true });
     const filePath = path.join(outboxDir, fileName);
 
-    const wwuid = generateWwuid('memo', fromActor, toActor, isoTimestamp, subject);
+    const wwuid = generateWwuid('wire', fromActor, toActor, isoTimestamp, subject);
 
     // Extract body (remove the template line)
     const cleanBody = body.split('\n')
-      .filter((line) => !line.includes('Write memo body here'))
+      .filter((line) => !line.includes('Write wire body here'))
       .join('\n')
       .trim();
 
-    const memo: Memo = {
+    const wire: Wire = {
       schema_version: '1',
       wwuid,
-      wwuid_type: 'memo',
+      wwuid_type: 'wire',
       from: fromActor,
       to: toActor,
       type,
@@ -344,14 +344,14 @@ export class TelegraphCommands {
       filename: fileName,
     };
 
-    fs.writeFileSync(filePath, JSON.stringify(memo, null, 2), 'utf8');
+    fs.writeFileSync(filePath, JSON.stringify(wire, null, 2), 'utf8');
 
-    if (this.memoStorage) {
-      this.memoStorage.write(memo);
+    if (this.wireStorage) {
+      this.wireStorage.write(wire);
     }
 
-    this.outputChannel.appendLine(`[TelegraphCommands] Memo created in outbox: ${fileName}`);
-    vscode.window.showInformationMessage(`Memo created in outbox: ${fileName}`);
+    this.outputChannel.appendLine(`[TelegraphCommands] Wire created in outbox: ${fileName}`);
+    vscode.window.showInformationMessage(`Wire created in outbox: ${fileName}`);
   }
 
 }

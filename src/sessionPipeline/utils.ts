@@ -14,7 +14,7 @@ import * as os from 'os';
 export const WW_NAMESPACE = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
 
 /** Valid entity types for wwuid generation */
-export type WwuidType = 'session' | 'device' | 'memo' | 'town' | 'county' | 'territory';
+export type WwuidType = 'session' | 'device' | 'wire' | 'town' | 'county' | 'territory';
 
 /**
  * Generate a deterministic wwuid (Wild West Universal ID)
@@ -23,14 +23,14 @@ export type WwuidType = 'session' | 'device' | 'memo' | 'town' | 'county' | 'ter
  * entity types even within the same namespace. Same (type, ...parts) always
  * produces the same wwuid — idempotent across runs and devices.
  * 
- * @param type   Entity type ('session', 'device', 'memo', 'town', ...)
+ * @param type   Entity type ('session', 'device', 'wire', 'town', ...)
  * @param parts  Discriminating parts unique to this entity
  * @returns UUIDv5 string
  * 
  * @example
  *   generateWwuid('session', 'cpt', 'abc123')   // session ID
  *   generateWwuid('device',  'macbook-pro')      // device ID
- *   generateWwuid('memo',    'TM', 'CD', '20260508-1707Z', 'release-done') // memo ID
+ *   generateWwuid('wire',    'TM', 'CD', '20260508-1707Z', 'release-done') // wire ID
  *   generateWwuid('town',    'wildwest-vscode')  // town ID
  */
 export function generateWwuid(type: WwuidType, ...parts: string[]): string {
