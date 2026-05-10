@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.36.10
+**Current version:** v0.37.0
 
 ---
 
 ## What's New
+
+**v0.37.0** — Telegraph Panel: bulk status change — individual checkboxes per wire row, select-all, status dropdown (Draft/Pending/Sent/Delivered/Archived), Apply writes all selected wires to flat/ SSOT. Inbox chips: New | Delivered | Archived | All (New default). Outbox chips: Draft | Pending | Sent | Delivered | Archived | All. New statuses: `draft` (AI-prepared, awaiting author send) and `pending` (in outbox, awaiting operator pickup).
 
 **v0.36.10** — Address matching stripped of legacy `(dyad)[alias]` handling — migration script normalizes flat/ data; extension expects canonical format only. No behavior change post-migration.
 

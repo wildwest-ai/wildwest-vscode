@@ -154,6 +154,12 @@ export class TelegraphPanel {
       case 'archive':
         this.handleArchiveWire(msg['wwuid'] as string);
         break;
+      case 'bulkStatus': {
+        const wwuids = msg['wwuids'] as string[];
+        const status = msg['status'] as string;
+        this.handleBulkStatus(wwuids, status);
+        break;
+      }
       case 'promptSearch': {
         const query = (msg['query'] as string) ?? '';
         const results = this.promptIndex?.search(query, undefined, 10, {
@@ -201,6 +207,26 @@ export class TelegraphPanel {
     }
 
     this.panel.webview.postMessage({ type: 'sent', wire });
+    this.sendWires();
+  }
+
+  private handleBulkStatus(wwuids: string[], status: string): void {
+    const flatDir = this.getFlatDir();
+    if (!flatDir || !wwuids?.length || !status) return;
+    const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+    for (const wwuid of wwuids) {
+      const filePath = path.join(flatDir, `${wwuid}.json`);
+      if (!fs.existsSync(filePath)) continue;
+      try {
+        const wire = JSON.parse(fs.readFileSync(filePath, 'utf8')) as FlatWire;
+        wire.status = status;
+        wire.status_transitions = [
+          ...(wire.status_transitions ?? []),
+          { status, timestamp: isoNow, repos: ['vscode'] },
+        ];
+        fs.writeFileSync(filePath, JSON.stringify(wire, null, 2), 'utf8');
+      } catch { /* skip */ }
+    }
     this.sendWires();
   }
 
@@ -301,7 +327,7 @@ export class TelegraphPanel {
 
   /* ── Wire list ── */
   .list-pane { width: 240px; flex-shrink: 0; border-right: 1px solid var(--vscode-panel-border); overflow-y: auto; display: flex; flex-direction: column; }
-  .wire-row { padding: 7px 10px; cursor: pointer; border-left: 3px solid transparent; }
+  .wire-row { border-left: 3px solid transparent; }
   .wire-row:hover { background: var(--vscode-list-hoverBackground); }
   .wire-row.active { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); border-left-color: var(--vscode-focusBorder); }
   .wire-row .subject { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -340,6 +366,18 @@ export class TelegraphPanel {
   /* ── Scope section headers ── */
   .scope-header { font-size: 10px; font-weight: 700; color: var(--vscode-descriptionForeground); text-transform: uppercase; letter-spacing: 0.07em; padding: 8px 10px 3px; opacity: 0.6; }
 
+  /* ── Bulk action bar ── */
+  .bulk-bar { display: none; align-items: center; gap: 6px; padding: 4px 10px; border-bottom: 1px solid var(--vscode-panel-border); background: var(--vscode-editor-inactiveSelectionBackground); flex-shrink: 0; }
+  .bulk-bar.visible { display: flex; }
+  .bulk-select-all { font-size: 11px; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .bulk-count { font-size: 11px; color: var(--vscode-descriptionForeground); flex: 1; }
+  .bulk-select { background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, #555); font-size: 11px; padding: 2px 4px; border-radius: 2px; }
+
+  /* ── Checkbox in wire rows ── */
+  .wire-row { display: flex; align-items: flex-start; gap: 6px; padding: 7px 10px; cursor: pointer; border-left: 3px solid transparent; }
+  .wire-check { margin-top: 2px; flex-shrink: 0; cursor: pointer; }
+  .wire-content { flex: 1; min-width: 0; }
+
   /* ── Compose drawer ── */
   .compose-drawer { border-top: 1px solid var(--vscode-panel-border); flex-shrink: 0; overflow: hidden; transition: max-height 0.2s ease; max-height: 0; }
   .compose-drawer.open { max-height: 300px; }
@@ -368,11 +406,21 @@ export class TelegraphPanel {
   <div class="tab" data-tab="all">All <span class="badge" id="badgeAll">0</span></div>
 </div>
 
-<div class="status-filter" id="statusFilter">
-  <button class="sf-btn active" data-status="all">All</button>
-  <button class="sf-btn" data-status="sent" id="sfBtnSent">New</button>
-  <button class="sf-btn" data-status="delivered">Delivered</button>
-  <button class="sf-btn" data-status="archived">Archived</button>
+<div class="status-filter" id="statusFilter"></div>
+
+<div class="bulk-bar" id="bulkBar">
+  <label class="bulk-select-all"><input type="checkbox" id="selectAll"> All</label>
+  <span id="selectedCount" class="bulk-count">0 selected</span>
+  <select id="bulkStatus" class="bulk-select">
+    <option value="">— set status —</option>
+    <option value="draft">Draft</option>
+    <option value="pending">Pending</option>
+    <option value="sent">Sent</option>
+    <option value="delivered">Delivered</option>
+    <option value="archived">Archived</option>
+  </select>
+  <button class="btn" id="bulkApply">Apply</button>
+  <button class="btn btn-secondary" id="bulkClear">✕</button>
 </div>
 
 <div class="search-bar" id="searchBar">
@@ -421,13 +469,48 @@ export class TelegraphPanel {
   let actorAlias = '';
   let flatAvailable = false;
   let activeTab = 'inbox';
-  let statusFilter = 'all';
+  let statusFilter = 'sent';   // default: New for inbox
   let selectedWwuid = null;
   let pendingFormatted = '';
   let searchQuery = '';
+  let selectedWwuids = new Set();
 
-  // Show status filter on initial load (inbox is active by default)
-  document.getElementById('statusFilter').classList.add('visible');
+  const CHIP_CONFIG = {
+    inbox:  [
+      { status: 'sent',      label: 'New'       },
+      { status: 'delivered', label: 'Delivered' },
+      { status: 'archived',  label: 'Archived'  },
+      { status: 'all',       label: 'All'       },
+    ],
+    outbox: [
+      { status: 'draft',     label: 'Draft'     },
+      { status: 'pending',   label: 'Pending'   },
+      { status: 'sent',      label: 'Sent'      },
+      { status: 'delivered', label: 'Delivered' },
+      { status: 'archived',  label: 'Archived'  },
+      { status: 'all',       label: 'All'       },
+    ],
+  };
+
+  // ── Chip rendering ────────────────────────────────────────────────────────
+
+  function renderChips(tab) {
+    const bar = document.getElementById('statusFilter');
+    const chips = CHIP_CONFIG[tab] || [];
+    bar.innerHTML = chips.map(c =>
+      '<button class="sf-btn' + (c.status === statusFilter ? ' active' : '') + '" data-status="' + c.status + '">' + c.label + '</button>'
+    ).join('');
+    bar.querySelectorAll('.sf-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        bar.querySelectorAll('.sf-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        statusFilter = btn.dataset.status;
+        clearSelection();
+        renderList();
+      });
+    });
+    bar.classList.toggle('visible', tab === 'inbox' || tab === 'outbox');
+  }
 
   // ── Tab switching ─────────────────────────────────────────────────────────
 
@@ -436,22 +519,18 @@ export class TelegraphPanel {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
       activeTab = tab.dataset.tab;
-      const scopedTab = activeTab === 'inbox' || activeTab === 'outbox';
+      // Reset to first chip for the new tab
+      const chips = CHIP_CONFIG[activeTab];
+      statusFilter = chips ? chips[0].status : 'all';
       document.getElementById('searchBar').classList.toggle('visible', activeTab === 'all');
-      document.getElementById('statusFilter').classList.toggle('visible', scopedTab);
-      document.getElementById('sfBtnSent').textContent = activeTab === 'outbox' ? 'Sent' : 'New';
+      clearSelection();
+      renderChips(activeTab);
       renderList();
     });
   });
 
-  document.querySelectorAll('.sf-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.sf-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      statusFilter = btn.dataset.status;
-      renderList();
-    });
-  });
+  // Initial chip render
+  renderChips('inbox');
 
   document.getElementById('searchInput').addEventListener('input', (e) => {
     searchQuery = e.target.value.toLowerCase();
@@ -460,12 +539,56 @@ export class TelegraphPanel {
 
   // ── Controls ──────────────────────────────────────────────────────────────
 
+  // ── Bulk bar ──────────────────────────────────────────────────────────────
+
+  function clearSelection() {
+    selectedWwuids.clear();
+    updateBulkBar();
+  }
+
+  function updateBulkBar() {
+    const n = selectedWwuids.size;
+    document.getElementById('bulkBar').classList.toggle('visible', n > 0);
+    document.getElementById('selectedCount').textContent = n + ' selected';
+    document.getElementById('selectAll').checked = n > 0 && n === currentList().length;
+    // Sync checkboxes in list
+    document.querySelectorAll('.wire-check').forEach(cb => {
+      cb.checked = selectedWwuids.has(cb.dataset.wwuid);
+    });
+  }
+
+  document.getElementById('selectAll').addEventListener('change', (e) => {
+    if (e.target.checked) {
+      currentList().forEach(w => selectedWwuids.add(w.wwuid));
+    } else {
+      clearSelection();
+    }
+    renderList();
+  });
+
+  document.getElementById('bulkApply').addEventListener('click', () => {
+    const status = document.getElementById('bulkStatus').value;
+    if (!status || selectedWwuids.size === 0) return;
+    vscode.postMessage({ type: 'bulkStatus', wwuids: [...selectedWwuids], status });
+    clearSelection();
+  });
+
+  document.getElementById('bulkClear').addEventListener('click', () => clearSelection());
+
   document.getElementById('btnRefresh').addEventListener('click', () => refresh());
   document.getElementById('btnCompose').addEventListener('click', () => toggleCompose());
   document.getElementById('btnCancel').addEventListener('click', () => toggleCompose(false));
   document.getElementById('btnSend').addEventListener('click', () => sendWire());
 
   document.getElementById('listPane').addEventListener('click', (e) => {
+    const cb = e.target.closest('.wire-check');
+    if (cb) {
+      e.stopPropagation();
+      if (cb.checked) selectedWwuids.add(cb.dataset.wwuid);
+      else selectedWwuids.delete(cb.dataset.wwuid);
+      updateBulkBar();
+      return;
+    }
     const row = e.target.closest('.wire-row');
     if (row && row.dataset.wwuid) selectWire(row.dataset.wwuid);
   });
@@ -489,6 +612,7 @@ export class TelegraphPanel {
       document.getElementById('badgeInbox').textContent  = inboxWires.length;
       document.getElementById('badgeOutbox').textContent = outboxWires.length;
       document.getElementById('badgeAll').textContent    = allWires.length;
+      clearSelection();
       renderList();
       if (selectedWwuid) renderDetail(selectedWwuid);
     }
@@ -603,13 +727,17 @@ export class TelegraphPanel {
 
   function wireRow(w) {
     const active = w.wwuid === selectedWwuid ? ' active' : '';
+    const checked = selectedWwuids.has(w.wwuid) ? ' checked' : '';
     const dateStr = w.date ? new Date(w.date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
     const statusBadge = '<span class="badge-status badge-' + esc(w.status || 'sent') + '">' + esc(w.status || '') + '</span>';
     const shortId = w.wwuid ? w.wwuid.slice(0, 8) : '—';
     return '<div class="wire-row' + active + '" data-wwuid="' + esc(w.wwuid) + '">'
+      + '<input type="checkbox" class="wire-check"' + checked + ' data-wwuid="' + esc(w.wwuid) + '">'
+      + '<div class="wire-content">'
       + '<div class="subject">' + esc(w.subject || w.filename || '—') + '</div>'
       + '<div class="meta">' + statusBadge + ' <span>' + esc(w.from || w.to || '') + '</span> <span>' + esc(dateStr) + '</span></div>'
       + '<div class="meta" style="opacity:0.45;font-family:monospace">' + esc(shortId) + '</div>'
+      + '</div>'
       + '</div>';
   }
 
