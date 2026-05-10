@@ -635,9 +635,9 @@ function deliverPendingOutbox(
     }
 
     const entries = fs.readdirSync(outboxDir);
-    // Process only .json files — exclude hidden, ! (failed), and history/
+    // Process .md/.json files — exclude hidden, ! (failed), and history/
     const memoFiles = entries.filter(
-      (e) => e.endsWith('.json') && !e.startsWith('.') && !e.startsWith('!'),
+      (e) => (e.endsWith('.md') || e.endsWith('.json')) && !e.startsWith('.') && !e.startsWith('!'),
     );
 
     for (const memoFile of memoFiles) {
@@ -797,7 +797,7 @@ function deliverPendingOutbox(
 
 function isActionableWireFile(filename: string): boolean {
   return (
-    filename.endsWith('.json') &&
+    (filename.endsWith('.md') || filename.endsWith('.json')) &&
     !filename.startsWith('.') &&
     filename !== '.gitkeep' &&
     !filename.includes('-heartbeat--')
@@ -826,7 +826,7 @@ function hasActionableTelegraphFiles(telegraphDir: string): boolean {
     const outboxDir = path.join(telegraphDir, 'outbox');
     if (fs.existsSync(outboxDir)) {
       const hasFailedOutboxWire = fs.readdirSync(outboxDir).some((e) =>
-        e.startsWith('!') && e.endsWith('.json')
+        e.startsWith('!') && (e.endsWith('.md') || e.endsWith('.json'))
       );
       if (hasFailedOutboxWire) return true;
     }
@@ -942,6 +942,14 @@ function beatCounty(
       }
     }
   }
+
+  // Process county and town outboxes when a county scope is active.
+  deliverPendingOutbox(rootPath, 'county', outputChannel, worldRoot, countiesDir);
+  const towns = listTownsInCounty(rootPath);
+  for (const townInfo of towns) {
+    deliverPendingOutbox(townInfo.path, 'town', outputChannel, worldRoot, countiesDir);
+  }
+
   return ok ? 'alive' : 'flagged';
 }
 
@@ -1067,13 +1075,24 @@ export class HeartbeatMonitor {
    */
   deliverOutboxNow(): void {
     const town = this.scopes.find((s) => s.scope === 'town');
-    if (!town) return;
-    this.outputChannel.appendLine('[HeartbeatMonitor] outbox delivery triggered by new memo');
-    deliverPendingOutbox(town.rootPath, town.scope, this.outputChannel, this.worldRoot, this.countiesDir);
-    // Also deliver county outbox
-    const countyRoot = findCountyRoot(town.rootPath);
-    if (countyRoot) {
-      deliverPendingOutbox(countyRoot, 'county', this.outputChannel, this.worldRoot, this.countiesDir);
+    if (town) {
+      this.outputChannel.appendLine('[HeartbeatMonitor] outbox delivery triggered by new memo');
+      deliverPendingOutbox(town.rootPath, town.scope, this.outputChannel, this.worldRoot, this.countiesDir);
+      const countyRoot = findCountyRoot(town.rootPath);
+      if (countyRoot) {
+        deliverPendingOutbox(countyRoot, 'county', this.outputChannel, this.worldRoot, this.countiesDir);
+      }
+      return;
+    }
+
+    const county = this.scopes.find((s) => s.scope === 'county');
+    if (county) {
+      this.outputChannel.appendLine('[HeartbeatMonitor] outbox delivery triggered by new memo in county scope');
+      deliverPendingOutbox(county.rootPath, county.scope, this.outputChannel, this.worldRoot, this.countiesDir);
+      const towns = listTownsInCounty(county.rootPath);
+      for (const townInfo of towns) {
+        deliverPendingOutbox(townInfo.path, 'town', this.outputChannel, this.worldRoot, this.countiesDir);
+      }
     }
   }
 

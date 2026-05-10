@@ -86,7 +86,8 @@ describe('Telegraph Delivery — production deliverPendingOutbox', () => {
     expect(fs.existsSync(path.join(countyPath, '.wildwest', 'telegraph', 'inbox', filename))).toBe(true);
     const historyPath = path.join(townPath, '.wildwest', 'telegraph', 'outbox', 'history', filename);
     expect(fs.existsSync(historyPath)).toBe(true);
-    expect(fs.readFileSync(historyPath, 'utf8')).toContain('delivered_at:');
+    const archivedJson = JSON.parse(fs.readFileSync(historyPath, 'utf8')) as Record<string, unknown>;
+    expect(archivedJson.delivered_at).toBeTruthy();
   });
 
   test('JSON wire — memo delivered to county inbox', () => {

@@ -17,11 +17,11 @@ import { generateWwuid } from './sessionPipeline/utils';
 import { telegraphTimestamp, archiveMemo, getTelegraphDirs as wwGetTelegraphDirs, parseFrontmatter } from './TelegraphService';
 
 const SKIP_RE = /^\.last-beat$|^\.gitkeep$|--heartbeat--|^ack-|--ack-/;
-const TIMESTAMPED_MEMO_RE = /^\d{8}-\d{4}Z-to-.+-from-.+--.+\.json$/;
-const LEGACY_TO_MEMO_RE = /^to-.+\.json$/;
+const TIMESTAMPED_MEMO_RE = /^\d{8}-\d{4}Z-to-.+-from-.+--.+\.(md|json)$/;
+const LEGACY_TO_MEMO_RE = /^to-.+\.(md|json)$/;
 
-// Parse rule-23 filename: <ts>-to-<identity>-from-<identity>--<subject>.json
-const PARSE_MEMO_RE = /^(\d{8}-\d{4}Z)-to-(.+?)-from-(.+?)--(.+)\.json$/;
+// Parse rule-23 filename: <ts>-to-<identity>-from-(.+?)--(.+)\.(md|json)
+const PARSE_MEMO_RE = /^(\d{8}-\d{4}Z)-to-(.+?)-from-(.+?)--(.+)\.(md|json)$/;
 
 type AckStatus = 'done' | 'blocked' | 'question';
 
@@ -73,7 +73,7 @@ export class TelegraphInbox {
   }
 
   private isPendingWireFilename(filename: string): boolean {
-    if (!filename.endsWith('.json')) return false;
+    if (!(filename.endsWith('.md') || filename.endsWith('.json'))) return false;
     if (filename.startsWith('.') || filename.startsWith('!')) return false;
     if (SKIP_RE.test(filename)) return false;
     return TIMESTAMPED_MEMO_RE.test(filename) || LEGACY_TO_MEMO_RE.test(filename);
