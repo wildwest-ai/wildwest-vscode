@@ -868,7 +868,7 @@ export class SidePanelProvider
     try {
       return fs
         .readdirSync(dir)
-        .filter((f) => f.endsWith('.md') && !f.startsWith('.') && f !== '.gitkeep')
+        .filter((f) => (f.endsWith('.md') || f.endsWith('.json')) && !f.startsWith('.') && f !== '.gitkeep')
         .sort();
     } catch {
       return [];

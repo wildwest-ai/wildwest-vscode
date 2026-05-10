@@ -2,11 +2,15 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.32.11
+**Current version:** v0.33.0
 
 ---
 
 ## What's New
+
+**v0.33.0** — Telegraph memos converted to JSON. `TelegraphCommands` writes `.json` to outbox and persists to `staged/storage/memos/<wwuid>.json` via new `MemoStorageService`. `TelegraphWatcher`, `SidePanelProvider`, and `wwMCPTools` all accept `.json` and `.md` (transition support). Ack flow reads JSON-native memos; legacy `.md` inboxes still handled.
+
+**v0.32.12** — Sidebar: Sessions Watcher moved to root level (below Heartbeat); tool rows (Copilot, Claude, Codex) are now expandable to show sessions for that tool.
 
 **v0.32.11** — Sidebar: Sessions Watcher moved to root level (below Heartbeat); tool rows (Copilot, Claude, Codex) are now expandable to show sessions for that tool.
 
