@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
   },
-  "version": "0.33.0",
+  "version": "0.34.0",
   "publisher": "wildwest-ai",
   "engines": {
     "vscode": "^1.90.0"
@@ -181,6 +181,12 @@
         "command": "wildwest.showReceipts",
         "title": "Delivery Receipts",
         "category": "Wild West"
+      },
+      {
+        "command": "wildwest.openTelegraphPanel",
+        "title": "Open Telegraph Panel",
+        "category": "Wild West",
+        "icon": "$(mail)"
       }
     ],
     "viewsContainers": {
@@ -204,6 +210,11 @@
       "view/title": [
         {
           "command": "wildwest.refreshSidePanel",
+          "when": "view == wildwest.sidepanel",
+          "group": "navigation"
+        },
+        {
+          "command": "wildwest.openTelegraphPanel",
           "when": "view == wildwest.sidepanel",
           "group": "navigation"
         }
