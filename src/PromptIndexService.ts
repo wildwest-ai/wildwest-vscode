@@ -116,7 +116,10 @@ export class PromptIndexService {
   }
 
   /**
-   * Full pipeline: scan sessions → raw.json → deduplicate/score → index.json.
+   * Two-stage pipeline:
+   *   Stage 1 — raw.json: incremental if raw.json exists (scan only sessions newer
+   *             than raw.json.updated_at and merge); full scan if raw.json is missing.
+   *   Stage 2 — index.json: always rebuilt from full raw.json (dedup + score).
    * Throttled to once per minute unless force=true.
    */
   async buildIndex(force = false): Promise<{ total: number }> {
@@ -137,6 +140,10 @@ export class PromptIndexService {
   }
 
   // ── Stage 1: scan sessions → raw.json ──────────────────────────────────────
+  //
+  // If raw.json exists: incremental — only scan sessions with last_turn_at
+  // newer than raw.json.updated_at, then merge new prompts in.
+  // If raw.json doesn't exist: full scan of all sessions.
 
   private async _buildRaw(): Promise<void> {
     const sessionsDir = path.join(this.exportPath, 'staged', 'storage', 'sessions');
@@ -146,12 +153,29 @@ export class PromptIndexService {
       fs.mkdirSync(this.promptsDir, { recursive: true });
     }
 
-    const prompts: RawPromptEntry[] = [];
+    // Load existing raw (if any) to determine cutoff and existing id set
+    let existingPrompts: RawPromptEntry[] = [];
+    let cutoff: string | null = null;
+
+    if (fs.existsSync(this.rawPath)) {
+      try {
+        const existing: RawPromptIndex = JSON.parse(fs.readFileSync(this.rawPath, 'utf8'));
+        existingPrompts = existing.prompts ?? [];
+        cutoff = existing.updated_at ?? null;
+      } catch { /* treat as missing */ }
+    }
+
+    const existingIds = new Set(existingPrompts.map(p => p.id));
+    const newPrompts: RawPromptEntry[] = [];
     const files = fs.readdirSync(sessionsDir).filter(f => f.endsWith('.json'));
 
     for (const file of files) {
       try {
         const record = JSON.parse(fs.readFileSync(path.join(sessionsDir, file), 'utf8'));
+
+        // Incremental: skip sessions not updated since last raw build
+        if (cutoff && record.last_turn_at && record.last_turn_at <= cutoff) continue;
+
         const session_wwuid = record.wwuid as string;
         const tool = (record.tool as string) || 'unknown';
         const recorder_scope = (record.recorder_scope as string) || '';
@@ -165,8 +189,11 @@ export class PromptIndexService {
           const raw = (turn.content as string) || '';
           if (!raw.trim()) continue;
 
-          prompts.push({
-            id: `${session_wwuid}:${turn.turn_index}`,
+          const id = `${session_wwuid}:${turn.turn_index}`;
+          if (existingIds.has(id)) continue; // already in raw
+
+          newPrompts.push({
+            id,
             session_wwuid,
             turn_index: turn.turn_index,
             timestamp: turn.timestamp,
@@ -181,13 +208,15 @@ export class PromptIndexService {
       } catch { /* skip bad records */ }
     }
 
-    prompts.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+    // Merge: new prompts prepended (newest-first order maintained)
+    const merged = [...newPrompts, ...existingPrompts];
+    merged.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 
     const raw: RawPromptIndex = {
       schema_version: '1',
       updated_at: new Date().toISOString(),
-      total: prompts.length,
-      prompts,
+      total: merged.length,
+      prompts: merged,
     };
 
     fs.writeFileSync(this.rawPath, JSON.stringify(raw, null, 2), 'utf8');

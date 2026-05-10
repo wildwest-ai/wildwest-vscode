@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.35.1
+**Current version:** v0.35.2
 
 ---
 
 ## What's New
+
+**v0.35.2** — Prompt raw.json is now incremental: if raw.json exists, only sessions with `last_turn_at` newer than `raw.json.updated_at` are scanned and merged in (new prompts prepended, existing ids skipped). Full scan only on first run. index.json always rebuilt from full raw.json.
 
 **v0.35.1** — Prompt index two-stage pipeline: raw scan → `raw.json` (6,871 entries), then dedup + noise filter + score → `index.json` (4,871 unique). Score = 50% frequency + 35% recency + 15% length. Noise filters: `<tag>`, continuation headers, compaction notices, `[Request interrupted]`, tool output headers. MIN_CHAR raised to 20. Schema v2 adds `frequency`, `score`, `last_used`, `first_used`, `occurrences` per entry.
 
