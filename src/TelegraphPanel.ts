@@ -53,14 +53,49 @@ export class TelegraphPanel {
     return readRegistryAlias(path.join(wsPath, '.wildwest')) ?? '';
   }
 
-  /** Match terms for inbox/outbox filter — registry alias + full identity string only. */
-  private getMatchTerms(): string[] {
-    const alias = this.getActorAlias();
-    const identity = vscode.workspace.getConfiguration('wildwest').get<string>('identity') ?? '';
-    const terms = new Set<string>();
-    if (alias) terms.add(alias.toLowerCase());
-    if (identity) terms.add(identity.toLowerCase());
-    return [...terms];
+  /**
+   * True if a `to`/`from` address field belongs to this actor.
+   *
+   * Handles current format: TM(alias), CD(RSn), CD(RSn).Cld
+   * Handles legacy format:  TM(dyad)[alias], CD(dyad)[RSn], TM(dyad)[*vscode]
+   * Handles glob:           TM(*vscode), TM(dyad)[*vscode]
+   * Handles bare alias:     wildwest-vscode
+   */
+  private addressMatchesSelf(field: string, alias: string, identity: string): boolean {
+    if (!field) return false;
+    const f = field.toLowerCase();
+    const a = alias.toLowerCase();
+    const id = identity.toLowerCase();
+
+    // Exact identity or with .Channel suffix: "CD(RSn)" or "CD(RSn).Cld"
+    if (id && (f === id || f.startsWith(id + '.'))) return true;
+
+    if (a) {
+      // Alias in parens (current): TM(wildwest-vscode)
+      if (f.includes('(' + a + ')')) return true;
+      // Alias in brackets (legacy): TM(dyad)[wildwest-vscode]
+      if (f.includes('[' + a + ']')) return true;
+      // Glob in parens: TM(*vscode) — alias ends with suffix
+      const parenGlob = f.match(/\(\*([^)]+)\)/);
+      if (parenGlob && a.endsWith(parenGlob[1])) return true;
+      // Glob in brackets (legacy): TM(dyad)[*vscode]
+      const bracketGlob = f.match(/\[\*([^\]]+)\]/);
+      if (bracketGlob && a.endsWith(bracketGlob[1])) return true;
+      // Bare alias as whole field
+      if (f === a) return true;
+    }
+
+    // Legacy format: Role(dyad)[ActorCode] matched via identity Role(ActorCode)
+    // e.g. "CD(dyad)[RSn]" with identity "CD(RSn)"
+    if (id) {
+      const idParts = id.match(/^([a-z]+)\(([^)]+)\)/);
+      const fParts  = f.match(/^([a-z]+)\(dyad\)\[([^\]]+)\]/);
+      if (idParts && fParts && idParts[1] === fParts[1] && idParts[2] === fParts[2].split('.')[0]) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   // ── Read flat/ wires ──────────────────────────────────────────────────────
@@ -94,12 +129,11 @@ export class TelegraphPanel {
     return results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }
 
-  private filterWires(all: FlatWire[], terms: string[]): { inbox: FlatWire[]; outbox: FlatWire[] } {
-    if (!terms.length) return { inbox: [], outbox: [] };
-    const match = (field: string) => terms.some((t) => field.toLowerCase().includes(t));
+  private filterWires(all: FlatWire[], alias: string, identity: string): { inbox: FlatWire[]; outbox: FlatWire[] } {
+    if (!alias && !identity) return { inbox: [], outbox: [] };
     return {
-      inbox:  all.filter((w) => match(w.to   ?? '')),
-      outbox: all.filter((w) => match(w.from  ?? '')),
+      inbox:  all.filter((w) => this.addressMatchesSelf(w.to   ?? '', alias, identity)),
+      outbox: all.filter((w) => this.addressMatchesSelf(w.from ?? '', alias, identity)),
     };
   }
 
@@ -108,7 +142,8 @@ export class TelegraphPanel {
   private sendWires(): void {
     const all = this.readAllFlatWires();
     const alias = this.getActorAlias();
-    const { inbox, outbox } = this.filterWires(all, this.getMatchTerms());
+    const identity = vscode.workspace.getConfiguration('wildwest').get<string>('identity') ?? '';
+    const { inbox, outbox } = this.filterWires(all, alias, identity);
     const flatAvailable = this.getFlatDir() !== null;
     this.panel.webview.postMessage({ type: 'wires', inbox, outbox, all, alias, flatAvailable });
   }
@@ -128,6 +163,9 @@ export class TelegraphPanel {
         break;
       case 'pushToTerminal':
         await this.pushToTerminal(msg['formatted'] as string, msg['label'] as string);
+        break;
+      case 'archive':
+        this.handleArchiveWire(msg['wwuid'] as string);
         break;
       case 'promptSearch': {
         const query = (msg['query'] as string) ?? '';
@@ -177,6 +215,23 @@ export class TelegraphPanel {
 
     this.panel.webview.postMessage({ type: 'sent', wire });
     this.sendWires();
+  }
+
+  private handleArchiveWire(wwuid: string): void {
+    const flatDir = this.getFlatDir();
+    if (!flatDir || !wwuid) return;
+    const filePath = path.join(flatDir, `${wwuid}.json`);
+    if (!fs.existsSync(filePath)) return;
+    try {
+      const wire = JSON.parse(fs.readFileSync(filePath, 'utf8')) as FlatWire;
+      wire.status = 'archived';
+      wire.status_transitions = [
+        ...(wire.status_transitions ?? []),
+        { status: 'archived', timestamp: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'), repos: ['vscode'] },
+      ];
+      fs.writeFileSync(filePath, JSON.stringify(wire, null, 2), 'utf8');
+      this.sendWires();
+    } catch { /* skip on error */ }
   }
 
   private async pushToCopilot(formatted: string): Promise<void> {
@@ -429,8 +484,10 @@ export class TelegraphPanel {
   });
 
   document.getElementById('detailPane').addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-push]');
-    if (btn) pushTo(pendingFormatted, btn.dataset.push);
+    const pushBtn = e.target.closest('[data-push]');
+    if (pushBtn) { pushTo(pendingFormatted, pushBtn.dataset.push); return; }
+    const archiveBtn = e.target.closest('[data-archive]');
+    if (archiveBtn) { vscode.postMessage({ type: 'archive', wwuid: archiveBtn.dataset.archive }); }
   });
 
   // ── Messages from extension ───────────────────────────────────────────────
@@ -561,9 +618,11 @@ export class TelegraphPanel {
     const active = w.wwuid === selectedWwuid ? ' active' : '';
     const dateStr = w.date ? new Date(w.date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
     const statusBadge = '<span class="badge-status badge-' + esc(w.status || 'sent') + '">' + esc(w.status || '') + '</span>';
+    const shortId = w.wwuid ? w.wwuid.slice(0, 8) : '—';
     return '<div class="wire-row' + active + '" data-wwuid="' + esc(w.wwuid) + '">'
       + '<div class="subject">' + esc(w.subject || w.filename || '—') + '</div>'
       + '<div class="meta">' + statusBadge + ' <span>' + esc(w.from || w.to || '') + '</span> <span>' + esc(dateStr) + '</span></div>'
+      + '<div class="meta" style="opacity:0.45;font-family:monospace">' + esc(shortId) + '</div>'
       + '</div>';
   }
 
@@ -615,11 +674,16 @@ export class TelegraphPanel {
       html += '</div></div>';
     }
 
-    // Push bar
+    // wwuid
+    html += '<div style="font-family:monospace;font-size:10px;opacity:0.5;word-break:break-all">' + esc(w.wwuid || '') + '</div>';
+
+    // Push bar + archive
+    const canArchive = (w.status || 'sent') !== 'archived';
     html += '<div class="push-bar">'
       + '<button class="btn" data-push="copilot">→ Copilot</button>'
       + '<button class="btn btn-secondary" data-push="claude">→ Claude</button>'
       + '<button class="btn btn-secondary" data-push="codex">→ Codex</button>'
+      + (canArchive ? '<button class="btn btn-secondary" data-archive="' + esc(w.wwuid) + '">Archive</button>' : '')
       + '</div>';
 
     pane.innerHTML = html;
