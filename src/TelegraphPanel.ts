@@ -1,51 +1,15 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { Wire, WireStorageService } from './WireStorageService';
-import { generateWwuid } from './sessionPipeline/utils';
-import { telegraphTimestamp, telegraphISOTimestamp, readRegistryAlias } from './TelegraphService';
+import { FlatWire, createFlatWire, writeFlatWire, parseFilenameActors } from './WireFactory';
+import { readRegistryAlias } from './TelegraphService';
 import { PromptIndexService } from './PromptIndexService';
-
-interface StatusTransition {
-  status: string;
-  timestamp: string;
-  instances?: number;
-  repos?: string[];
-}
-
-interface FlatWire {
-  schema_version: string;
-  wwuid: string;
-  wwuid_type: 'wire';
-  from?: string;
-  to?: string;
-  type: string;
-  date: string;
-  subject: string;
-  status: string;
-  body?: string;
-  filename: string;
-  delivered_at?: string;
-  re?: string;
-  original_wire?: string;
-  status_transitions?: StatusTransition[];
-}
-
-// Parse to/from from wire filename: YYYYMMDD-HHMMz-to-<to>-from-<from>--<subject>.md
-const FILENAME_RE = /^\d{8}-\d{4}Z-to-(.+?)-from-(.+?)--.+\.(md|json)$/;
-
-function parseFilenameActors(filename: string): { to?: string; from?: string } {
-  const m = path.basename(filename).match(FILENAME_RE);
-  if (!m) return {};
-  return { to: m[1], from: m[2] };
-}
 
 export class TelegraphPanel {
   static readonly viewType = 'wildwest.telegraphPanel';
   private static instance: TelegraphPanel | undefined;
 
   private readonly panel: vscode.WebviewPanel;
-  private readonly wireStorage: WireStorageService;
   private disposables: vscode.Disposable[] = [];
 
   static open(exportPath: string, promptIndex?: PromptIndexService): void {
@@ -59,17 +23,14 @@ export class TelegraphPanel {
       vscode.ViewColumn.Beside,
       { enableScripts: true, retainContextWhenHidden: true },
     );
-    TelegraphPanel.instance = new TelegraphPanel(panel, exportPath, promptIndex);
+    TelegraphPanel.instance = new TelegraphPanel(panel, promptIndex);
   }
 
   private constructor(
     panel: vscode.WebviewPanel,
-    private readonly exportPath: string,
     private readonly promptIndex?: PromptIndexService,
   ) {
     this.panel = panel;
-    this.wireStorage = new WireStorageService(exportPath);
-
     this.panel.webview.html = this.buildHtml();
     this.sendWires();
 
@@ -182,41 +143,26 @@ export class TelegraphPanel {
     }
 
     const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
-    const telegraphDir = path.join(wsPath, '.wildwest', 'telegraph');
-    if (!fs.existsSync(telegraphDir)) {
-      this.panel.webview.postMessage({ type: 'error', text: 'Telegraph directory not found.' });
-      return;
-    }
-
     const alias = readRegistryAlias(path.join(wsPath, '.wildwest'));
     const identity = vscode.workspace.getConfiguration('wildwest').get<string>('identity') ?? '';
     const roleMatch = identity.match(/^([A-Za-z]+)/);
     const role = roleMatch?.[1] ?? 'TM';
     const fromActor = alias ? `${role}(${alias})` : (identity || 'TM');
 
-    const timestamp = telegraphTimestamp();
-    const isoTimestamp = telegraphISOTimestamp();
-    const fileName = `${timestamp}-to-${to}-from-${fromActor}--${subject}.json`;
-    const wwuid = generateWwuid('wire', fromActor, to, isoTimestamp, subject);
+    const wire = createFlatWire({ from: fromActor, to, type, subject, body });
 
-    const wire: Wire = {
-      schema_version: '1',
-      wwuid,
-      wwuid_type: 'wire',
-      from: fromActor,
-      to,
-      type,
-      date: isoTimestamp,
-      subject,
-      status: 'sent',
-      body,
-      filename: fileName,
-    };
+    // Primary: write directly to flat/ (territory SSOT)
+    const flatDir = this.getFlatDir();
+    if (flatDir) {
+      writeFlatWire(wire, flatDir);
+    }
 
-    const outboxDir = path.join(telegraphDir, 'outbox');
-    fs.mkdirSync(outboxDir, { recursive: true });
-    fs.writeFileSync(path.join(outboxDir, fileName), JSON.stringify(wire, null, 2), 'utf8');
-    this.wireStorage.write(wire);
+    // Secondary: also drop in workspace outbox for actors relying on inbox delivery
+    const outboxDir = path.join(wsPath, '.wildwest', 'telegraph', 'outbox');
+    if (fs.existsSync(path.dirname(outboxDir))) {
+      fs.mkdirSync(outboxDir, { recursive: true });
+      fs.writeFileSync(path.join(outboxDir, wire.filename), JSON.stringify(wire, null, 2), 'utf8');
+    }
 
     this.panel.webview.postMessage({ type: 'sent', wire });
     this.sendWires();

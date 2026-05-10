@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.36.4
+**Current version:** v0.36.5
 
 ---
 
 ## What's New
+
+**v0.36.5** — `WireFactory.ts`: canonical schema v2 wire factory (`createFlatWire`, `writeFlatWire`, `parseFilenameActors`). Telegraph Panel Compose now writes directly to `~/wildwest/telegraph/flat/` (territory SSOT) as primary path, with workspace outbox as secondary for inbox delivery. `WireStorageService` removed from panel — no longer staging compose wires locally.
 
 **v0.36.4** — Telegraph Panel now reads from `~/wildwest/telegraph/flat/` (territory SSOT — 231 wires). Three tabs: Inbox (wires addressed to current actor), Outbox (wires from current actor), All (full archive with search). Detail view shows type, `delivered_at`, `re` reply chain, and `status_transitions` timeline. Status badges: sent/delivered/archived. Compose still writes to workspace outbox for heartbeat delivery.
 
