@@ -338,6 +338,14 @@ function parseMemoFrontmatter(
     const content = fs.readFileSync(memoPath, 'utf8');
     const result: Record<string, unknown> = {};
 
+    if (memoPath.endsWith('.json')) {
+      try {
+        return JSON.parse(content) as Record<string, unknown>;
+      } catch {
+        return {};
+      }
+    }
+
     // Try YAML frontmatter first (--- block)
     const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
     if (yamlMatch) {
@@ -564,10 +572,24 @@ function markMemoFailed(
 ): void {
   try {
     let content = fs.readFileSync(memoPath, 'utf8');
-    // Inject (!) into YAML to: field
-    content = content.replace(/^(to:\s*)(\S[^\n]*)$/m, '$1$2(!)');
-    // Inject (!) into Markdown **To:** field (if no YAML)
-    content = content.replace(/^(\*\*To:\*\*\s*)(\S[^\n]*)$/m, '$1$2(!)');
+
+    if (memoFile.endsWith('.json')) {
+      try {
+        const json = JSON.parse(content) as Record<string, unknown>;
+        if (typeof json['to'] === 'string') {
+          json['to'] = `${json['to']}(!)`;
+        }
+        content = JSON.stringify(json, null, 2);
+      } catch {
+        // Fall back to raw content if JSON is invalid.
+      }
+    } else {
+      // Inject (!) into YAML to: field
+      content = content.replace(/^(to:\s*)(\S[^\n]*)$/m, '$1$2(!)');
+      // Inject (!) into Markdown **To:** field (if no YAML)
+      content = content.replace(/^(\*\*To:\*\*\s*)(\S[^\n]*)$/m, '$1$2(!)');
+    }
+
     const failedPath = path.join(outboxDir, `!${memoFile}`);
     fs.writeFileSync(failedPath, content, 'utf8');
     fs.unlinkSync(memoPath);
@@ -593,8 +615,8 @@ function markMemoFailed(
  * 7. Archive original to outbox/history/
  * 
  * Supported formats:
- * - New (v0.18.0+): "CD" (role-only), "TM(*vscode)" (role + pattern)
- * - Old (deprecated): "CD(RSn).Cpt" (generates warning, still works)
+ * - JSON wires only (schema v2) using `to`/`from` fields and role-based addressing.
+ * - Old markdown wire format is legacy and is no longer delivered by heartbeat.
  */
 function deliverPendingOutbox(
   rootPath: string,
@@ -613,9 +635,9 @@ function deliverPendingOutbox(
     }
 
     const entries = fs.readdirSync(outboxDir);
-    // Process only .md files — exclude hidden, ! (failed), and history/
+    // Process only .json files — exclude hidden, ! (failed), and history/
     const memoFiles = entries.filter(
-      (e) => e.endsWith('.md') && !e.startsWith('.') && !e.startsWith('!'),
+      (e) => e.endsWith('.json') && !e.startsWith('.') && !e.startsWith('!'),
     );
 
     for (const memoFile of memoFiles) {
@@ -721,14 +743,24 @@ function deliverPendingOutbox(
         // Stamp delivered_at in our copy
         let content = fs.readFileSync(memoPath, 'utf8');
         const now = new Date().toISOString();
-        const deliveredLine = `delivered_at: ${now}\n`;
-        // Insert delivered_at after the opening ---
-        const frontmatterMatch = content.match(/^(---\n)/);
-        if (frontmatterMatch) {
-          content =
-            frontmatterMatch[1] +
-            deliveredLine +
-            content.substring(frontmatterMatch[1].length);
+        if (memoFile.endsWith('.json')) {
+          try {
+            const json = JSON.parse(content) as Record<string, unknown>;
+            json['delivered_at'] = now;
+            content = JSON.stringify(json, null, 2);
+          } catch {
+            // If JSON parse fails, leave the content unchanged.
+          }
+        } else {
+          const deliveredLine = `delivered_at: ${now}\n`;
+          // Insert delivered_at after the opening ---
+          const frontmatterMatch = content.match(/^(---\n)/);
+          if (frontmatterMatch) {
+            content =
+              frontmatterMatch[1] +
+              deliveredLine +
+              content.substring(frontmatterMatch[1].length);
+          }
         }
 
         // Move to outbox/history/
@@ -765,7 +797,7 @@ function deliverPendingOutbox(
 
 function isActionableWireFile(filename: string): boolean {
   return (
-    filename.endsWith('.md') &&
+    filename.endsWith('.json') &&
     !filename.startsWith('.') &&
     filename !== '.gitkeep' &&
     !filename.includes('-heartbeat--')
@@ -794,7 +826,7 @@ function hasActionableTelegraphFiles(telegraphDir: string): boolean {
     const outboxDir = path.join(telegraphDir, 'outbox');
     if (fs.existsSync(outboxDir)) {
       const hasFailedOutboxWire = fs.readdirSync(outboxDir).some((e) =>
-        e.startsWith('!') && e.endsWith('.md')
+        e.startsWith('!') && e.endsWith('.json')
       );
       if (hasFailedOutboxWire) return true;
     }

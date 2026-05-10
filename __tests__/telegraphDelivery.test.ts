@@ -58,9 +58,22 @@ describe('Telegraph Delivery — production deliverPendingOutbox', () => {
     const townPath = path.join(countyPath, 'mytown');
     fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
 
-    const memoContent = `---\nto: CD\nfrom: TM\nsubject: test\n---\n\nTest memo`;
+    const filename = '20260508-1200Z-to-CD-from-TM--test.json';
+    const memoContent = JSON.stringify({
+      schema_version: '2',
+      wwuid: 'test-wire',
+      wwuid_type: 'wire',
+      from: 'TM',
+      to: 'CD',
+      type: 'status-update',
+      date: '2026-05-08T12:00:00Z',
+      subject: 'test',
+      status: 'sent',
+      body: 'Test memo',
+      filename,
+    }, null, 2);
     fs.writeFileSync(
-      path.join(townPath, '.wildwest', 'telegraph', 'outbox', '20260508-1200Z-to-CD-from-TM--test.md'),
+      path.join(townPath, '.wildwest', 'telegraph', 'outbox', filename),
       memoContent,
     );
 
@@ -70,11 +83,47 @@ describe('Telegraph Delivery — production deliverPendingOutbox', () => {
     expect(result.failed).toBe(0);
     expect(logs.some((l) => l.includes('delivery:'))).toBe(true);
 
-    const filename = '20260508-1200Z-to-CD-from-TM--test.md';
     expect(fs.existsSync(path.join(countyPath, '.wildwest', 'telegraph', 'inbox', filename))).toBe(true);
     const historyPath = path.join(townPath, '.wildwest', 'telegraph', 'outbox', 'history', filename);
     expect(fs.existsSync(historyPath)).toBe(true);
     expect(fs.readFileSync(historyPath, 'utf8')).toContain('delivered_at:');
+  });
+
+  test('JSON wire — memo delivered to county inbox', () => {
+    const worldRoot = tempDir;
+    const countyPath = path.join(worldRoot, 'counties', 'mycounty');
+    const townPath = path.join(countyPath, 'mytown');
+    fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
+
+    const filename = '20260508-1200Z-to-CD-from-TM--test.json';
+    const wire = {
+      schema_version: '2',
+      wwuid: 'test-wire',
+      wwuid_type: 'wire',
+      from: 'TM',
+      to: 'CD',
+      type: 'status-update',
+      date: '2026-05-08T12:00:00Z',
+      subject: 'test',
+      status: 'sent',
+      body: 'Test memo',
+      filename,
+    };
+    fs.writeFileSync(
+      path.join(townPath, '.wildwest', 'telegraph', 'outbox', filename),
+      JSON.stringify(wire, null, 2),
+      'utf8',
+    );
+
+    const { result, logs } = deliver(townPath, worldRoot);
+
+    expect(result.delivered).toBe(1);
+    expect(result.failed).toBe(0);
+    expect(logs.some((l) => l.includes('delivery:'))).toBe(true);
+    expect(fs.existsSync(path.join(countyPath, '.wildwest', 'telegraph', 'inbox', filename))).toBe(true);
+    const historyPath = path.join(townPath, '.wildwest', 'telegraph', 'outbox', 'history', filename);
+    expect(fs.existsSync(historyPath)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(historyPath, 'utf8')).delivered_at).toBeTruthy();
   });
 
   test('Unknown role — memo marked failed, not delivered', () => {
@@ -82,10 +131,22 @@ describe('Telegraph Delivery — production deliverPendingOutbox', () => {
     const townPath = path.join(worldRoot, 'counties', 'myc', 'mytown');
     fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
 
-    const filename = '20260508-1200Z-to-BOGUS-from-TM--test.md';
+    const filename = '20260508-1200Z-to-BOGUS-from-TM--test.json';
     fs.writeFileSync(
       path.join(townPath, '.wildwest', 'telegraph', 'outbox', filename),
-      `---\nto: BOGUS\nfrom: TM\n---\n\nTest`,
+      JSON.stringify({
+        schema_version: '2',
+        wwuid: 'bogus-wire',
+        wwuid_type: 'wire',
+        from: 'TM',
+        to: 'BOGUS',
+        type: 'status-update',
+        date: '2026-05-08T12:00:00Z',
+        subject: 'test',
+        status: 'sent',
+        body: 'Test',
+        filename,
+      }, null, 2),
     );
 
     const { result, logs } = deliver(townPath, worldRoot);
@@ -115,10 +176,22 @@ describe('Telegraph Delivery — production deliverPendingOutbox', () => {
     fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
 
     // HG is town-only in SCOPE_ROLES → same scope → local delivery
-    const filename = '20260508-1200Z-to-HG-from-TM--local.md';
+    const filename = '20260508-1200Z-to-HG-from-TM--local.json';
     fs.writeFileSync(
       path.join(townPath, '.wildwest', 'telegraph', 'outbox', filename),
-      `---\nto: HG\nfrom: TM\n---\n\nLocal`,
+      JSON.stringify({
+        schema_version: '2',
+        wwuid: 'local-wire',
+        wwuid_type: 'wire',
+        from: 'TM',
+        to: 'HG',
+        type: 'status-update',
+        date: '2026-05-08T12:00:00Z',
+        subject: 'local',
+        status: 'sent',
+        body: 'Local',
+        filename,
+      }, null, 2),
     );
 
     const { result, logs } = deliver(townPath, worldRoot);
@@ -133,10 +206,21 @@ describe('Telegraph Delivery — production deliverPendingOutbox', () => {
     const townPath = path.join(worldRoot, 'counties', 'myc', 'mytown');
     fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
 
-    const filename = '20260508-1200Z-to-MISSING-from-TM--no-to.md';
+    const filename = '20260508-1200Z-to-MISSING-from-TM--no-to.json';
     fs.writeFileSync(
       path.join(townPath, '.wildwest', 'telegraph', 'outbox', filename),
-      `---\nfrom: TM\nsubject: test\n---\n\nNo to field`,
+      JSON.stringify({
+        schema_version: '2',
+        wwuid: 'missing-to-wire',
+        wwuid_type: 'wire',
+        from: 'TM',
+        type: 'status-update',
+        date: '2026-05-08T12:00:00Z',
+        subject: 'test',
+        status: 'sent',
+        body: 'No to field',
+        filename,
+      }, null, 2),
     );
 
     const { result, logs } = deliver(townPath, worldRoot);
@@ -151,10 +235,22 @@ describe('Telegraph Delivery — production deliverPendingOutbox', () => {
     const townPath = path.join(worldRoot, 'counties', 'myc', 'mytown');
     fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
 
-    const filename = '20260508-1200Z-to-INVALID-from-TM--bad-role.md';
+    const filename = '20260508-1200Z-to-INVALID-from-TM--bad-role.json';
     fs.writeFileSync(
       path.join(townPath, '.wildwest', 'telegraph', 'outbox', filename),
-      `---\nto: (BadRole)\nfrom: TM\n---\n\nTest`,
+      JSON.stringify({
+        schema_version: '2',
+        wwuid: 'invalid-role-wire',
+        wwuid_type: 'wire',
+        from: 'TM',
+        to: '(BadRole)',
+        type: 'status-update',
+        date: '2026-05-08T12:00:00Z',
+        subject: 'Test',
+        status: 'sent',
+        body: 'Test',
+        filename,
+      }, null, 2),
     );
 
     const { result, logs } = deliver(townPath, worldRoot);

@@ -56,6 +56,20 @@ export function outboxPath(telegraphDir: string): string {
 export function parseFrontmatter(filePath: string): Record<string, string> {
   try {
     const content = fs.readFileSync(filePath, 'utf8');
+    if (filePath.endsWith('.json')) {
+      try {
+        const json = JSON.parse(content) as Record<string, unknown>;
+        const result: Record<string, string> = {};
+        for (const [key, value] of Object.entries(json)) {
+          if (typeof value === 'string') {
+            result[key] = value;
+          }
+        }
+        return result;
+      } catch {
+        return {};
+      }
+    }
     const match = content.match(/^---\n([\s\S]*?)\n---/);
     if (!match) return {};
     const result: Record<string, string> = {};
