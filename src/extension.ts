@@ -19,6 +19,7 @@ import { SidePanelProvider } from './SidePanelProvider';
 import { getDeliveryReceipts, statusIcon } from './DeliveryReceipts';
 import { getTelegraphDirs } from './TelegraphService';
 import { SessionPreviewProvider, SESSION_PREVIEW_SCHEME } from './SessionPreviewProvider';
+import { TelegraphPanel } from './TelegraphPanel';
 
 // ── Configuration types & helpers ──────────────────────────────────────────
 
@@ -249,6 +250,9 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('wildwest.doctor', () =>
       runDoctor(context, outputChannel, heartbeatMonitor),
     ),
+    vscode.commands.registerCommand('wildwest.openTelegraphPanel', () => {
+      TelegraphPanel.open(exporter.getExportPath());
+    }),
     vscode.commands.registerCommand('wildwest.showReceipts', async () => {
       const allReceipts = getTelegraphDirs().flatMap((dir) => getDeliveryReceipts(dir));
       if (allReceipts.length === 0) {

@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.33.0
+**Current version:** v0.34.0
 
 ---
 
 ## What's New
+
+**v0.34.0** — Telegraph Panel: `wildwest.openTelegraphPanel` opens a webview panel with inbox/outbox list, rendered memo view, compose drawer (To/Type/Subject/Body → Send), and push buttons [→ Copilot] [→ Claude] [→ Codex] that inject formatted memo content into the target chat input.
 
 **v0.33.0** — Telegraph memos converted to JSON. `TelegraphCommands` writes `.json` to outbox and persists to `staged/storage/memos/<wwuid>.json` via new `MemoStorageService`. `TelegraphWatcher`, `SidePanelProvider`, and `wwMCPTools` all accept `.json` and `.md` (transition support). Ack flow reads JSON-native memos; legacy `.md` inboxes still handled.
 
