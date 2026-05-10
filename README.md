@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.36.7
+**Current version:** v0.36.8
 
 ---
 
 ## What's New
+
+**v0.36.8** — Telegraph Panel inbox filter: status chip relabeled "New" (inbox) / "Sent" (outbox) — wires with `status:sent` in your inbox are new/unread. Match terms narrowed to alias + full identity only (no role-prefix wildcard) — town inbox no longer floods with cross-town TM wires.
 
 **v0.36.7** — Telegraph Panel: status filter bar (All / Sent / Delivered / Archived) on Inbox and Outbox tabs; wires grouped by scope (Town / County / Territory) based on role prefix in `to`/`from` address. Scope determination: `RA`/`G` → Territory, `CD`/`S`/`aCD`/`M` → County, all others → Town.
 

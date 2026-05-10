@@ -53,17 +53,13 @@ export class TelegraphPanel {
     return readRegistryAlias(path.join(wsPath, '.wildwest')) ?? '';
   }
 
-  /** Match terms for inbox/outbox filter — registry alias + identity role prefix. */
+  /** Match terms for inbox/outbox filter — registry alias + full identity string only. */
   private getMatchTerms(): string[] {
     const alias = this.getActorAlias();
     const identity = vscode.workspace.getConfiguration('wildwest').get<string>('identity') ?? '';
     const terms = new Set<string>();
     if (alias) terms.add(alias.toLowerCase());
-    if (identity) {
-      terms.add(identity.toLowerCase());
-      const roleMatch = identity.match(/^([A-Za-z]+)/);
-      if (roleMatch) terms.add(roleMatch[1].toLowerCase());
-    }
+    if (identity) terms.add(identity.toLowerCase());
     return [...terms];
   }
 
@@ -332,7 +328,7 @@ export class TelegraphPanel {
 
 <div class="status-filter" id="statusFilter">
   <button class="sf-btn active" data-status="all">All</button>
-  <button class="sf-btn" data-status="sent">Sent</button>
+  <button class="sf-btn" data-status="sent" id="sfBtnSent">New</button>
   <button class="sf-btn" data-status="delivered">Delivered</button>
   <button class="sf-btn" data-status="archived">Archived</button>
 </div>
@@ -401,6 +397,7 @@ export class TelegraphPanel {
       const scopedTab = activeTab === 'inbox' || activeTab === 'outbox';
       document.getElementById('searchBar').classList.toggle('visible', activeTab === 'all');
       document.getElementById('statusFilter').classList.toggle('visible', scopedTab);
+      document.getElementById('sfBtnSent').textContent = activeTab === 'outbox' ? 'Sent' : 'New';
       renderList();
     });
   });
