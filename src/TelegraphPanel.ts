@@ -240,8 +240,8 @@ export class TelegraphPanel {
 <div class="header">
   <h2>📬 Telegraph</h2>
   <div style="display:flex;gap:6px">
-    <button class="btn btn-secondary" onclick="refresh()">↻</button>
-    <button class="btn" onclick="toggleCompose()">✎ Compose</button>
+    <button class="btn btn-secondary" id="btnRefresh">↻</button>
+    <button class="btn" id="btnCompose">✎ Compose</button>
   </div>
 </div>
 
@@ -268,8 +268,8 @@ export class TelegraphPanel {
     <textarea class="compose-body" id="cBody" placeholder="Memo body…"></textarea>
     <div class="compose-footer">
       <span class="error-bar" id="composeError"></span>
-      <button class="btn btn-secondary" onclick="toggleCompose()">Cancel</button>
-      <button class="btn" onclick="sendMemo()">Send</button>
+      <button class="btn btn-secondary" id="btnCancel">Cancel</button>
+      <button class="btn" id="btnSend">Send</button>
     </div>
   </div>
 </div>
@@ -278,6 +278,22 @@ export class TelegraphPanel {
   const vscode = acquireVsCodeApi();
   let memos = { inbox: [], outbox: [] };
   let selectedWwuid = null;
+  let pendingFormatted = '';
+
+  document.getElementById('btnRefresh').addEventListener('click', () => refresh());
+  document.getElementById('btnCompose').addEventListener('click', () => toggleCompose());
+  document.getElementById('btnCancel').addEventListener('click', () => toggleCompose(false));
+  document.getElementById('btnSend').addEventListener('click', () => sendMemo());
+
+  document.getElementById('listPane').addEventListener('click', (e) => {
+    const row = e.target.closest('.memo-row');
+    if (row && row.dataset.wwuid) selectMemo(row.dataset.wwuid);
+  });
+
+  document.getElementById('detailPane').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-push]');
+    if (btn) pushTo(pendingFormatted, btn.dataset.push);
+  });
 
   window.addEventListener('message', ({ data }) => {
     if (data.type === 'memos') {
@@ -316,7 +332,7 @@ export class TelegraphPanel {
   function memoRow(m) {
     const active = m.wwuid === selectedWwuid ? ' active' : '';
     const dateStr = m.date ? new Date(m.date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
-    return '<div class="memo-row' + active + '" onclick="selectMemo(' + JSON.stringify(m.wwuid) + ')">'
+    return '<div class="memo-row' + active + '" data-wwuid="' + esc(m.wwuid) + '">'
       + '<div class="subject">' + esc(m.subject || m.filename || '—') + '</div>'
       + '<div class="meta">' + esc(m.from || '') + ' · ' + dateStr + '</div>'
       + '</div>';
@@ -339,7 +355,7 @@ export class TelegraphPanel {
     }
     pane.className = 'detail-pane';
     const dateStr = m.date ? new Date(m.date).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
-    const formatted = '📬 [from ' + (m.from||'') + ' | ' + (m.subject||'') + ' | ' + (m.date||'') + ']\\n\\n' + (m.body||'');
+    pendingFormatted = '📬 [from ' + (m.from||'') + ' | ' + (m.subject||'') + ' | ' + (m.date||'') + ']\\n\\n' + (m.body||'');
     pane.innerHTML =
       '<div class="memo-header"><table>'
       + row('From', m.from) + row('To', m.to) + row('Date', dateStr)
@@ -347,9 +363,9 @@ export class TelegraphPanel {
       + '</table></div>'
       + '<div class="memo-body">' + esc(m.body || '') + '</div>'
       + '<div class="push-bar">'
-      + '<button class="btn" onclick="pushTo(' + JSON.stringify(formatted) + ', \'copilot\')">→ Copilot</button>'
-      + '<button class="btn btn-secondary" onclick="pushTo(' + JSON.stringify(formatted) + ', \'claude\')">→ Claude</button>'
-      + '<button class="btn btn-secondary" onclick="pushTo(' + JSON.stringify(formatted) + ', \'codex\')">→ Codex</button>'
+      + '<button class="btn" data-push="copilot">→ Copilot</button>'
+      + '<button class="btn btn-secondary" data-push="claude">→ Claude</button>'
+      + '<button class="btn btn-secondary" data-push="codex">→ Codex</button>'
       + '</div>';
   }
 
