@@ -69,7 +69,7 @@ export function activate(context: vscode.ExtensionContext) {
   telegraphWatcher = new TelegraphWatcher(outputChannel, worktreeManager, heartbeatMonitor);
   soloModeController = new SoloModeController(outputChannel, worktreeManager, heartbeatMonitor);
   telegraphInbox = new TelegraphInbox(outputChannel);
-  telegraphCommands = new TelegraphCommands(outputChannel, heartbeatMonitor);
+  telegraphCommands = new TelegraphCommands(outputChannel, heartbeatMonitor, exporter.getExportPath());
   telegraphCommands.register(context);
 
   // ── AI Tool Bridge ────────────────────────────────────────────────────────

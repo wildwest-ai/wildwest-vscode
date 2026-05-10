@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { HeartbeatMonitor } from './HeartbeatMonitor';
+import { Memo, MemoStorageService } from './MemoStorageService';
 import { generateWwuid } from './sessionPipeline/utils';
 import {
   telegraphTimestamp,
@@ -14,10 +15,14 @@ import {
 export class TelegraphCommands {
   private outputChannel: vscode.OutputChannel;
   private heartbeatMonitor: HeartbeatMonitor;
+  private memoStorage: MemoStorageService | null = null;
 
-  constructor(outputChannel: vscode.OutputChannel, heartbeatMonitor?: HeartbeatMonitor) {
+  constructor(outputChannel: vscode.OutputChannel, heartbeatMonitor?: HeartbeatMonitor, exportPath?: string) {
     this.outputChannel = outputChannel;
     this.heartbeatMonitor = heartbeatMonitor || ({} as HeartbeatMonitor);
+    if (exportPath) {
+      this.memoStorage = new MemoStorageService(exportPath);
+    }
   }
 
   /**
@@ -105,8 +110,7 @@ export class TelegraphCommands {
     const files = fs.readdirSync(inboxDir);
     const inboundMemos = files.filter((f) => {
       if (f.startsWith('.') || f.includes('ack-')) return false;
-      // Match memo pattern: YYYYMMDD-HHMMz-to-* 
-      return f.includes('-to-');
+      return f.includes('-to-') && (f.endsWith('.json') || f.endsWith('.md'));
     });
 
     if (inboundMemos.length === 0) {
@@ -118,7 +122,7 @@ export class TelegraphCommands {
     const selection = await vscode.window.showQuickPick(
       inboundMemos.map((f) => ({
         label: f,
-        description: f.split('--').slice(-1)[0].replace('.md', ''),
+        description: f.split('--').slice(-1)[0].replace(/\.(json|md)$/, ''),
       })),
       { placeHolder: 'Select memo to ack' }
     );
@@ -128,18 +132,33 @@ export class TelegraphCommands {
     const originalFileName = selection.label;
     const originalPath = path.join(inboxDir, originalFileName);
 
-    // Parse frontmatter
-    const fm = this.parseFrontmatter(originalPath);
-    const fromActor = fm['from'];
-    const toActor = fm['to'];
+    // Parse memo — JSON or legacy MD frontmatter
+    let fromActor: string;
+    let toActor: string;
+    let originalWwuid: string | undefined;
+    if (originalFileName.endsWith('.json')) {
+      try {
+        const memo = JSON.parse(fs.readFileSync(originalPath, 'utf8')) as Partial<Memo>;
+        fromActor = memo.from ?? '';
+        toActor = memo.to ?? '';
+        originalWwuid = memo.wwuid;
+      } catch {
+        vscode.window.showErrorMessage('Could not parse memo JSON');
+        return;
+      }
+    } else {
+      const fm = this.parseFrontmatter(originalPath);
+      fromActor = fm['from'] ?? '';
+      toActor = fm['to'] ?? '';
+    }
 
     if (!fromActor || !toActor) {
-      vscode.window.showErrorMessage('Could not parse memo frontmatter');
+      vscode.window.showErrorMessage('Could not parse memo sender/recipient');
       return;
     }
 
     // Extract subject
-    const subjectMatch = originalFileName.match(/--(.+?)\.md$/);
+    const subjectMatch = originalFileName.match(/--(.+?)\.(json|md)$/);
     const subject = subjectMatch ? subjectMatch[1] : 'unknown';
 
     // Prompt for ack status
@@ -159,43 +178,54 @@ export class TelegraphCommands {
       }) || '';
     }
 
-    // Build ack filename: YYYYMMDD-HHMMZ-to-<FromActor>-from-<ToActor>--ack-<status>--<subject>.md
+    // Build ack filename: YYYYMMDD-HHMMZ-to-<FromActor>-from-<ToActor>--ack-<status>--<subject>.json
     const timestamp = this.getTimestamp();
-    const ackFileName = `${timestamp}-to-${fromActor}-from-${toActor}--ack-${status}--${subject}.md`;
+    const isoTimestamp = this.getISO8601Timestamp();
+    const ackFileName = `${timestamp}-to-${fromActor}-from-${toActor}--ack-${status}--${subject}.json`;
     const outboxDir = path.join(telegraphDir, 'outbox');
     fs.mkdirSync(outboxDir, { recursive: true });
     const ackPath = path.join(outboxDir, ackFileName);
 
-    // Build YAML frontmatter
-    const isoTimestamp = this.getISO8601Timestamp();
-    const wwuid = generateWwuid('memo', fromActor, toActor, isoTimestamp, subject);
-    const frontmatter = `---
-wwuid: ${wwuid}
-from: ${toActor}
-to: ${fromActor}
-type: ack
-status: ${status}
-date: ${isoTimestamp}
-original_memo: ${originalFileName}
----`;
+    const wwuid = generateWwuid('memo', toActor, fromActor, isoTimestamp, `ack-${status}--${subject}`);
 
-    // Build body
     let body = '';
     if (status === 'question') {
-      body = `# Question\n\n${note || '(Add question here)'}`;
+      body = `Question\n\n${note || '(Add question here)'}`;
     } else if (status === 'blocked') {
-      body = `# Blocked\n\n${note || '(Add blocker details here)'}`;
+      body = `Blocked\n\n${note || '(Add blocker details here)'}`;
     } else if (status === 'deferred') {
-      body = `# Deferred\n\n${note || ''}`;
+      body = `Deferred\n\n${note || ''}`;
     } else {
-      body = `# Acknowledged: ${status}`;
+      body = `Acknowledged: ${status}`;
     }
 
-    // Write ack file to outbox so the delivery operator can route it
-    const ackContent = `${frontmatter}\n\n${body}\n`;
-    fs.writeFileSync(ackPath, ackContent, 'utf8');
+    const ackMemo: Memo = {
+      schema_version: '1',
+      wwuid,
+      wwuid_type: 'memo',
+      from: toActor,
+      to: fromActor,
+      type: 'ack',
+      date: isoTimestamp,
+      subject: `ack-${status}--${subject}`,
+      status: 'sent',
+      body,
+      filename: ackFileName,
+      ack_status: status,
+      original_memo: originalFileName,
+    };
 
-    // Archive original to inbox/history/YYYY-MM-DD/
+    fs.writeFileSync(ackPath, JSON.stringify(ackMemo, null, 2), 'utf8');
+
+    // Persist to storage and mark original as acked
+    if (this.memoStorage) {
+      this.memoStorage.write(ackMemo);
+      if (originalWwuid) {
+        this.memoStorage.updateStatus(originalWwuid, 'acked', status);
+      }
+    }
+
+    // Archive original to inbox/history/
     const today = new Date().toISOString().split('T')[0];
     const historyDir = path.join(inboxDir, 'history', today);
     archiveMemo(originalPath, historyDir);
@@ -282,40 +312,43 @@ original_memo: ${originalFileName}
     const role = roleMatch ? roleMatch[1] : 'TM';
     const fromActor = alias ? `${role}(${alias})` : (identitySetting || 'TM');
 
-    // Build filename: YYYYMMDD-HHMMZ-to-<ToActor>-from-<FromActor>--<subject>.md
+    // Build filename: YYYYMMDD-HHMMZ-to-<ToActor>-from-<FromActor>--<subject>.json
     const timestamp = this.getTimestamp();
-    const fileName = `${timestamp}-to-${toActor}-from-${fromActor}--${subject}.md`;
-    
+    const isoTimestamp = this.getISO8601Timestamp();
+    const fileName = `${timestamp}-to-${toActor}-from-${fromActor}--${subject}.json`;
+
     // Write to outbox/
     const outboxDir = path.join(telegraphDir, 'outbox');
-    if (!fs.existsSync(outboxDir)) {
-      fs.mkdirSync(outboxDir, { recursive: true });
-    }
+    fs.mkdirSync(outboxDir, { recursive: true });
     const filePath = path.join(outboxDir, fileName);
 
-    // Build YAML frontmatter
-    const isoTimestamp = this.getISO8601Timestamp();
     const wwuid = generateWwuid('memo', fromActor, toActor, isoTimestamp, subject);
-    const frontmatter = `---
-wwuid: ${wwuid}
-from: ${fromActor}
-to: ${toActor}
-type: ${type}
-branch: —
-date: ${isoTimestamp}
-subject: ${subject}
----`;
 
     // Extract body (remove the template line)
-    const bodyLines = body.split('\n');
-    const cleanBody = bodyLines
+    const cleanBody = body.split('\n')
       .filter((line) => !line.includes('Write memo body here'))
       .join('\n')
       .trim();
 
-    // Write memo file
-    const content = `${frontmatter}\n\n${cleanBody}\n`;
-    fs.writeFileSync(filePath, content, 'utf8');
+    const memo: Memo = {
+      schema_version: '1',
+      wwuid,
+      wwuid_type: 'memo',
+      from: fromActor,
+      to: toActor,
+      type,
+      date: isoTimestamp,
+      subject,
+      status: 'sent',
+      body: cleanBody,
+      filename: fileName,
+    };
+
+    fs.writeFileSync(filePath, JSON.stringify(memo, null, 2), 'utf8');
+
+    if (this.memoStorage) {
+      this.memoStorage.write(memo);
+    }
 
     this.outputChannel.appendLine(`[TelegraphCommands] Memo created in outbox: ${fileName}`);
     vscode.window.showInformationMessage(`Memo created in outbox: ${fileName}`);

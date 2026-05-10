@@ -50,7 +50,7 @@ export function toolInbox(ctx: MCPScopeContext, input: InboxInput): InboxOutput 
 
   const files = fs
     .readdirSync(inboxDir)
-    .filter((f) => f.endsWith('.md') && !f.startsWith('.') && !f.startsWith('!') && f !== 'history')
+    .filter((f) => (f.endsWith('.json') || f.endsWith('.md')) && !f.startsWith('.') && !f.startsWith('!') && f !== 'history')
     .sort()
     .slice(0, limit);
 
@@ -106,12 +106,12 @@ export function toolTelegraphCheck(ctx: MCPScopeContext): TelegraphCheckOutput {
   const inboxDir = path.join(telegraphDir, 'inbox');
   const outboxDir = path.join(telegraphDir, 'outbox');
   const historyDir = path.join(telegraphDir, 'history');
-  const isMd = (f: string) => f.endsWith('.md') && !f.startsWith('.');
+  const isMemo = (f: string) => (f.endsWith('.json') || f.endsWith('.md')) && !f.startsWith('.');
 
   return {
-    inbox: count(inboxDir, (f) => isMd(f) && !f.startsWith('!')),
-    outbox: count(outboxDir, (f) => isMd(f) && !f.startsWith('!')),
-    history: count(historyDir, isMd),
+    inbox: count(inboxDir, (f) => isMemo(f) && !f.startsWith('!')),
+    outbox: count(outboxDir, (f) => isMemo(f) && !f.startsWith('!')),
+    history: count(historyDir, isMemo),
     deadLetter: count(inboxDir, (f) => f.startsWith('!')) +
                 count(outboxDir, (f) => f.startsWith('!')),
   };
@@ -126,16 +126,23 @@ function parseMemoSummary(filePath: string, filename: string): MemoSummary {
 
   try {
     const content = fs.readFileSync(filePath, 'utf8');
-    const subjectMatch = content.match(/^subject:\s*(.+)$/m);
-    const fromMatch = content.match(/^from:\s*(.+)$/m);
-    const dateMatch = content.match(/^date:\s*(.+)$/m);
-    subject = subjectMatch?.[1]?.trim() ?? '';
-    from = fromMatch?.[1]?.trim() ?? '';
-    date = dateMatch?.[1]?.trim() ?? '';
+    if (filename.endsWith('.json')) {
+      const memo = JSON.parse(content) as Record<string, string>;
+      subject = memo['subject'] ?? '';
+      from = memo['from'] ?? '';
+      date = memo['date'] ?? '';
+    } else {
+      const subjectMatch = content.match(/^subject:\s*(.+)$/m);
+      const fromMatch = content.match(/^from:\s*(.+)$/m);
+      const dateMatch = content.match(/^date:\s*(.+)$/m);
+      subject = subjectMatch?.[1]?.trim() ?? '';
+      from = fromMatch?.[1]?.trim() ?? '';
+      date = dateMatch?.[1]?.trim() ?? '';
+    }
   } catch { /* use defaults */ }
 
   if (!subject) {
-    const parts = filename.replace('.md', '').split('--');
+    const parts = filename.replace(/\.(json|md)$/, '').split('--');
     subject = parts.length > 1 ? parts[parts.length - 1].replace(/-/g, ' ') : filename;
   }
 

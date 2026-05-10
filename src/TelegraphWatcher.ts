@@ -102,7 +102,7 @@ export class TelegraphWatcher {
 
   private onOutboxFile(filePath: string): void {
     const basename = path.basename(filePath);
-    if (!basename.endsWith('.md') || basename.startsWith('.') || basename.startsWith('!')) {
+    if ((!basename.endsWith('.json') && !basename.endsWith('.md')) || basename.startsWith('.') || basename.startsWith('!')) {
       return;
     }
     // Guard: file must exist and have content — prevents double-fire when delivery
