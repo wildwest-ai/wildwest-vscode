@@ -2,11 +2,15 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.34.0
+**Current version:** v0.34.2
 
 ---
 
 ## What's New
+
+**v0.34.2** — Fix `last_turn_at` staying stale on continued CPT sessions: `normalizeCopilotSession` now uses `max(existing, inferred)` for `lastMessageDate` (Copilot sets it at creation and never updates via patches); `packetWriter` now uses `max(turn.timestamp)` across packet turns instead of last turn's timestamp. Sort: Updated in the sidebar now correctly moves continued sessions to Today.
+
+**v0.34.1** — Fix CPT `.jsonl` session parsing: handle both `kind=0` envelope and direct session object at root; add `kind=None` text fragment capture. Prevents empty session export for new Copilot `.jsonl` format.
 
 **v0.34.0** — Telegraph Panel: `wildwest.openTelegraphPanel` opens a webview panel with inbox/outbox list, rendered memo view, compose drawer (To/Type/Subject/Body → Send), and push buttons [→ Copilot] [→ Claude] [→ Codex] that inject formatted memo content into the target chat input.
 

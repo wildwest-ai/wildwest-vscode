@@ -554,8 +554,10 @@ export class SessionExporter {
     }
 
     const inferredLastMessageDate = this.inferSessionLastMessageDate(session);
-    if (typeof session.lastMessageDate !== 'number' && inferredLastMessageDate !== null) {
-      session.lastMessageDate = inferredLastMessageDate;
+    if (inferredLastMessageDate !== null) {
+      // Always update to max — Copilot sets lastMessageDate at creation and never updates it via patches
+      const existing = typeof session.lastMessageDate === 'number' ? session.lastMessageDate : 0;
+      session.lastMessageDate = Math.max(existing, inferredLastMessageDate);
     }
 
     if (typeof session.creationDate !== 'number' && inferredLastMessageDate !== null) {
