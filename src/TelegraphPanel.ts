@@ -88,7 +88,11 @@ export class TelegraphPanel {
       case 'promptSearch': {
         const query = (msg['query'] as string) ?? '';
         const scope = (msg['scope'] as string) ?? undefined;
-        const results = this.promptIndex?.search(query, scope, 10) ?? [];
+        const results = this.promptIndex?.search(query, scope, 10, {
+          excludeKinds: ['terminal_output', 'authorization', 'continuation'],
+          includeGlobalFallback: false,
+          includeScopeLineage: true,
+        }) ?? [];
         this.panel.webview.postMessage({ type: 'promptResults', results });
         break;
       }
@@ -352,7 +356,7 @@ export class TelegraphPanel {
     promptDropdown.innerHTML = results.map((p, i) =>
       '<div class="prompt-item" data-idx="' + i + '" style="padding:4px 8px;cursor:pointer;border-bottom:1px solid var(--vscode-panel-border)">'
       + '<div style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(p.content.slice(0, 80)) + '</div>'
-      + '<div style="font-size:10px;color:var(--vscode-descriptionForeground)">' + esc(p.tool + ' · ' + (p.scope_alias || p.recorder_scope) + ' · ' + p.timestamp.slice(0,10)) + '</div>'
+      + '<div style="font-size:10px;color:var(--vscode-descriptionForeground)">' + esc(p.kind + ' · ' + p.tool + ' · ' + (p.scope_alias || p.recorder_scope) + ' · ' + p.last_used.slice(0,10)) + '</div>'
       + '</div>'
     ).join('');
     promptDropdown.style.display = 'block';

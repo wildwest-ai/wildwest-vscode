@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.35.2
+**Current version:** v0.36.0
 
 ---
 
 ## What's New
+
+**v0.36.0** — Prompt index suggestions are now context-sensitive: predictive entries are schema v3 with prompt kind, reusable score, scope lineage, framework compliance flags, and stricter scoped search. Completion and telegraph prompt suggestions suppress terminal output, bare continuation commands, and authorization snippets; `@wildwest prompts` now reports kind and framework flag breakdowns. Tests updated for registry v3 `identities`, current side-panel roots, and additive multi-workspace CPT attribution.
 
 **v0.35.2** — Prompt raw.json is now incremental: if raw.json exists, only sessions with `last_turn_at` newer than `raw.json.updated_at` are scanned and merged in (new prompts prepended, existing ids skipped). Full scan only on first run. index.json always rebuilt from full raw.json.
 

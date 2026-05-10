@@ -378,6 +378,16 @@ async function handlePrompts(
     const a = index.analytics;
     const byTool = Object.entries(a.by_tool).map(([t, n]) => `${t}: ${n}`).join(', ');
     const byScope = Object.entries(a.by_scope).map(([s, n]) => `${s}: ${n}`).join(', ');
+    const byKind = Object.entries(a.by_kind ?? {})
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 6)
+      .map(([kind, n]) => `${kind}: ${n}`)
+      .join(', ');
+    const violations = Object.entries(a.framework_violations ?? {})
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([flag, n]) => `${flag}: ${n}`)
+      .join(', ');
     const topAliases = Object.entries(a.by_scope_alias)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5)
@@ -389,7 +399,9 @@ async function handlePrompts(
       `| Dimension | Breakdown |\n|---|---|\n` +
       `| By tool | ${byTool} |\n` +
       `| By scope | ${byScope} |\n` +
-      `| Top aliases | ${topAliases || '—'} |\n\n` +
+      `| By kind | ${byKind || '—'} |\n` +
+      `| Top aliases | ${topAliases || '—'} |\n` +
+      `| Framework flags | ${violations || '—'} |\n\n` +
       `_Use \`@wildwest prompts <query>\` to search. Use \`@wildwest prompts scope:<alias> <query>\` to filter by workspace._`,
     );
     return;
@@ -404,7 +416,10 @@ async function handlePrompts(
     searchQuery = scopeMatch[2] ?? '';
   }
 
-  const results = promptIndex.search(searchQuery, scopeAlias, 15);
+  const results = promptIndex.search(searchQuery, scopeAlias, 15, {
+    includeGlobalFallback: false,
+    includeScopeLineage: true,
+  });
   if (results.length === 0) {
     stream.markdown(`No prompts found for **"${searchQuery}"**${scopeAlias ? ` in scope \`${scopeAlias}\`` : ''}.`);
     return;
@@ -416,8 +431,9 @@ async function handlePrompts(
   for (const p of results) {
     const preview = p.content.length > 120 ? p.content.slice(0, 120) + '…' : p.content;
     const freqTag = p.frequency > 1 ? ` · ×${p.frequency}` : '';
+    const compliance = p.framework_compliant ? 'framework-ok' : `flags: ${p.compliance_flags.join(', ')}`;
     stream.markdown(
-      `**score ${p.score.toFixed(2)}${freqTag}** · ${p.tool} · \`${p.scope_alias || p.recorder_scope}\` · ${p.last_used.slice(0, 10)}\n` +
+      `**score ${p.score.toFixed(2)}${freqTag}** · ${p.kind} · ${compliance} · ${p.tool} · \`${p.scope_alias || p.recorder_scope}\` · ${p.last_used.slice(0, 10)}\n` +
       `> ${preview.replace(/\n/g, ' ')}\n\n---\n\n`,
     );
   }
@@ -487,5 +503,3 @@ function findCountyRootFromWwDir(wwRoot: string): string | null {
   }
   return null;
 }
-
-
