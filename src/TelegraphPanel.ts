@@ -154,6 +154,9 @@ export class TelegraphPanel {
       case 'archive':
         this.handleArchiveWire(msg['wwuid'] as string);
         break;
+      case 'sendDraft':
+        this.handleSendDraft(msg['wwuid'] as string);
+        break;
       case 'bulkStatus': {
         const wwuids = msg['wwuids'] as string[];
         const status = msg['status'] as string;
@@ -228,6 +231,33 @@ export class TelegraphPanel {
       } catch { /* skip */ }
     }
     this.sendWires();
+  }
+
+  private handleSendDraft(wwuid: string): void {
+    const flatDir = this.getFlatDir();
+    if (!flatDir || !wwuid) return;
+    const filePath = path.join(flatDir, `${wwuid}.json`);
+    if (!fs.existsSync(filePath)) return;
+    try {
+      const wire = JSON.parse(fs.readFileSync(filePath, 'utf8')) as FlatWire;
+      const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+      wire.status = 'pending';
+      wire.status_transitions = [
+        ...(wire.status_transitions ?? []),
+        { status: 'pending', timestamp: isoNow, repos: ['vscode'] },
+      ];
+      // Update flat/ SSOT
+      fs.writeFileSync(filePath, JSON.stringify(wire, null, 2), 'utf8');
+      // Drop in workspace outbox/ for heartbeat pickup
+      const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+      const outboxDir = path.join(wsPath, '.wildwest', 'telegraph', 'outbox');
+      fs.mkdirSync(outboxDir, { recursive: true });
+      fs.writeFileSync(path.join(outboxDir, wire.filename), JSON.stringify(wire, null, 2), 'utf8');
+      vscode.window.showInformationMessage(`Wild West: wire pending — operator will deliver on next heartbeat.`);
+      this.sendWires();
+    } catch (err) {
+      vscode.window.showErrorMessage(`Wild West: send draft failed — ${err}`);
+    }
   }
 
   private handleArchiveWire(wwuid: string): void {
@@ -597,7 +627,9 @@ export class TelegraphPanel {
     const pushBtn = e.target.closest('[data-push]');
     if (pushBtn) { pushTo(pendingFormatted, pushBtn.dataset.push); return; }
     const archiveBtn = e.target.closest('[data-archive]');
-    if (archiveBtn) { vscode.postMessage({ type: 'archive', wwuid: archiveBtn.dataset.archive }); }
+    if (archiveBtn) { vscode.postMessage({ type: 'archive', wwuid: archiveBtn.dataset.archive }); return; }
+    const sendDraftBtn = e.target.closest('[data-send-draft]');
+    if (sendDraftBtn) { vscode.postMessage({ type: 'sendDraft', wwuid: sendDraftBtn.dataset.sendDraft }); }
   });
 
   // ── Messages from extension ───────────────────────────────────────────────
@@ -792,13 +824,14 @@ export class TelegraphPanel {
     // wwuid
     html += '<div style="font-family:monospace;font-size:10px;opacity:0.5;word-break:break-all">' + esc(w.wwuid || '') + '</div>';
 
-    // Push bar + archive
-    const canArchive = (w.status || 'sent') !== 'archived';
+    // Push bar + actions
+    const status = w.status || 'sent';
     html += '<div class="push-bar">'
       + '<button class="btn" data-push="copilot">→ Copilot</button>'
       + '<button class="btn btn-secondary" data-push="claude">→ Claude</button>'
       + '<button class="btn btn-secondary" data-push="codex">→ Codex</button>'
-      + (canArchive ? '<button class="btn btn-secondary" data-archive="' + esc(w.wwuid) + '">Archive</button>' : '')
+      + (status === 'draft' ? '<button class="btn" data-send-draft="' + esc(w.wwuid) + '">Send</button>' : '')
+      + (status !== 'archived' ? '<button class="btn btn-secondary" data-archive="' + esc(w.wwuid) + '">Archive</button>' : '')
       + '</div>';
 
     pane.innerHTML = html;
