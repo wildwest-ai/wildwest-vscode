@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { HeartbeatMonitor } from './HeartbeatMonitor';
 import { getTelegraphDirs } from './TelegraphService';
 import { DeliveryReceipt, getDeliveryReceipts, statusIcon } from './DeliveryReceipts';
+import { PromptIndexService } from './PromptIndexService';
 
 // ── SidePanelItem ────────────────────────────────────────────────────────────
 
@@ -54,6 +55,7 @@ export class SidePanelProvider
   private isWatching: boolean = false;
   private exportPath: string = '';
   private sessionSortBy: 'created' | 'updated' = 'created';
+  private promptIndexService: PromptIndexService | null = null;
 
   constructor(private readonly heartbeatMonitor: HeartbeatMonitor) {
     this.refreshInterval = setInterval(() => this.refresh(), REFRESH_INTERVAL_MS);
@@ -68,6 +70,10 @@ export class SidePanelProvider
   /** Called by extension.ts to provide the export path for Sessions section. */
   setExportPath(p: string): void {
     this.exportPath = p;
+  }
+
+  setPromptIndexService(svc: PromptIndexService): void {
+    this.promptIndexService = svc;
   }
 
   /** Toggle session date grouping between created and updated. */
@@ -694,9 +700,14 @@ export class SidePanelProvider
       item.command = { command: cmd, title: label };
       return item;
     };
+    const analytics = this.promptIndexService?.getAnalytics();
+    const promptLabel = analytics
+      ? `Regenerate Prompts (${analytics.total_prompts.toLocaleString()})`
+      : 'Regenerate Prompts';
     return [
       action('Export Now', 'wildwest.exportNow', 'sync'),
       action('Rebuild Index', 'wildwest.rebuildIndex', 'database'),
+      action(promptLabel, 'wildwest.buildPromptIndex', 'lightbulb'),
       action('Seed Session Map', 'wildwest.seedSessionMap', 'git-branch'),
       action('Open Export Folder', 'wildwest.openExportFolder', 'folder-opened'),
       action('Doctor', 'wildwest.doctor', 'heart'),

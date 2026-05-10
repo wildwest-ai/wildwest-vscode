@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.34.2
+**Current version:** v0.35.0
 
 ---
 
 ## What's New
+
+**v0.35.0** — Prompt index: scans all session turns and builds `sessions/reneyap/prompts/index.json` (6,869 prompts across cld/cpt/ccx, tagged by tool + recorder_scope + scope_alias). IntelliSense surfaces: "Regenerate Prompts" in wwSidebar Utilities (shows count); `@wildwest prompts` for analytics + search (supports `scope:<alias>` filter); prompt autocomplete dropdown in Telegraph compose drawer body field; VSCode completion provider for `.md` files. Throttled auto-rebuild on pipeline activity.
 
 **v0.34.2** — Fix `last_turn_at` staying stale on continued CPT sessions: `normalizeCopilotSession` now uses `max(existing, inferred)` for `lastMessageDate` (Copilot sets it at creation and never updates via patches); `packetWriter` now uses `max(turn.timestamp)` across packet turns instead of last turn's timestamp. Sort: Updated in the sidebar now correctly moves continued sessions to Today.
 

@@ -5,6 +5,7 @@ import { Memo, MemoStorageService } from './MemoStorageService';
 import { generateWwuid } from './sessionPipeline/utils';
 import { telegraphTimestamp, telegraphISOTimestamp, readRegistryAlias } from './TelegraphService';
 import { getTelegraphDirs } from './TelegraphService';
+import { PromptIndexService } from './PromptIndexService';
 
 export class TelegraphPanel {
   static readonly viewType = 'wildwest.telegraphPanel';
@@ -14,7 +15,7 @@ export class TelegraphPanel {
   private readonly memoStorage: MemoStorageService;
   private disposables: vscode.Disposable[] = [];
 
-  static open(exportPath: string): void {
+  static open(exportPath: string, promptIndex?: PromptIndexService): void {
     if (TelegraphPanel.instance) {
       TelegraphPanel.instance.panel.reveal();
       return;
@@ -25,10 +26,14 @@ export class TelegraphPanel {
       vscode.ViewColumn.Beside,
       { enableScripts: true, retainContextWhenHidden: true },
     );
-    TelegraphPanel.instance = new TelegraphPanel(panel, exportPath);
+    TelegraphPanel.instance = new TelegraphPanel(panel, exportPath, promptIndex);
   }
 
-  private constructor(panel: vscode.WebviewPanel, private readonly exportPath: string) {
+  private constructor(
+    panel: vscode.WebviewPanel,
+    private readonly exportPath: string,
+    private readonly promptIndex?: PromptIndexService,
+  ) {
     this.panel = panel;
     this.memoStorage = new MemoStorageService(exportPath);
 
@@ -80,6 +85,13 @@ export class TelegraphPanel {
       case 'pushToTerminal':
         await this.pushToTerminal(msg['formatted'] as string, msg['label'] as string);
         break;
+      case 'promptSearch': {
+        const query = (msg['query'] as string) ?? '';
+        const scope = (msg['scope'] as string) ?? undefined;
+        const results = this.promptIndex?.search(query, scope, 10) ?? [];
+        this.panel.webview.postMessage({ type: 'promptResults', results });
+        break;
+      }
     }
   }
 
@@ -265,7 +277,10 @@ export class TelegraphPanel {
       </select>
     </div>
     <div class="compose-row"><label>Subject</label><input id="cSubject" placeholder="my-topic-slug" /></div>
-    <textarea class="compose-body" id="cBody" placeholder="Memo body…"></textarea>
+    <div style="position:relative">
+      <textarea class="compose-body" id="cBody" placeholder="Memo body… (type 3+ chars to see past prompts)" autocomplete="off"></textarea>
+      <div id="promptDropdown" style="display:none;position:absolute;bottom:100%;left:0;right:0;max-height:160px;overflow-y:auto;background:var(--vscode-editorSuggestWidget-background,var(--vscode-input-background));border:1px solid var(--vscode-editorSuggestWidget-border,#555);z-index:100;font-size:11px;"></div>
+    </div>
     <div class="compose-footer">
       <span class="error-bar" id="composeError"></span>
       <button class="btn btn-secondary" id="btnCancel">Cancel</button>
@@ -308,7 +323,48 @@ export class TelegraphPanel {
     if (data.type === 'error') {
       document.getElementById('composeError').textContent = data.text;
     }
+    if (data.type === 'promptResults') {
+      renderPromptDropdown(data.results);
+    }
   });
+
+  // ── Prompt autocomplete ──────────────────────────────────────────────────
+  let promptSearchTimer = null;
+  const cBody = document.getElementById('cBody');
+  const promptDropdown = document.getElementById('promptDropdown');
+
+  cBody.addEventListener('input', () => {
+    clearTimeout(promptSearchTimer);
+    const val = cBody.value;
+    const lastLine = val.split('\\n').pop() || '';
+    if (lastLine.trim().length < 3) { promptDropdown.style.display = 'none'; return; }
+    promptSearchTimer = setTimeout(() => {
+      vscode.postMessage({ type: 'promptSearch', query: lastLine.trim() });
+    }, 250);
+  });
+
+  cBody.addEventListener('blur', () => {
+    setTimeout(() => { promptDropdown.style.display = 'none'; }, 150);
+  });
+
+  function renderPromptDropdown(results) {
+    if (!results || results.length === 0) { promptDropdown.style.display = 'none'; return; }
+    promptDropdown.innerHTML = results.map((p, i) =>
+      '<div class="prompt-item" data-idx="' + i + '" style="padding:4px 8px;cursor:pointer;border-bottom:1px solid var(--vscode-panel-border)">'
+      + '<div style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(p.content.slice(0, 80)) + '</div>'
+      + '<div style="font-size:10px;color:var(--vscode-descriptionForeground)">' + esc(p.tool + ' · ' + (p.scope_alias || p.recorder_scope) + ' · ' + p.timestamp.slice(0,10)) + '</div>'
+      + '</div>'
+    ).join('');
+    promptDropdown.style.display = 'block';
+    promptDropdown._results = results;
+    promptDropdown.querySelectorAll('.prompt-item').forEach(el => {
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const r = results[parseInt(el.dataset.idx)];
+        if (r) { cBody.value = r.content; promptDropdown.style.display = 'none'; }
+      });
+    });
+  }
 
   function refresh() { vscode.postMessage({ type: 'refresh' }); }
 
