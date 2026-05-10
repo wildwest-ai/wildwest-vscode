@@ -53,6 +53,20 @@ export class TelegraphPanel {
     return readRegistryAlias(path.join(wsPath, '.wildwest')) ?? '';
   }
 
+  /** Match terms for inbox/outbox filter — registry alias + identity role prefix. */
+  private getMatchTerms(): string[] {
+    const alias = this.getActorAlias();
+    const identity = vscode.workspace.getConfiguration('wildwest').get<string>('identity') ?? '';
+    const terms = new Set<string>();
+    if (alias) terms.add(alias.toLowerCase());
+    if (identity) {
+      terms.add(identity.toLowerCase());
+      const roleMatch = identity.match(/^([A-Za-z]+)/);
+      if (roleMatch) terms.add(roleMatch[1].toLowerCase());
+    }
+    return [...terms];
+  }
+
   // ── Read flat/ wires ──────────────────────────────────────────────────────
 
   private readAllFlatWires(): FlatWire[] {
@@ -84,12 +98,13 @@ export class TelegraphPanel {
     return results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }
 
-  private filterWires(all: FlatWire[], alias: string): { inbox: FlatWire[]; outbox: FlatWire[] } {
-    if (!alias) return { inbox: [], outbox: [] };
-    const lower = alias.toLowerCase();
-    const inbox = all.filter((w) => (w.to ?? '').toLowerCase().includes(lower));
-    const outbox = all.filter((w) => (w.from ?? '').toLowerCase().includes(lower));
-    return { inbox, outbox };
+  private filterWires(all: FlatWire[], terms: string[]): { inbox: FlatWire[]; outbox: FlatWire[] } {
+    if (!terms.length) return { inbox: [], outbox: [] };
+    const match = (field: string) => terms.some((t) => field.toLowerCase().includes(t));
+    return {
+      inbox:  all.filter((w) => match(w.to   ?? '')),
+      outbox: all.filter((w) => match(w.from  ?? '')),
+    };
   }
 
   // ── Outbound to webview ───────────────────────────────────────────────────
@@ -97,7 +112,7 @@ export class TelegraphPanel {
   private sendWires(): void {
     const all = this.readAllFlatWires();
     const alias = this.getActorAlias();
-    const { inbox, outbox } = this.filterWires(all, alias);
+    const { inbox, outbox } = this.filterWires(all, this.getMatchTerms());
     const flatAvailable = this.getFlatDir() !== null;
     this.panel.webview.postMessage({ type: 'wires', inbox, outbox, all, alias, flatAvailable });
   }

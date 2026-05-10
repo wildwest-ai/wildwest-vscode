@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.36.5
+**Current version:** v0.36.6
 
 ---
 
 ## What's New
+
+**v0.36.6** — Telegraph Panel inbox/outbox filter now matches on both registry alias and `wildwest.identity` role (e.g. `CD(RSn)`) — county windows with role-based `to:` addressing now see their wires. `@wildwest send` and `@wildwest ack` both updated to use `WireFactory` (`createFlatWire` + `writeFlatWire`); wire preview shows JSON; wires drop to flat/ primary + outbox secondary.
 
 **v0.36.5** — `WireFactory.ts`: canonical schema v2 wire factory (`createFlatWire`, `writeFlatWire`, `parseFilenameActors`). Telegraph Panel Compose now writes directly to `~/wildwest/telegraph/flat/` (territory SSOT) as primary path, with workspace outbox as secondary for inbox delivery. `WireStorageService` removed from panel — no longer staging compose wires locally.
 

@@ -1,12 +1,13 @@
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import {
-  telegraphTimestamp,
   parseFrontmatter,
   archiveMemo,
   readRegistryAlias,
 } from './TelegraphService';
+import { createFlatWire, writeFlatWire, FlatWire } from './WireFactory';
 import { PromptIndexService } from './PromptIndexService';
 
 /**
@@ -43,13 +44,22 @@ export function registerChatParticipant(
 
   context.subscriptions.push(
     vscode.commands.registerCommand(CMD_CONFIRM_SEND, async (args: {
-      outboxDir: string; filename: string; content: string;
+      wire: FlatWire; flatDir: string | null; outboxDir: string;
     }) => {
       try {
+        // Primary: flat/ (territory SSOT)
+        if (args.flatDir) {
+          writeFlatWire(args.wire, args.flatDir);
+        }
+        // Secondary: workspace outbox for inbox delivery
         fs.mkdirSync(args.outboxDir, { recursive: true });
-        fs.writeFileSync(path.join(args.outboxDir, args.filename), args.content, 'utf8');
-        vscode.window.showInformationMessage(`Wild West: wire sent → ${args.filename}`);
-        outputChannel.appendLine(`[WildwestParticipant] sent wire: ${args.filename}`);
+        fs.writeFileSync(
+          path.join(args.outboxDir, args.wire.filename),
+          JSON.stringify(args.wire, null, 2),
+          'utf8',
+        );
+        vscode.window.showInformationMessage(`Wild West: wire sent → ${args.wire.filename}`);
+        outputChannel.appendLine(`[WildwestParticipant] sent wire: ${args.wire.filename}`);
       } catch (err) {
         vscode.window.showErrorMessage(`Wild West: send failed — ${err}`);
       }
@@ -68,13 +78,20 @@ export function registerChatParticipant(
     }),
 
     vscode.commands.registerCommand(CMD_CONFIRM_ACK, async (args: {
-      outboxDir: string; filename: string; content: string;
+      wire: FlatWire; flatDir: string | null; outboxDir: string;
     }) => {
       try {
+        if (args.flatDir) {
+          writeFlatWire(args.wire, args.flatDir);
+        }
         fs.mkdirSync(args.outboxDir, { recursive: true });
-        fs.writeFileSync(path.join(args.outboxDir, args.filename), args.content, 'utf8');
-        vscode.window.showInformationMessage(`Wild West: ack sent → ${args.filename}`);
-        outputChannel.appendLine(`[WildwestParticipant] sent ack: ${args.filename}`);
+        fs.writeFileSync(
+          path.join(args.outboxDir, args.wire.filename),
+          JSON.stringify(args.wire, null, 2),
+          'utf8',
+        );
+        vscode.window.showInformationMessage(`Wild West: ack sent → ${args.wire.filename}`);
+        outputChannel.appendLine(`[WildwestParticipant] sent ack: ${args.wire.filename}`);
       } catch (err) {
         vscode.window.showErrorMessage(`Wild West: ack send failed — ${err}`);
       }
@@ -207,17 +224,15 @@ async function handleSend(wwRoot: string, rawPrompt: string, stream: vscode.Chat
   const role = roleMatch ? roleMatch[1] : 'TM';
   const senderAlias = alias ? `${role}(${alias})` : (identitySetting || 'TM');
   const outboxDir = path.join(wwRoot, 'telegraph', 'outbox');
-  const now = new Date();
-  const ts = telegraphTimestamp(now);
   const subject = body.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '').toLowerCase().slice(0, 40);
-  const filename = `${ts}-to-${toRole}-from-${senderAlias}--${subject}.md`;
-  const content =
-    `---\nto: ${toRole}\nfrom: ${senderAlias}\ndate: ${now.toISOString().slice(0, 16)}Z\nsubject: ${subject}\n---\n\n${body}\n\n${senderAlias}\n`;
+  const flatDir = resolveFlatDir();
+
+  const wire = createFlatWire({ from: senderAlias, to: toRole, type: 'status-update', subject, body });
 
   stream.markdown(`**Draft wire** — preview before sending:\n\n`);
-  stream.markdown('```\n' + content + '```\n\n');
-  stream.markdown(`Filename: \`${filename}\`\n\n`);
-  stream.button({ command: CMD_CONFIRM_SEND, title: 'Confirm Send', arguments: [{ outboxDir, filename, content }] });
+  stream.markdown('```json\n' + JSON.stringify(wire, null, 2) + '\n```\n\n');
+  stream.markdown(`Filename: \`${wire.filename}\`\n\n`);
+  stream.button({ command: CMD_CONFIRM_SEND, title: 'Confirm Send', arguments: [{ wire, flatDir, outboxDir }] });
 }
 
 async function handleAck(wwRoot: string, timestampArg: string, stream: vscode.ChatResponseStream): Promise<void> {
@@ -247,17 +262,23 @@ async function handleAck(wwRoot: string, timestampArg: string, stream: vscode.Ch
   const role = roleMatch ? roleMatch[1] : 'TM';
   const senderAlias = alias ? `${role}(${alias})` : (identitySetting || 'TM');
   const outboxDir = path.join(wwRoot, 'telegraph', 'outbox');
-  const now = new Date();
-  const ts = telegraphTimestamp(now);
   const ackSubject = `ack-${timestampArg}-${originalSubject}`.slice(0, 60).replace(/\s+/g, '-');
-  const filename = `${ts}-to-${originalFrom}-from-${senderAlias}--${ackSubject}.md`;
-  const content =
-    `---\nto: ${originalFrom}\nfrom: ${senderAlias}\ndate: ${now.toISOString().slice(0, 16)}Z\nsubject: ${ackSubject}\n---\n\n` +
-    `Ack — your ${timestampArg} wire (${originalSubject}) received and processed.\n\n${senderAlias}\n`;
+  const ackBody = `Ack — your ${timestampArg} wire (${originalSubject}) received and processed.\n\n${senderAlias}`;
+  const flatDir = resolveFlatDir();
+
+  const wire = createFlatWire({
+    from: senderAlias,
+    to: originalFrom,
+    type: 'ack',
+    subject: ackSubject,
+    body: ackBody,
+    re: matched,
+    original_wire: matched,
+  });
 
   stream.markdown(`**Ack wire** — \`${matched}\`:\n\n`);
-  stream.markdown('```\n' + content + '```\n\n');
-  stream.button({ command: CMD_CONFIRM_ACK, title: 'Send Ack', arguments: [{ outboxDir, filename, content }] });
+  stream.markdown('```json\n' + JSON.stringify(wire, null, 2) + '\n```\n\n');
+  stream.button({ command: CMD_CONFIRM_ACK, title: 'Send Ack', arguments: [{ wire, flatDir, outboxDir }] });
 }
 
 async function handleArchive(wwRoot: string, filenameArg: string, stream: vscode.ChatResponseStream): Promise<void> {
@@ -484,6 +505,16 @@ function extractSubject(filePath: string, filename: string): string {
     if (parts.length > 1) return parts[parts.length - 1].replace(/-/g, ' ');
   } catch { /* ignore */ }
   return filename;
+}
+
+function resolveFlatDir(): string | null {
+  const cfg = vscode.workspace.getConfiguration('wildwest');
+  let worldRoot = cfg.get<string>('worldRoot') ?? '~/wildwest';
+  if (worldRoot.startsWith('~')) {
+    worldRoot = path.join(os.homedir(), worldRoot.slice(1));
+  }
+  const flatDir = path.join(worldRoot, 'telegraph', 'flat');
+  return fs.existsSync(flatDir) ? flatDir : null;
 }
 
 function findCountyRootFromWwDir(wwRoot: string): string | null {
