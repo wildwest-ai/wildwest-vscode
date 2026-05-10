@@ -2,11 +2,15 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.36.2
+**Current version:** v0.36.4
 
 ---
 
 ## What's New
+
+**v0.36.4** — Telegraph Panel now reads from `~/wildwest/telegraph/flat/` (territory SSOT — 231 wires). Three tabs: Inbox (wires addressed to current actor), Outbox (wires from current actor), All (full archive with search). Detail view shows type, `delivered_at`, `re` reply chain, and `status_transitions` timeline. Status badges: sent/delivered/archived. Compose still writes to workspace outbox for heartbeat delivery.
+
+**v0.36.3** — Rename: all `memo`/`Memo` terminology updated to `wire`/`Wire` throughout the codebase — `MemoStorageService` → `WireStorageService`, `Memo` interface → `Wire`, `MemoStatus` → `WireStatus`, webview selectors, user-facing strings, MCP descriptions, and `wwuid_type: 'memo'` → `'wire'`. No behavior change.
 
 **v0.36.1** — Rename: all `memo`/`Memo` terminology updated to `wire`/`Wire` throughout — `MemoStorageService` → `WireStorageService`, `Memo` interface → `Wire`, `MemoStatus` → `WireStatus`, `listMemos` → `listWires`, webview selectors, user-facing strings, MCP descriptions, and `wwuid_type: 'memo'` → `'wire'`. No behavior change.
 

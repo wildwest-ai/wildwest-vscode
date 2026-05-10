@@ -4,8 +4,41 @@ import * as vscode from 'vscode';
 import { Wire, WireStorageService } from './WireStorageService';
 import { generateWwuid } from './sessionPipeline/utils';
 import { telegraphTimestamp, telegraphISOTimestamp, readRegistryAlias } from './TelegraphService';
-import { getTelegraphDirs } from './TelegraphService';
 import { PromptIndexService } from './PromptIndexService';
+
+interface StatusTransition {
+  status: string;
+  timestamp: string;
+  instances?: number;
+  repos?: string[];
+}
+
+interface FlatWire {
+  schema_version: string;
+  wwuid: string;
+  wwuid_type: 'wire';
+  from?: string;
+  to?: string;
+  type: string;
+  date: string;
+  subject: string;
+  status: string;
+  body?: string;
+  filename: string;
+  delivered_at?: string;
+  re?: string;
+  original_wire?: string;
+  status_transitions?: StatusTransition[];
+}
+
+// Parse to/from from wire filename: YYYYMMDD-HHMMz-to-<to>-from-<from>--<subject>.md
+const FILENAME_RE = /^\d{8}-\d{4}Z-to-(.+?)-from-(.+?)--.+\.(md|json)$/;
+
+function parseFilenameActors(filename: string): { to?: string; from?: string } {
+  const m = path.basename(filename).match(FILENAME_RE);
+  if (!m) return {};
+  return { to: m[1], from: m[2] };
+}
 
 export class TelegraphPanel {
   static readonly viewType = 'wildwest.telegraphPanel';
@@ -44,29 +77,68 @@ export class TelegraphPanel {
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
   }
 
+  // ── Flat directory resolution ─────────────────────────────────────────────
+
+  private getFlatDir(): string | null {
+    const cfg = vscode.workspace.getConfiguration('wildwest');
+    const home = process.env['HOME'] ?? '~';
+    const worldRoot = (cfg.get<string>('worldRoot') ?? '~/wildwest').replace(/^~/, home);
+    const flatDir = path.join(worldRoot, 'telegraph', 'flat');
+    return fs.existsSync(flatDir) ? flatDir : null;
+  }
+
+  private getActorAlias(): string {
+    const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+    return readRegistryAlias(path.join(wsPath, '.wildwest')) ?? '';
+  }
+
+  // ── Read flat/ wires ──────────────────────────────────────────────────────
+
+  private readAllFlatWires(): FlatWire[] {
+    const flatDir = this.getFlatDir();
+    if (!flatDir) return [];
+
+    const results: FlatWire[] = [];
+    let entries: string[];
+    try {
+      entries = fs.readdirSync(flatDir);
+    } catch {
+      return [];
+    }
+
+    for (const f of entries) {
+      if (!f.endsWith('.json') || f.startsWith('.')) continue;
+      try {
+        const wire = JSON.parse(fs.readFileSync(path.join(flatDir, f), 'utf8')) as FlatWire;
+        // Backfill from/to from filename if missing in JSON
+        if (!wire.from || !wire.to) {
+          const parsed = parseFilenameActors(wire.filename);
+          if (!wire.from && parsed.from) wire.from = parsed.from;
+          if (!wire.to && parsed.to) wire.to = parsed.to;
+        }
+        results.push(wire);
+      } catch { /* skip corrupt */ }
+    }
+
+    return results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }
+
+  private filterWires(all: FlatWire[], alias: string): { inbox: FlatWire[]; outbox: FlatWire[] } {
+    if (!alias) return { inbox: [], outbox: [] };
+    const lower = alias.toLowerCase();
+    const inbox = all.filter((w) => (w.to ?? '').toLowerCase().includes(lower));
+    const outbox = all.filter((w) => (w.from ?? '').toLowerCase().includes(lower));
+    return { inbox, outbox };
+  }
+
   // ── Outbound to webview ───────────────────────────────────────────────────
 
   private sendWires(): void {
-    const inbox = this.collectFileWires('inbox');
-    const outbox = this.collectFileWires('outbox');
-    this.panel.webview.postMessage({ type: 'wires', inbox, outbox });
-  }
-
-  private collectFileWires(section: 'inbox' | 'outbox'): Wire[] {
-    const results: Wire[] = [];
-    for (const telegraphDir of getTelegraphDirs()) {
-      const dir = path.join(telegraphDir, section);
-      if (!fs.existsSync(dir)) continue;
-      for (const f of fs.readdirSync(dir)) {
-        if (!f.endsWith('.json') || f.startsWith('.')) continue;
-        try {
-          const wire = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) as Wire;
-          results.push(wire);
-        } catch { /* skip corrupt */ }
-      }
-    }
-    // Sort newest first
-    return results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const all = this.readAllFlatWires();
+    const alias = this.getActorAlias();
+    const { inbox, outbox } = this.filterWires(all, alias);
+    const flatAvailable = this.getFlatDir() !== null;
+    this.panel.webview.postMessage({ type: 'wires', inbox, outbox, all, alias, flatAvailable });
   }
 
   // ── Inbound from webview ──────────────────────────────────────────────────
@@ -87,8 +159,7 @@ export class TelegraphPanel {
         break;
       case 'promptSearch': {
         const query = (msg['query'] as string) ?? '';
-        const scope = (msg['scope'] as string) ?? undefined;
-        const results = this.promptIndex?.search(query, scope, 10, {
+        const results = this.promptIndex?.search(query, undefined, 10, {
           excludeKinds: ['terminal_output', 'authorization', 'continuation'],
           includeGlobalFallback: false,
           includeScopeLineage: true,
@@ -164,11 +235,10 @@ export class TelegraphPanel {
     const terminals = vscode.window.terminals;
     if (terminals.length === 0) {
       await vscode.env.clipboard.writeText(formatted);
-      vscode.window.showInformationMessage(`No terminals open — copied to clipboard.`);
+      vscode.window.showInformationMessage('No terminals open — copied to clipboard.');
       return;
     }
 
-    // Sort: terminals matching the label float to top
     const keyword = label.toLowerCase();
     const sorted = [...terminals].sort((a, b) => {
       const aMatch = a.name.toLowerCase().includes(keyword) ? -1 : 1;
@@ -215,33 +285,55 @@ export class TelegraphPanel {
   .btn-secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
   .btn-secondary:hover { background: var(--vscode-button-secondaryHoverBackground); }
 
+  /* ── Tabs ── */
+  .tabs { display: flex; border-bottom: 1px solid var(--vscode-panel-border); flex-shrink: 0; }
+  .tab { padding: 6px 14px; font-size: 12px; cursor: pointer; border-bottom: 2px solid transparent; color: var(--vscode-descriptionForeground); user-select: none; }
+  .tab:hover { color: var(--vscode-foreground); }
+  .tab.active { color: var(--vscode-foreground); border-bottom-color: var(--vscode-focusBorder); }
+  .tab .badge { display: inline-block; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); font-size: 10px; border-radius: 8px; padding: 0 5px; margin-left: 4px; }
+
+  /* ── Search (All tab) ── */
+  .search-bar { padding: 6px 10px; border-bottom: 1px solid var(--vscode-panel-border); flex-shrink: 0; display: none; }
+  .search-bar.visible { display: block; }
+  .search-bar input { width: 100%; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, #555); padding: 3px 6px; font-size: 12px; border-radius: 2px; }
+
   /* ── Main layout ── */
   .main { display: flex; flex: 1; overflow: hidden; }
 
   /* ── Wire list ── */
-  .list-pane { width: 220px; flex-shrink: 0; border-right: 1px solid var(--vscode-panel-border); overflow-y: auto; display: flex; flex-direction: column; }
-  .list-section { padding: 6px 8px 2px; font-size: 11px; font-weight: 600; color: var(--vscode-descriptionForeground); text-transform: uppercase; letter-spacing: 0.05em; }
-  .wire-row { padding: 6px 10px; cursor: pointer; border-left: 2px solid transparent; }
+  .list-pane { width: 240px; flex-shrink: 0; border-right: 1px solid var(--vscode-panel-border); overflow-y: auto; display: flex; flex-direction: column; }
+  .wire-row { padding: 7px 10px; cursor: pointer; border-left: 3px solid transparent; }
   .wire-row:hover { background: var(--vscode-list-hoverBackground); }
   .wire-row.active { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); border-left-color: var(--vscode-focusBorder); }
   .wire-row .subject { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .wire-row .meta { font-size: 10px; color: var(--vscode-descriptionForeground); margin-top: 2px; }
+  .wire-row .meta { font-size: 10px; color: var(--vscode-descriptionForeground); margin-top: 2px; display: flex; gap: 4px; align-items: center; }
   .wire-row.active .meta { color: var(--vscode-list-activeSelectionForeground); opacity: 0.8; }
-  .empty-list { padding: 12px 10px; font-size: 12px; color: var(--vscode-descriptionForeground); }
+  .empty-list { padding: 16px 10px; font-size: 12px; color: var(--vscode-descriptionForeground); text-align: center; }
+
+  /* ── Status badges ── */
+  .badge-status { font-size: 9px; padding: 1px 4px; border-radius: 3px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .badge-sent { background: #6b6b00; color: #ffff80; }
+  .badge-delivered { background: #003d6b; color: #80cfff; }
+  .badge-archived { background: #333; color: #aaa; }
 
   /* ── Wire detail ── */
   .detail-pane { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
   .detail-pane.empty-detail { align-items: center; justify-content: center; color: var(--vscode-descriptionForeground); font-size: 12px; }
-  .wire-header table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .wire-header td { padding: 3px 8px; }
-  .wire-header td:first-child { font-weight: 600; color: var(--vscode-descriptionForeground); width: 70px; }
-  .wire-body { font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+  .wire-meta-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .wire-meta-table td { padding: 3px 8px; vertical-align: top; }
+  .wire-meta-table td:first-child { font-weight: 600; color: var(--vscode-descriptionForeground); width: 80px; white-space: nowrap; }
+  .wire-body { font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; padding: 10px; background: var(--vscode-textBlockQuote-background, var(--vscode-editor-inactiveSelectionBackground)); border-radius: 3px; border-left: 3px solid var(--vscode-panel-border); }
+  .wire-body.empty { color: var(--vscode-descriptionForeground); font-style: italic; }
+  .timeline { font-size: 11px; color: var(--vscode-descriptionForeground); }
+  .timeline-item { display: flex; gap: 8px; align-items: baseline; padding: 2px 0; }
+  .timeline-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--vscode-focusBorder); flex-shrink: 0; margin-top: 4px; }
   .push-bar { display: flex; gap: 8px; flex-wrap: wrap; }
   .push-bar .btn { font-size: 11px; padding: 3px 8px; }
+  .section-label { font-size: 11px; font-weight: 600; color: var(--vscode-descriptionForeground); text-transform: uppercase; letter-spacing: 0.05em; }
 
   /* ── Compose drawer ── */
   .compose-drawer { border-top: 1px solid var(--vscode-panel-border); flex-shrink: 0; overflow: hidden; transition: max-height 0.2s ease; max-height: 0; }
-  .compose-drawer.open { max-height: 280px; }
+  .compose-drawer.open { max-height: 300px; }
   .compose-form { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
   .compose-row { display: flex; gap: 8px; align-items: center; }
   .compose-row label { font-size: 11px; font-weight: 600; color: var(--vscode-descriptionForeground); width: 52px; flex-shrink: 0; }
@@ -261,6 +353,16 @@ export class TelegraphPanel {
   </div>
 </div>
 
+<div class="tabs">
+  <div class="tab active" data-tab="inbox">Inbox <span class="badge" id="badgeInbox">0</span></div>
+  <div class="tab" data-tab="outbox">Outbox <span class="badge" id="badgeOutbox">0</span></div>
+  <div class="tab" data-tab="all">All <span class="badge" id="badgeAll">0</span></div>
+</div>
+
+<div class="search-bar" id="searchBar">
+  <input id="searchInput" placeholder="Search wires…" autocomplete="off" />
+</div>
+
 <div class="main">
   <div class="list-pane" id="listPane"></div>
   <div class="detail-pane empty-detail" id="detailPane">
@@ -278,6 +380,8 @@ export class TelegraphPanel {
         <option>scope-change</option>
         <option>question</option>
         <option>incident-report</option>
+        <option>request</option>
+        <option>notification</option>
       </select>
     </div>
     <div class="compose-row"><label>Subject</label><input id="cSubject" placeholder="my-topic-slug" /></div>
@@ -295,9 +399,34 @@ export class TelegraphPanel {
 
 <script>
   const vscode = acquireVsCodeApi();
-  let wires = { inbox: [], outbox: [] };
+  let allWires = [];
+  let inboxWires = [];
+  let outboxWires = [];
+  let actorAlias = '';
+  let flatAvailable = false;
+  let activeTab = 'inbox';
   let selectedWwuid = null;
   let pendingFormatted = '';
+  let searchQuery = '';
+
+  // ── Tab switching ─────────────────────────────────────────────────────────
+
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      activeTab = tab.dataset.tab;
+      document.getElementById('searchBar').classList.toggle('visible', activeTab === 'all');
+      renderList();
+    });
+  });
+
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+    searchQuery = e.target.value.toLowerCase();
+    renderList();
+  });
+
+  // ── Controls ──────────────────────────────────────────────────────────────
 
   document.getElementById('btnRefresh').addEventListener('click', () => refresh());
   document.getElementById('btnCompose').addEventListener('click', () => toggleCompose());
@@ -314,9 +443,18 @@ export class TelegraphPanel {
     if (btn) pushTo(pendingFormatted, btn.dataset.push);
   });
 
+  // ── Messages from extension ───────────────────────────────────────────────
+
   window.addEventListener('message', ({ data }) => {
     if (data.type === 'wires') {
-      wires = data;
+      inboxWires  = data.inbox  || [];
+      outboxWires = data.outbox || [];
+      allWires    = data.all    || [];
+      actorAlias  = data.alias  || '';
+      flatAvailable = data.flatAvailable || false;
+      document.getElementById('badgeInbox').textContent  = inboxWires.length;
+      document.getElementById('badgeOutbox').textContent = outboxWires.length;
+      document.getElementById('badgeAll').textContent    = allWires.length;
       renderList();
       if (selectedWwuid) renderDetail(selectedWwuid);
     }
@@ -332,15 +470,15 @@ export class TelegraphPanel {
     }
   });
 
-  // ── Prompt autocomplete ──────────────────────────────────────────────────
+  // ── Prompt autocomplete ───────────────────────────────────────────────────
+
   let promptSearchTimer = null;
   const cBody = document.getElementById('cBody');
   const promptDropdown = document.getElementById('promptDropdown');
 
   cBody.addEventListener('input', () => {
     clearTimeout(promptSearchTimer);
-    const val = cBody.value;
-    const lastLine = val.split('\\n').pop() || '';
+    const lastLine = cBody.value.split('\\n').pop() || '';
     if (lastLine.trim().length < 3) { promptDropdown.style.display = 'none'; return; }
     promptSearchTimer = setTimeout(() => {
       vscode.postMessage({ type: 'promptSearch', query: lastLine.trim() });
@@ -356,11 +494,10 @@ export class TelegraphPanel {
     promptDropdown.innerHTML = results.map((p, i) =>
       '<div class="prompt-item" data-idx="' + i + '" style="padding:4px 8px;cursor:pointer;border-bottom:1px solid var(--vscode-panel-border)">'
       + '<div style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(p.content.slice(0, 80)) + '</div>'
-      + '<div style="font-size:10px;color:var(--vscode-descriptionForeground)">' + esc(p.kind + ' · ' + p.tool + ' · ' + (p.scope_alias || p.recorder_scope) + ' · ' + p.last_used.slice(0,10)) + '</div>'
+      + '<div style="font-size:10px;color:var(--vscode-descriptionForeground)">' + esc(p.kind + ' · ' + (p.scope_alias || p.recorder_scope) + ' · ' + p.last_used.slice(0,10)) + '</div>'
       + '</div>'
     ).join('');
     promptDropdown.style.display = 'block';
-    promptDropdown._results = results;
     promptDropdown.querySelectorAll('.prompt-item').forEach(el => {
       el.addEventListener('mousedown', (e) => {
         e.preventDefault();
@@ -370,33 +507,51 @@ export class TelegraphPanel {
     });
   }
 
+  // ── List rendering ────────────────────────────────────────────────────────
+
   function refresh() { vscode.postMessage({ type: 'refresh' }); }
+
+  function currentList() {
+    if (activeTab === 'inbox')  return inboxWires;
+    if (activeTab === 'outbox') return outboxWires;
+    // All tab with optional search
+    if (!searchQuery) return allWires;
+    return allWires.filter(w =>
+      (w.subject || '').toLowerCase().includes(searchQuery) ||
+      (w.from    || '').toLowerCase().includes(searchQuery) ||
+      (w.to      || '').toLowerCase().includes(searchQuery) ||
+      (w.type    || '').toLowerCase().includes(searchQuery) ||
+      (w.body    || '').toLowerCase().includes(searchQuery)
+    );
+  }
 
   function renderList() {
     const pane = document.getElementById('listPane');
-    let html = '';
-    if (wires.inbox.length) {
-      html += '<div class="list-section">Inbox (' + wires.inbox.length + ')</div>';
-      html += wires.inbox.map(w => wireRow(w)).join('');
+    const list = currentList();
+    if (list.length === 0) {
+      const msg = !flatAvailable
+        ? 'telegraph/flat/ not found'
+        : activeTab === 'inbox'  ? 'Inbox empty'
+        : activeTab === 'outbox' ? 'No sent wires'
+        : searchQuery            ? 'No matches'
+        : 'No wires';
+      pane.innerHTML = '<div class="empty-list">' + esc(msg) + '</div>';
+      return;
     }
-    if (wires.outbox.length) {
-      html += '<div class="list-section">Outbox (' + wires.outbox.length + ')</div>';
-      html += wires.outbox.map(w => wireRow(w)).join('');
-    }
-    if (!wires.inbox.length && !wires.outbox.length) {
-      html = '<div class="empty-list">No wires</div>';
-    }
-    pane.innerHTML = html;
+    pane.innerHTML = list.map(w => wireRow(w)).join('');
   }
 
   function wireRow(w) {
     const active = w.wwuid === selectedWwuid ? ' active' : '';
     const dateStr = w.date ? new Date(w.date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
+    const statusBadge = '<span class="badge-status badge-' + esc(w.status || 'sent') + '">' + esc(w.status || '') + '</span>';
     return '<div class="wire-row' + active + '" data-wwuid="' + esc(w.wwuid) + '">'
       + '<div class="subject">' + esc(w.subject || w.filename || '—') + '</div>'
-      + '<div class="meta">' + esc(w.from || '') + ' · ' + dateStr + '</div>'
+      + '<div class="meta">' + statusBadge + ' <span>' + esc(w.from || w.to || '') + '</span> <span>' + esc(dateStr) + '</span></div>'
       + '</div>';
   }
+
+  // ── Detail rendering ──────────────────────────────────────────────────────
 
   function selectWire(wwuid) {
     selectedWwuid = wwuid;
@@ -405,8 +560,7 @@ export class TelegraphPanel {
   }
 
   function renderDetail(wwuid) {
-    const all = [...(wires.inbox || []), ...(wires.outbox || [])];
-    const w = all.find(x => x.wwuid === wwuid);
+    const w = [...inboxWires, ...outboxWires, ...allWires].find(x => x.wwuid === wwuid);
     const pane = document.getElementById('detailPane');
     if (!w) {
       pane.className = 'detail-pane empty-detail';
@@ -415,22 +569,53 @@ export class TelegraphPanel {
     }
     pane.className = 'detail-pane';
     const dateStr = w.date ? new Date(w.date).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
-    pendingFormatted = '📬 [from ' + (w.from||'') + ' | ' + (w.subject||'') + ' | ' + (w.date||'') + ']\\n\\n' + (w.body||'');
-    pane.innerHTML =
-      '<div class="wire-header"><table>'
-      + row('From', w.from) + row('To', w.to) + row('Date', dateStr)
-      + row('Subject', w.subject) + row('Type', w.type) + row('Status', w.status)
-      + '</table></div>'
-      + '<div class="wire-body">' + esc(w.body || '') + '</div>'
-      + '<div class="push-bar">'
+    pendingFormatted = '[from ' + (w.from||'?') + ' → ' + (w.to||'?') + '] ' + (w.subject||'') + '\\n\\n' + (w.body||'');
+
+    let html = '<table class="wire-meta-table">';
+    if (w.from)         html += metaRow('From', w.from);
+    if (w.to)           html += metaRow('To', w.to);
+                        html += metaRow('Date', dateStr);
+                        html += metaRow('Subject', w.subject);
+                        html += metaRow('Type', w.type);
+    if (w.delivered_at) html += metaRow('Delivered', fmtDate(w.delivered_at));
+    if (w.re)           html += metaRow('Re', w.re);
+    if (w.original_wire) html += metaRow('Re wire', w.original_wire);
+    html += '</table>';
+
+    // Body
+    const bodyText = (w.body || '').trim();
+    html += '<div class="wire-body' + (bodyText ? '' : ' empty') + '">'
+      + (bodyText ? esc(bodyText) : '(no body)') + '</div>';
+
+    // Status timeline
+    if (w.status_transitions && w.status_transitions.length > 0) {
+      html += '<div><div class="section-label" style="margin-bottom:6px">Timeline</div><div class="timeline">';
+      for (const t of w.status_transitions) {
+        html += '<div class="timeline-item"><div class="timeline-dot"></div><div>'
+          + '<strong>' + esc(t.status) + '</strong> — ' + esc(fmtDate(t.timestamp))
+          + (t.repos && t.repos.length ? ' <span style="opacity:0.7">(' + esc(t.repos.join(', ')) + ')</span>' : '')
+          + '</div></div>';
+      }
+      html += '</div></div>';
+    }
+
+    // Push bar
+    html += '<div class="push-bar">'
       + '<button class="btn" data-push="copilot">→ Copilot</button>'
       + '<button class="btn btn-secondary" data-push="claude">→ Claude</button>'
       + '<button class="btn btn-secondary" data-push="codex">→ Codex</button>'
       + '</div>';
+
+    pane.innerHTML = html;
   }
 
-  function row(label, val) {
+  function metaRow(label, val) {
     return '<tr><td>' + esc(label) + '</td><td>' + esc(val || '—') + '</td></tr>';
+  }
+
+  function fmtDate(iso) {
+    try { return new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+    catch { return iso; }
   }
 
   function pushTo(formatted, target) {
@@ -440,6 +625,8 @@ export class TelegraphPanel {
       vscode.postMessage({ type: 'pushToTerminal', formatted, label: target });
     }
   }
+
+  // ── Compose ───────────────────────────────────────────────────────────────
 
   function toggleCompose(forceOpen) {
     const drawer = document.getElementById('composeDrawer');
@@ -470,7 +657,7 @@ export class TelegraphPanel {
   }
 
   function esc(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
   refresh();
