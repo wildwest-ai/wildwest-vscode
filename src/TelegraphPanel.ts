@@ -292,6 +292,16 @@ export class TelegraphPanel {
   .push-bar .btn { font-size: 11px; padding: 3px 8px; }
   .section-label { font-size: 11px; font-weight: 600; color: var(--vscode-descriptionForeground); text-transform: uppercase; letter-spacing: 0.05em; }
 
+  /* ── Status filter bar ── */
+  .status-filter { display: none; gap: 6px; padding: 5px 10px; border-bottom: 1px solid var(--vscode-panel-border); flex-shrink: 0; }
+  .status-filter.visible { display: flex; }
+  .sf-btn { background: none; border: 1px solid var(--vscode-panel-border); color: var(--vscode-descriptionForeground); font-size: 11px; padding: 1px 8px; border-radius: 10px; cursor: pointer; }
+  .sf-btn:hover { color: var(--vscode-foreground); }
+  .sf-btn.active { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: var(--vscode-button-background); }
+
+  /* ── Scope section headers ── */
+  .scope-header { font-size: 10px; font-weight: 700; color: var(--vscode-descriptionForeground); text-transform: uppercase; letter-spacing: 0.07em; padding: 8px 10px 3px; opacity: 0.6; }
+
   /* ── Compose drawer ── */
   .compose-drawer { border-top: 1px solid var(--vscode-panel-border); flex-shrink: 0; overflow: hidden; transition: max-height 0.2s ease; max-height: 0; }
   .compose-drawer.open { max-height: 300px; }
@@ -318,6 +328,13 @@ export class TelegraphPanel {
   <div class="tab active" data-tab="inbox">Inbox <span class="badge" id="badgeInbox">0</span></div>
   <div class="tab" data-tab="outbox">Outbox <span class="badge" id="badgeOutbox">0</span></div>
   <div class="tab" data-tab="all">All <span class="badge" id="badgeAll">0</span></div>
+</div>
+
+<div class="status-filter" id="statusFilter">
+  <button class="sf-btn active" data-status="all">All</button>
+  <button class="sf-btn" data-status="sent">Sent</button>
+  <button class="sf-btn" data-status="delivered">Delivered</button>
+  <button class="sf-btn" data-status="archived">Archived</button>
 </div>
 
 <div class="search-bar" id="searchBar">
@@ -366,9 +383,13 @@ export class TelegraphPanel {
   let actorAlias = '';
   let flatAvailable = false;
   let activeTab = 'inbox';
+  let statusFilter = 'all';
   let selectedWwuid = null;
   let pendingFormatted = '';
   let searchQuery = '';
+
+  // Show status filter on initial load (inbox is active by default)
+  document.getElementById('statusFilter').classList.add('visible');
 
   // ── Tab switching ─────────────────────────────────────────────────────────
 
@@ -377,7 +398,18 @@ export class TelegraphPanel {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
       activeTab = tab.dataset.tab;
+      const scopedTab = activeTab === 'inbox' || activeTab === 'outbox';
       document.getElementById('searchBar').classList.toggle('visible', activeTab === 'all');
+      document.getElementById('statusFilter').classList.toggle('visible', scopedTab);
+      renderList();
+    });
+  });
+
+  document.querySelectorAll('.sf-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.sf-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      statusFilter = btn.dataset.status;
       renderList();
     });
   });
@@ -472,18 +504,28 @@ export class TelegraphPanel {
 
   function refresh() { vscode.postMessage({ type: 'refresh' }); }
 
+  function wireScope(addr) {
+    const role = ((addr || '').match(/^([A-Za-z]+)/) || [])[1] || '';
+    const r = role.toUpperCase();
+    if (r === 'RA' || r === 'G') return 'territory';
+    if (r === 'CD' || r === 'ACD' || r === 'S' || r === 'M') return 'county';
+    return 'town';
+  }
+
   function currentList() {
-    if (activeTab === 'inbox')  return inboxWires;
-    if (activeTab === 'outbox') return outboxWires;
-    // All tab with optional search
-    if (!searchQuery) return allWires;
-    return allWires.filter(w =>
-      (w.subject || '').toLowerCase().includes(searchQuery) ||
-      (w.from    || '').toLowerCase().includes(searchQuery) ||
-      (w.to      || '').toLowerCase().includes(searchQuery) ||
-      (w.type    || '').toLowerCase().includes(searchQuery) ||
-      (w.body    || '').toLowerCase().includes(searchQuery)
-    );
+    if (activeTab === 'all') {
+      if (!searchQuery) return allWires;
+      return allWires.filter(w =>
+        (w.subject || '').toLowerCase().includes(searchQuery) ||
+        (w.from    || '').toLowerCase().includes(searchQuery) ||
+        (w.to      || '').toLowerCase().includes(searchQuery) ||
+        (w.type    || '').toLowerCase().includes(searchQuery) ||
+        (w.body    || '').toLowerCase().includes(searchQuery)
+      );
+    }
+    const base = activeTab === 'inbox' ? inboxWires : outboxWires;
+    if (statusFilter === 'all') return base;
+    return base.filter(w => (w.status || 'sent') === statusFilter);
   }
 
   function renderList() {
@@ -492,14 +534,30 @@ export class TelegraphPanel {
     if (list.length === 0) {
       const msg = !flatAvailable
         ? 'telegraph/flat/ not found'
-        : activeTab === 'inbox'  ? 'Inbox empty'
-        : activeTab === 'outbox' ? 'No sent wires'
+        : activeTab === 'inbox'  ? (statusFilter !== 'all' ? 'No ' + statusFilter + ' wires' : 'Inbox empty')
+        : activeTab === 'outbox' ? (statusFilter !== 'all' ? 'No ' + statusFilter + ' wires' : 'No sent wires')
         : searchQuery            ? 'No matches'
         : 'No wires';
       pane.innerHTML = '<div class="empty-list">' + esc(msg) + '</div>';
       return;
     }
-    pane.innerHTML = list.map(w => wireRow(w)).join('');
+
+    if (activeTab === 'inbox' || activeTab === 'outbox') {
+      const addrField = activeTab === 'inbox' ? 'to' : 'from';
+      const groups = { town: [], county: [], territory: [] };
+      for (const w of list) groups[wireScope(w[addrField] || '')].push(w);
+      const LABELS = { town: 'Town', county: 'County', territory: 'Territory' };
+      let html = '';
+      for (const key of ['town', 'county', 'territory']) {
+        const wires = groups[key];
+        if (!wires.length) continue;
+        html += '<div class="scope-header">' + esc(LABELS[key]) + ' · ' + wires.length + '</div>';
+        html += wires.map(w => wireRow(w)).join('');
+      }
+      pane.innerHTML = html;
+    } else {
+      pane.innerHTML = list.map(w => wireRow(w)).join('');
+    }
   }
 
   function wireRow(w) {

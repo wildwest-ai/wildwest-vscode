@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.36.6
+**Current version:** v0.36.7
 
 ---
 
 ## What's New
+
+**v0.36.7** — Telegraph Panel: status filter bar (All / Sent / Delivered / Archived) on Inbox and Outbox tabs; wires grouped by scope (Town / County / Territory) based on role prefix in `to`/`from` address. Scope determination: `RA`/`G` → Territory, `CD`/`S`/`aCD`/`M` → County, all others → Town.
 
 **v0.36.6** — Telegraph Panel inbox/outbox filter now matches on both registry alias and `wildwest.identity` role (e.g. `CD(RSn)`) — county windows with role-based `to:` addressing now see their wires. `@wildwest send` and `@wildwest ack` both updated to use `WireFactory` (`createFlatWire` + `writeFlatWire`); wire preview shows JSON; wires drop to flat/ primary + outbox secondary.
 
