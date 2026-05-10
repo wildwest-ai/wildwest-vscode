@@ -1,7 +1,7 @@
 # feat/context-sensitive-prompts — Branch Doc
 
-> **Last updated:** 2026-05-10 12:24 UTC
-> **Status:** Active
+> **Last updated:** 2026-05-10 12:32 UTC
+> **Status:** Merged
 > **Created:** 2026-05-10 — RCx
 > **Type:** feature / governance UX
 > **Owner:** RCx
@@ -36,11 +36,11 @@ Improve generated prompt suggestions so session-derived prompts are context sens
 - [x] Search can include scope lineage without falling back blindly to global prompts
 - [x] Framework-stale terminology/addressing is penalized or flagged
 - [x] Tests pass
-- [ ] PR opened
-- [ ] Release built and installed after merge
+- [x] PR opened
+- [x] Release built and installed after merge
 
 ## Notes
 
-- Current `main` is ahead of `origin/main` with release commits v0.34.2 through v0.35.2.
-- This branch intentionally starts from local `main` because the prompt-index implementation exists in that line.
+- PR #10 merged into `main` on 2026-05-10.
+- This branch intentionally started from local `main` because the prompt-index implementation existed in that line.
 - Validation: `npm test -- --runInBand` passed on 2026-05-10 (18 suites / 247 tests). Lint reports three existing warnings in unrelated files.
