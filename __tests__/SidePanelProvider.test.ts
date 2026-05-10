@@ -118,13 +118,13 @@ describe('SidePanelProvider', () => {
     };
   }
 
-  it('returns 10 root items with correct sectionIds', () => {
+  it('returns 11 root items with correct sectionIds', () => {
     const provider = new SidePanelProvider(mockMonitor);
     const roots = provider.getChildren();
-    // Structure: [scopeItem, idItem, Sessions, Utilities, Inbox, Outbox, History, Board, Receipts, hbItem]
-    expect(roots).toHaveLength(10);
+    // Structure: [scopeItem, idItem, Sessions, Utilities, Inbox, Outbox, History, Board, Receipts, hbItem, watcherItem]
+    expect(roots).toHaveLength(11);
     expect(roots.map((r) => r.sectionId)).toEqual([
-      undefined, undefined, 'sessions', 'utilities', 'inbox', 'outbox', 'history', 'board', 'receipts', undefined,
+      undefined, undefined, 'sessions', 'utilities', 'inbox', 'outbox', 'history', 'board', 'receipts', undefined, undefined,
     ]);
     provider.dispose();
   });
@@ -222,9 +222,9 @@ describe('SidePanelProvider', () => {
 
   it('heartbeat root item shows state and last beat timestamp', () => {
     const provider = new SidePanelProvider(mockMonitor);
-    // hbItem is the last root item (index 9) — a flat inline item with no sectionId
+    // hbItem is second-last; watcher state is the final root item.
     const roots = provider.getChildren();
-    const hbItem = roots[roots.length - 1] as SidePanelItem;
+    const hbItem = roots[roots.length - 2] as SidePanelItem;
     expect(hbItem.sectionId).toBeUndefined();
     expect(hbItem.label).toContain('alive');
     expect(hbItem.tooltip).toContain('2026-05-08T12:00:00.000Z');
@@ -269,11 +269,32 @@ describe('SidePanelProvider', () => {
     writeRegistry(townRoot, 'town', 'town', 'town-wwuid');
     const exportPath = path.join(tempDir, 'sessions');
     const siblingTown = path.join(tempDir, 'sibling-town');
+    const townScopeRef = { scope: 'town', wwuid: 'town-wwuid', alias: 'town', path: townRoot, signal_count: 1 };
     writeSessionIndex(exportPath, [
-      makeSession('town-path', { project_path: townRoot, turn_count: 2 }),
-      makeSession('town-descendant', { project_path: path.join(townRoot, 'packages', 'api'), turn_count: 3 }),
+      makeSession('town-path', {
+        recorder_wwuid: 'town-wwuid',
+        recorder_scope: 'town',
+        tool: 'cld',
+        scope_refs: [townScopeRef],
+        project_path: townRoot,
+        turn_count: 2,
+      }),
+      makeSession('town-descendant', {
+        recorder_wwuid: 'town-wwuid',
+        recorder_scope: 'town',
+        tool: 'ccx',
+        scope_refs: [townScopeRef],
+        project_path: path.join(townRoot, 'packages', 'api'),
+        turn_count: 3,
+      }),
       makeSession('town-wwuid', { workspace_wwuids: ['town-wwuid'], turn_count: 4 }),
-      makeSession('town-scope-ref', { scope_refs: [{ scope: 'town', wwuid: 'town-wwuid', alias: 'town', path: townRoot }], turn_count: 5 }),
+      makeSession('town-scope-ref', {
+        recorder_wwuid: 'town-wwuid',
+        recorder_scope: 'town',
+        tool: 'cpt',
+        scope_refs: [townScopeRef],
+        turn_count: 5,
+      }),
       makeSession('other-scoped-town', {
         recorder_wwuid: 'other-town-wwuid',
         recorder_scope: 'town',
@@ -317,8 +338,16 @@ describe('SidePanelProvider', () => {
 
     const exportPath = path.join(tempDir, 'sessions');
     writeSessionIndex(exportPath, [
-      makeSession('county-path', { project_path: countyRoot, turn_count: 2 }),
-      makeSession('town-path', { project_path: path.join(townA, 'src'), turn_count: 3 }),
+      makeSession('county-path', {
+        scope_refs: [{ scope: 'county', wwuid: 'county-wwuid', alias: 'county', path: countyRoot }],
+        project_path: countyRoot,
+        turn_count: 2,
+      }),
+      makeSession('town-path', {
+        scope_refs: [{ scope: 'town', wwuid: 'town-a-wwuid', alias: 'town-a', path: townA }],
+        project_path: path.join(townA, 'src'),
+        turn_count: 3,
+      }),
       makeSession('town-wwuid', { recorder_wwuid: 'town-b-wwuid', turn_count: 4 }),
       makeSession('county-wwuid', { workspace_wwuids: ['county-wwuid'], turn_count: 5 }),
       makeSession('county-scope-ref', { scope_refs: [{ scope: 'county', wwuid: 'county-wwuid', alias: 'county', path: countyRoot }], turn_count: 6 }),

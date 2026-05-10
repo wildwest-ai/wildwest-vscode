@@ -211,7 +211,7 @@ export class PacketWriter {
       `${packet.wwuid}.json`
     );
 
-    const lastTurnTimestamp = packet.turns[packet.turns.length - 1].timestamp;
+    const lastTurnTimestamp = packet.turns.reduce((max, t) => t.timestamp > max ? t.timestamp : max, packet.turns[0].timestamp);
     const firstTurnTimestamp = packet.turns[0].timestamp;
 
     let record = this.loadSessionRecord(packet.wwuid);

@@ -7,6 +7,7 @@ import {
   archiveMemo,
   readRegistryAlias,
 } from './TelegraphService';
+import { PromptIndexService } from './PromptIndexService';
 
 /**
  * @wildwest Copilot Chat participant — P7 (v0.22.0)
@@ -36,6 +37,7 @@ const CMD_CONFIRM_ACK  = 'wildwest.participant.confirmAck';
 export function registerChatParticipant(
   context: vscode.ExtensionContext,
   outputChannel: vscode.OutputChannel,
+  promptIndex?: PromptIndexService,
 ): void {
   // ── Companion commands (needed before participant so buttons work) ──────────
 
@@ -118,6 +120,9 @@ export function registerChatParticipant(
           break;
         case 'status':
           await handleStatus(wwRoot, stream);
+          break;
+        case 'prompts':
+          await handlePrompts(rawPrompt, tokens.slice(1).join(' '), promptIndex, stream);
           break;
         default:
           await handleHelp(stream);
@@ -348,6 +353,92 @@ async function handleStatus(wwRoot: string, stream: vscode.ChatResponseStream): 
   }
 }
 
+async function handlePrompts(
+  rawPrompt: string,
+  queryTokens: string,
+  promptIndex: PromptIndexService | undefined,
+  stream: vscode.ChatResponseStream,
+): Promise<void> {
+  if (!promptIndex) {
+    stream.markdown('Prompt index not available. Run **Wild West: Regenerate Prompts** from the sidebar first.');
+    return;
+  }
+
+  const index = promptIndex.getIndex();
+  if (!index) {
+    stream.markdown('Prompt index not built yet. Run **Wild West: Regenerate Prompts** from the sidebar.');
+    return;
+  }
+
+  // `@wildwest prompts` with no query → show analytics
+  // `@wildwest prompts <query>` → search
+  const query = queryTokens.trim();
+
+  if (!query) {
+    const a = index.analytics;
+    const byTool = Object.entries(a.by_tool).map(([t, n]) => `${t}: ${n}`).join(', ');
+    const byScope = Object.entries(a.by_scope).map(([s, n]) => `${s}: ${n}`).join(', ');
+    const byKind = Object.entries(a.by_kind ?? {})
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 6)
+      .map(([kind, n]) => `${kind}: ${n}`)
+      .join(', ');
+    const violations = Object.entries(a.framework_violations ?? {})
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([flag, n]) => `${flag}: ${n}`)
+      .join(', ');
+    const topAliases = Object.entries(a.by_scope_alias)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([alias, n]) => `${alias}: ${n}`)
+      .join(', ');
+
+    stream.markdown(
+      `**Prompt Index** — ${a.unique_total.toLocaleString()} unique · ${a.raw_total.toLocaleString()} raw · ${a.filtered_noise.toLocaleString()} noise filtered\n\n` +
+      `| Dimension | Breakdown |\n|---|---|\n` +
+      `| By tool | ${byTool} |\n` +
+      `| By scope | ${byScope} |\n` +
+      `| By kind | ${byKind || '—'} |\n` +
+      `| Top aliases | ${topAliases || '—'} |\n` +
+      `| Framework flags | ${violations || '—'} |\n\n` +
+      `_Use \`@wildwest prompts <query>\` to search. Use \`@wildwest prompts scope:<alias> <query>\` to filter by workspace._`,
+    );
+    return;
+  }
+
+  // Parse optional `scope:<alias>` prefix
+  let scopeAlias: string | undefined;
+  let searchQuery = query;
+  const scopeMatch = query.match(/^scope:(\S+)\s*(.*)/i);
+  if (scopeMatch) {
+    scopeAlias = scopeMatch[1];
+    searchQuery = scopeMatch[2] ?? '';
+  }
+
+  const results = promptIndex.search(searchQuery, scopeAlias, 15, {
+    includeGlobalFallback: false,
+    includeScopeLineage: true,
+  });
+  if (results.length === 0) {
+    stream.markdown(`No prompts found for **"${searchQuery}"**${scopeAlias ? ` in scope \`${scopeAlias}\`` : ''}.`);
+    return;
+  }
+
+  stream.markdown(
+    `**${results.length} prompt${results.length > 1 ? 's' : ''}** matching \`${searchQuery}\`${scopeAlias ? ` · scope \`${scopeAlias}\`` : ''}:\n\n`,
+  );
+  for (const p of results) {
+    const preview = p.content.length > 120 ? p.content.slice(0, 120) + '…' : p.content;
+    const freqTag = p.frequency > 1 ? ` · ×${p.frequency}` : '';
+    const compliance = p.framework_compliant ? 'framework-ok' : `flags: ${p.compliance_flags.join(', ')}`;
+    stream.markdown(
+      `**score ${p.score.toFixed(2)}${freqTag}** · ${p.kind} · ${compliance} · ${p.tool} · \`${p.scope_alias || p.recorder_scope}\` · ${p.last_used.slice(0, 10)}\n` +
+      `> ${preview.replace(/\n/g, ' ')}\n\n---\n\n`,
+    );
+  }
+}
+
 async function handleHelp(stream: vscode.ChatResponseStream): Promise<void> {
   stream.markdown(
     '**@wildwest** — Wild West governance\n\n' +
@@ -359,6 +450,8 @@ async function handleHelp(stream: vscode.ChatResponseStream): Promise<void> {
     '| `@wildwest telegraph check` | 4-dir sweep: inbox, outbox, history, dead-letter |\n' +
     '| `@wildwest board` | Active branches from .wildwest/board/ |\n' +
     '| `@wildwest status` | Identity, heartbeat, open memo count |\n' +
+    '| `@wildwest prompts` | Prompt index analytics |\n' +
+    '| `@wildwest prompts <query>` | Search past prompts; supports `scope:<alias>` prefix |\n' +
     '| `@wildwest help` | Show this help |\n',
   );
 }
@@ -410,5 +503,3 @@ function findCountyRootFromWwDir(wwRoot: string): string | null {
   }
   return null;
 }
-
-

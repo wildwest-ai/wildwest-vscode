@@ -14,6 +14,7 @@ export class SessionExporter {
   private vscodeStoragePath: string;
   private exportPath: string;
   private onWatchingChanged: ((isWatching: boolean) => void) | null = null;
+  private onPipelineActivity: (() => void) | null = null;
   private isWatching: boolean = false;
   private outputChannel: vscode.OutputChannel;
   private exportedFiles: Set<string> = new Set();
@@ -554,8 +555,10 @@ export class SessionExporter {
     }
 
     const inferredLastMessageDate = this.inferSessionLastMessageDate(session);
-    if (typeof session.lastMessageDate !== 'number' && inferredLastMessageDate !== null) {
-      session.lastMessageDate = inferredLastMessageDate;
+    if (inferredLastMessageDate !== null) {
+      // Always update to max — Copilot sets lastMessageDate at creation and never updates it via patches
+      const existing = typeof session.lastMessageDate === 'number' ? session.lastMessageDate : 0;
+      session.lastMessageDate = Math.max(existing, inferredLastMessageDate);
     }
 
     if (typeof session.creationDate !== 'number' && inferredLastMessageDate !== null) {
@@ -911,7 +914,9 @@ export class SessionExporter {
         
         // Process new sessions through pipeline (emit packets)
         if (this.pipelineAdapter) {
-          this.pipelineAdapter.processRawSessions().catch((err) => {
+          this.pipelineAdapter.processRawSessions().then(() => {
+            this.onPipelineActivity?.();
+          }).catch((err) => {
             this.log(`${this.getTimestamp('warn')} Pipeline processing error: ${err}`);
           });
         }
@@ -1430,6 +1435,11 @@ export class SessionExporter {
   /** Register a callback to be notified when the watcher starts or stops. */
   setWatchingCallback(cb: (isWatching: boolean) => void): void {
     this.onWatchingChanged = cb;
+  }
+
+  /** Register a callback fired after each successful pipeline activity cycle. */
+  setPipelineActivityCallback(cb: () => void): void {
+    this.onPipelineActivity = cb;
   }
 
   async showMenu(): Promise<void> {

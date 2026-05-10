@@ -2,11 +2,23 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.34.0
+**Current version:** v0.36.0
 
 ---
 
 ## What's New
+
+**v0.36.0** — Prompt index suggestions are now context-sensitive: predictive entries are schema v3 with prompt kind, reusable score, scope lineage, framework compliance flags, and stricter scoped search. Completion and telegraph prompt suggestions suppress terminal output, bare continuation commands, and authorization snippets; `@wildwest prompts` now reports kind and framework flag breakdowns. Tests updated for registry v3 `identities`, current side-panel roots, and additive multi-workspace CPT attribution.
+
+**v0.35.2** — Prompt raw.json is now incremental: if raw.json exists, only sessions with `last_turn_at` newer than `raw.json.updated_at` are scanned and merged in (new prompts prepended, existing ids skipped). Full scan only on first run. index.json always rebuilt from full raw.json.
+
+**v0.35.1** — Prompt index two-stage pipeline: raw scan → `raw.json` (6,871 entries), then dedup + noise filter + score → `index.json` (4,871 unique). Score = 50% frequency + 35% recency + 15% length. Noise filters: `<tag>`, continuation headers, compaction notices, `[Request interrupted]`, tool output headers. MIN_CHAR raised to 20. Schema v2 adds `frequency`, `score`, `last_used`, `first_used`, `occurrences` per entry.
+
+**v0.35.0** — Prompt index: scans all session turns and builds `sessions/reneyap/prompts/index.json` (6,869 prompts across cld/cpt/ccx, tagged by tool + recorder_scope + scope_alias). IntelliSense surfaces: "Regenerate Prompts" in wwSidebar Utilities (shows count); `@wildwest prompts` for analytics + search (supports `scope:<alias>` filter); prompt autocomplete dropdown in Telegraph compose drawer body field; VSCode completion provider for `.md` files. Throttled auto-rebuild on pipeline activity.
+
+**v0.34.2** — Fix `last_turn_at` staying stale on continued CPT sessions: `normalizeCopilotSession` now uses `max(existing, inferred)` for `lastMessageDate` (Copilot sets it at creation and never updates via patches); `packetWriter` now uses `max(turn.timestamp)` across packet turns instead of last turn's timestamp. Sort: Updated in the sidebar now correctly moves continued sessions to Today.
+
+**v0.34.1** — Fix CPT `.jsonl` session parsing: handle both `kind=0` envelope and direct session object at root; add `kind=None` text fragment capture. Prevents empty session export for new Copilot `.jsonl` format.
 
 **v0.34.0** — Telegraph Panel: `wildwest.openTelegraphPanel` opens a webview panel with inbox/outbox list, rendered memo view, compose drawer (To/Type/Subject/Body → Send), and push buttons [→ Copilot] [→ Claude] [→ Codex] that inject formatted memo content into the target chat input.
 

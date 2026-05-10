@@ -23,7 +23,7 @@ describe('validateRegistryData', () => {
     scope: 'town',
     remote: 'https://github.com/wildwest-ai/wildwest-vscode',
     mcp: null,
-    actors: [{ role: 'TM', identity: 'RHk', channel: 'main' }],
+    identities: [{ role: 'TM', dyad: 'RHk' }],
   };
 
   it('passes a fully valid registry', () => {
@@ -131,38 +131,38 @@ describe('validateRegistryData', () => {
     expect(result.valid).toBe(true);
   });
 
-  // ── actors ───────────────────────────────────────────────────────────────
+  // ── identities ───────────────────────────────────────────────────────────
 
-  it('errors when actors is not an array', () => {
-    const result = validateRegistryData({ ...valid, actors: 'bad' });
+  it('errors when identities is not an array', () => {
+    const result = validateRegistryData({ ...valid, identities: 'bad' });
     expect(result.valid).toBe(false);
-    expect(result.issues).toContainEqual(expect.objectContaining({ field: 'actors', severity: 'error' }));
+    expect(result.issues).toContainEqual(expect.objectContaining({ field: 'identities', severity: 'error' }));
   });
 
   it('errors when identity entry is missing required fields', () => {
-    const result = validateRegistryData({ ...valid, actors: [{ role: 'TM' }] });
+    const result = validateRegistryData({ ...valid, identities: [{ role: 'TM' }] });
     expect(result.valid).toBe(false);
-    expect(result.issues.some((i) => i.field.startsWith('actors[0]') && i.severity === 'error')).toBe(true);
+    expect(result.issues.some((i) => i.field.startsWith('identities[0]') && i.severity === 'error')).toBe(true);
   });
 
   it('warns when identity role is invalid for scope', () => {
-    // scope=town, valid roles: Mayor, TM, HG — "CD" is county-only
-    const result = validateRegistryData({ ...valid, scope: 'town', actors: [{ role: 'CD', identity: 'RSn', channel: 'main' }] });
+    // scope=town, valid roles: M, TM, DM, HG — "CD" is county-only
+    const result = validateRegistryData({ ...valid, scope: 'town', identities: [{ role: 'CD', dyad: 'RSn' }] });
     expect(result.valid).toBe(true); // warn, not error
     expect(result.issues).toContainEqual(
-      expect.objectContaining({ field: 'actors[0].role', severity: 'warn' }),
+      expect.objectContaining({ field: 'identities[0].role', severity: 'warn' }),
     );
   });
 
   it('does not warn on unknown scope when checking identity roles', () => {
     // scope is invalid (already errored), but should not double-warn on role
-    const result = validateRegistryData({ ...valid, scope: 'unknown', actors: [{ role: 'X', identity: 'Y', channel: 'main' }] });
-    const roleWarn = result.issues.find((i) => i.field === 'actors[0].role' && i.severity === 'warn');
+    const result = validateRegistryData({ ...valid, scope: 'unknown', identities: [{ role: 'X', dyad: 'Y' }] });
+    const roleWarn = result.issues.find((i) => i.field === 'identities[0].role' && i.severity === 'warn');
     expect(roleWarn).toBeUndefined();
   });
 
-  it('accepts empty actors array', () => {
-    const result = validateRegistryData({ ...valid, actors: [] });
+  it('accepts empty identities array', () => {
+    const result = validateRegistryData({ ...valid, identities: [] });
     expect(result.valid).toBe(true);
     expect(result.issues).toHaveLength(0);
   });

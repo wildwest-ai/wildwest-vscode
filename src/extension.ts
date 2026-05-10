@@ -20,6 +20,8 @@ import { getDeliveryReceipts, statusIcon } from './DeliveryReceipts';
 import { getTelegraphDirs } from './TelegraphService';
 import { SessionPreviewProvider, SESSION_PREVIEW_SCHEME } from './SessionPreviewProvider';
 import { TelegraphPanel } from './TelegraphPanel';
+import { PromptIndexService } from './PromptIndexService';
+import { PromptCompletionProvider } from './PromptCompletionProvider';
 
 // ── Configuration types & helpers ──────────────────────────────────────────
 
@@ -48,6 +50,7 @@ let telegraphCommands: TelegraphCommands;
 let telegraphInbox: TelegraphInbox;
 let aiToolBridge: AIToolBridge;
 let sidePanelProvider: SidePanelProvider;
+let promptIndexService: PromptIndexService;
 let outputChannel: vscode.OutputChannel;
 
 export function activate(context: vscode.ExtensionContext) {
@@ -66,6 +69,12 @@ export function activate(context: vscode.ExtensionContext) {
   exporter.setWatchingCallback((isWatching) => {
     statusBarManager.setWatching(isWatching);
     sidePanelProvider?.setWatching(isWatching);
+  });
+  exporter.setPipelineActivityCallback(() => {
+    // Throttled rebuild — no-op if called within 60s of last build
+    promptIndexService?.buildIndex().then(() => {
+      sidePanelProvider?.refresh();
+    }).catch(() => { /* silent */ });
   });
   telegraphWatcher = new TelegraphWatcher(outputChannel, worktreeManager, heartbeatMonitor);
   soloModeController = new SoloModeController(outputChannel, worktreeManager, heartbeatMonitor);
@@ -97,9 +106,17 @@ export function activate(context: vscode.ExtensionContext) {
     }),
   );
 
+  // ── Prompt index service ──────────────────────────────────────────────────
+  promptIndexService = new PromptIndexService(exporter.getExportPath());
+  // Build index on startup if it already exists (fast path); full build deferred to command
+  if (promptIndexService.isBuilt()) {
+    promptIndexService.buildIndex().catch(() => { /* silent */ });
+  }
+
   // ── Side panel (TreeView) ─────────────────────────────────────────────────
   sidePanelProvider = new SidePanelProvider(heartbeatMonitor);
   sidePanelProvider.setExportPath(exporter.getExportPath());
+  sidePanelProvider.setPromptIndexService(promptIndexService);
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider('wildwest.sidepanel', sidePanelProvider),
     vscode.commands.registerCommand('wildwest.refreshSidePanel', () =>
@@ -109,7 +126,7 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   // ── @wildwest Copilot Chat participant (P3) ───────────────────────────────
-  registerChatParticipant(context, outputChannel);
+  registerChatParticipant(context, outputChannel, promptIndexService);
 
   // ── wwMCP server (P6) — stdio, opt-in via wildwest.mcp.enabled ───────────
   registerMCPServer(context, outputChannel, heartbeatMonitor);
@@ -121,6 +138,14 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('wildwest.exportNow', () => exporter.exportNow()),
     vscode.commands.registerCommand('wildwest.toggleSessionSortBy', () => sidePanelProvider?.toggleSessionSortBy()),
     vscode.commands.registerCommand('wildwest.rebuildIndex', () => exporter.rebuildIndex()),
+    vscode.commands.registerCommand('wildwest.buildPromptIndex', async () => {
+      vscode.window.showInformationMessage('Wild West: Building prompt index…');
+      const { total } = await promptIndexService.buildIndex(true);
+      promptIndexService.invalidateCache();
+      promptIndexService.getIndex(); // warm cache
+      sidePanelProvider?.refresh();
+      vscode.window.showInformationMessage(`Wild West: Prompt index built — ${total.toLocaleString()} prompts.`);
+    }),
     vscode.commands.registerCommand('wildwest.seedSessionMap', () => exporter.seedSessionMap()),
     vscode.commands.registerCommand('wildwest.batchConvert', () => exporter.batchConvertSessions()),
     vscode.commands.registerCommand('wildwest.convertToMarkdown', () => exporter.convertExportsToMarkdown()),
@@ -184,6 +209,15 @@ export function activate(context: vscode.ExtensionContext) {
         if (cmd) vscode.commands.executeCommand(cmd);
       }
     }),
+  );
+
+  // ── Prompt IntelliSense — completion provider for markdown files ──────────
+  context.subscriptions.push(
+    vscode.languages.registerCompletionItemProvider(
+      [{ language: 'markdown' }],
+      new PromptCompletionProvider(promptIndexService),
+      // No commit characters — user presses Tab/Enter to accept
+    ),
   );
 
   // ── Command — town/county/territory init ──────────────────────────────────
@@ -251,7 +285,7 @@ export function activate(context: vscode.ExtensionContext) {
       runDoctor(context, outputChannel, heartbeatMonitor),
     ),
     vscode.commands.registerCommand('wildwest.openTelegraphPanel', () => {
-      TelegraphPanel.open(exporter.getExportPath());
+      TelegraphPanel.open(exporter.getExportPath(), promptIndexService);
     }),
     vscode.commands.registerCommand('wildwest.showReceipts', async () => {
       const allReceipts = getTelegraphDirs().flatMap((dir) => getDeliveryReceipts(dir));
