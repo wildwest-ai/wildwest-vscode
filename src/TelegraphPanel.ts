@@ -56,10 +56,12 @@ export class TelegraphPanel {
   /**
    * True if a `to`/`from` address field belongs to this actor.
    *
-   * Handles current format: TM(alias), CD(RSn), CD(RSn).Cld
-   * Handles legacy format:  TM(dyad)[alias], CD(dyad)[RSn], TM(dyad)[*vscode]
-   * Handles glob:           TM(*vscode), TM(dyad)[*vscode]
-   * Handles bare alias:     wildwest-vscode
+   * Canonical formats only (legacy normalized by migration script):
+   *   TM(wildwest-vscode)   — role(alias)
+   *   CD(RSn)               — role(dyad)
+   *   CD(RSn).Cld           — role(dyad).channel
+   *   TM(*vscode)           — glob: alias ends with suffix
+   *   wildwest-vscode       — bare alias
    */
   private addressMatchesSelf(field: string, alias: string, identity: string): boolean {
     if (!field) return false;
@@ -71,28 +73,13 @@ export class TelegraphPanel {
     if (id && (f === id || f.startsWith(id + '.'))) return true;
 
     if (a) {
-      // Alias in parens (current): TM(wildwest-vscode)
+      // Alias in parens: TM(wildwest-vscode)
       if (f.includes('(' + a + ')')) return true;
-      // Alias in brackets (legacy): TM(dyad)[wildwest-vscode]
-      if (f.includes('[' + a + ']')) return true;
       // Glob in parens: TM(*vscode) — alias ends with suffix
-      const parenGlob = f.match(/\(\*([^)]+)\)/);
-      if (parenGlob && a.endsWith(parenGlob[1])) return true;
-      // Glob in brackets (legacy): TM(dyad)[*vscode]
-      const bracketGlob = f.match(/\[\*([^\]]+)\]/);
-      if (bracketGlob && a.endsWith(bracketGlob[1])) return true;
+      const glob = f.match(/\(\*([^)]+)\)/);
+      if (glob && a.endsWith(glob[1])) return true;
       // Bare alias as whole field
       if (f === a) return true;
-    }
-
-    // Legacy format: Role(dyad)[ActorCode] matched via identity Role(ActorCode)
-    // e.g. "CD(dyad)[RSn]" with identity "CD(RSn)"
-    if (id) {
-      const idParts = id.match(/^([a-z]+)\(([^)]+)\)/);
-      const fParts  = f.match(/^([a-z]+)\(dyad\)\[([^\]]+)\]/);
-      if (idParts && fParts && idParts[1] === fParts[1] && idParts[2] === fParts[2].split('.')[0]) {
-        return true;
-      }
     }
 
     return false;

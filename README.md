@@ -2,13 +2,15 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.36.9
+**Current version:** v0.36.10
 
 ---
 
 ## What's New
 
-**v0.36.9** — Telegraph Panel: address matching rewritten — replaces loose `includes()` with exact address parsing. Handles current `Role(alias)`, legacy `Role(dyad)[alias]`, glob `Role(*suffix)` and bracket-glob `Role(dyad)[*suffix]`. Archive action now writes `status:archived` + `status_transitions` entry directly to flat/ JSON (territory SSOT). Wire wwuid (first 8 chars) shown in list row; full wwuid shown in detail. Archive button in detail pane.
+**v0.36.10** — Address matching stripped of legacy `(dyad)[alias]` handling — migration script normalizes flat/ data; extension expects canonical format only. No behavior change post-migration.
+
+**v0.36.9** — Telegraph Panel: address matching rewritten — exact address parsing replacing loose `includes()`. Archive writes `status:archived` to flat/ JSON. Wire wwuid shown in list (8 chars) and detail (full). Archive button in detail pane.
 
 **v0.36.8** — Telegraph Panel inbox filter: status chip relabeled "New" (inbox) / "Sent" (outbox) — wires with `status:sent` in your inbox are new/unread. Match terms narrowed to alias + full identity only (no role-prefix wildcard) — town inbox no longer floods with cross-town TM wires.
 
