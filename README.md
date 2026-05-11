@@ -2,15 +2,15 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.37.8
+**Current version:** v0.37.9
 
 ---
 
 ## What's New
 
-**v0.37.8** — Bug fix: heartbeat now reconciles wires to destination scope SSOT. When delivering from town outbox to county inbox, heartbeat also creates the wire in county's `flat/` directory (SSOT). Fixes: wires invisible at destination scope in Telegraph panel because they only existed in legacy `inbox/` directory.
+**v0.37.9** — Bug fix: wire status now correctly shows as "New" at recipient scope (not "Delivered"). Heartbeat no longer sets status to "delivered" when syncing to destination flat/. Wires show as "New" in recipient inbox until read/acted upon; "Delivered" only in sender outbox.
 
-**v0.37.7** — Bug fix: heartbeat now reconciles wires to destination scope SSOT. When delivering from town outbox to county inbox, heartbeat also creates the wire in county's `flat/` directory (SSOT). Fixes: wires invisible at destination scope in Telegraph panel because they only existed in legacy `inbox/` directory.
+**v0.37.8** — Bug fix: heartbeat now reconciles wires to destination scope SSOT. When delivering from town outbox to county inbox, heartbeat also creates the wire in county's `flat/` directory (SSOT). Fixes: wires invisible at destination scope in Telegraph panel because they only existed in legacy `inbox/` directory.
 
 **v0.37.6** — Bug fix: added heartbeat debug logging and fixed TM→CD county delivery routing so pending outbox wires are correctly resolved and delivered to the parent county inbox.
 
