@@ -19,6 +19,7 @@ import { telegraphTimestamp, archiveMemo, getTelegraphDirs as wwGetTelegraphDirs
 const SKIP_RE = /^\.last-beat$|^\.gitkeep$|--heartbeat--|^ack-|--ack-/;
 const TIMESTAMPED_MEMO_RE = /^\d{8}-\d{4}Z-to-.+-from-.+--.+\.(md|json)$/;
 const LEGACY_TO_MEMO_RE = /^to-.+\.(md|json)$/;
+const UUID_WIRE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.json$/
 
 // Parse rule-23 filename: <ts>-to-<identity>-from-(.+?)--(.+)\.(md|json)
 const PARSE_MEMO_RE = /^(\d{8}-\d{4}Z)-to-(.+?)-from-(.+?)--(.+)\.(md|json)$/;
@@ -76,7 +77,7 @@ export class TelegraphInbox {
     if (!(filename.endsWith('.md') || filename.endsWith('.json'))) return false;
     if (filename.startsWith('.') || filename.startsWith('!')) return false;
     if (SKIP_RE.test(filename)) return false;
-    return TIMESTAMPED_MEMO_RE.test(filename) || LEGACY_TO_MEMO_RE.test(filename);
+    return TIMESTAMPED_MEMO_RE.test(filename) || LEGACY_TO_MEMO_RE.test(filename) || UUID_WIRE_RE.test(filename);
   }
 
   /**
@@ -217,39 +218,62 @@ export class TelegraphInbox {
       return true; // continue inbox, don't stop
     }
 
-    const ts = telegraphTimestamp();
     const reSubject = match ? `re-${match[4]}` : `re-${subject.replace(/\s+/g, '-')}`;
-    const replyFilename = `${ts}-to-${fromIdentity}-from-${toIdentity}--${reSubject}.md`;
-
     const isoNow = new Date().toISOString();
     const replyWwuid = generateWwuid('wire', toIdentity, fromIdentity, isoNow, reSubject);
-    const replyBody = [
-      `---`,
-      `wwuid: ${replyWwuid}`,
-      `from: ${toIdentity}`,
-      `to: ${fromIdentity}`,
-      `type: reply`,
-      `date: ${isoNow}`,
-      `subject: ${reSubject}`,
-      `---`,
-      ``,
-      `Ref: ${filename}`,
-      ``,
-      body,
-      ``,
-    ].join('\n');
 
     // Determine outbox path relative to telegraph dir
     const telegraphDir = path.basename(dir) === 'inbox' ? path.dirname(dir) : dir;
     const outboxDir = path.join(telegraphDir, 'outbox');
     fs.mkdirSync(outboxDir, { recursive: true });
-    fs.writeFileSync(path.join(outboxDir, replyFilename), replyBody, 'utf-8');
+
+    let outFilename: string;
+    let outContent: string;
+    if (UUID_WIRE_RE.test(filename)) {
+      // New protocol: flat wire JSON
+      outFilename = `${replyWwuid}.json`;
+      outContent = JSON.stringify({
+        schema_version: '2',
+        wwuid: replyWwuid,
+        wwuid_type: 'wire',
+        from: toIdentity,
+        to: fromIdentity,
+        type: 'reply',
+        date: isoNow,
+        subject: reSubject,
+        status: 'sent',
+        body,
+        filename: outFilename,
+        in_reply_to: filename.replace('.json', ''),
+      }, null, 2);
+    } else {
+      // Old protocol: markdown memo with timestamp filename
+      const ts = telegraphTimestamp();
+      outFilename = `${ts}-to-${fromIdentity}-from-${toIdentity}--${reSubject}.md`;
+      outContent = [
+        `---`,
+        `wwuid: ${replyWwuid}`,
+        `from: ${toIdentity}`,
+        `to: ${fromIdentity}`,
+        `type: reply`,
+        `date: ${isoNow}`,
+        `subject: ${reSubject}`,
+        `---`,
+        ``,
+        `Ref: ${filename}`,
+        ``,
+        body,
+        ``,
+      ].join('\n');
+    }
+
+    fs.writeFileSync(path.join(outboxDir, outFilename), outContent, 'utf-8');
 
     // Archive original
     archiveMemo(path.join(dir, filename), path.join(dir, 'history'));
 
-    this.outputChannel.appendLine(`[TelegraphInbox] reply queued in outbox: ${replyFilename}`);
-    vscode.window.showInformationMessage(`Wild West: reply queued — ${replyFilename}`);
+    this.outputChannel.appendLine(`[TelegraphInbox] reply queued in outbox: ${outFilename}`);
+    vscode.window.showInformationMessage(`Wild West: reply queued — ${outFilename}`);
     return true;
   }
 
@@ -314,6 +338,34 @@ export class TelegraphInbox {
         lines.push(``, status === 'blocked' ? `Blocked: ${comment}` : `Question: ${comment}`);
       }
       ackBody = lines.join('\n') + '\n';
+    } else if (UUID_WIRE_RE.test(filename)) {
+      // New protocol: flat wire JSON ack
+      let fromId = 'unknown', toId = 'unknown', subjectStr = filename.replace('.json', '');
+      try {
+        const wire = JSON.parse(fs.readFileSync(path.join(dir, filename), 'utf8')) as Record<string, unknown>;
+        fromId = (wire['from'] as string | undefined) ?? fromId;
+        toId = (wire['to'] as string | undefined) ?? toId;
+        subjectStr = (wire['subject'] as string | undefined) ?? subjectStr;
+      } catch { /* best effort */ }
+      const ackSubject = `ack-${status}--${subjectStr}`;
+      const isoAck = new Date().toISOString();
+      const ackWwuid = generateWwuid('wire', toId, fromId, isoAck, ackSubject);
+      ackFilename = `${ackWwuid}.json`;
+      ackBody = JSON.stringify({
+        schema_version: '2',
+        wwuid: ackWwuid,
+        wwuid_type: 'wire',
+        from: toId,
+        to: fromId,
+        type: `ack-${status}`,
+        date: isoAck,
+        subject: ackSubject,
+        status: 'sent',
+        body: `Ref: ${filename}\nStatus: ${status}${comment ? `\n\nNote: ${comment}` : ''}`,
+        filename: ackFilename,
+        in_reply_to: filename.replace('.json', ''),
+        ack_status: status,
+      }, null, 2);
     } else {
       // Filename doesn't match expected pattern — write a best-effort ack
       ackFilename = `${ts}-ack-${status}--${filename}`;

@@ -195,30 +195,6 @@ function updateFlatWireDeliveryStatus(worldRoot: string, memoPath: string, memoF
   const targetPath = path.join(flatDir, memoFile);
   if (fs.existsSync(targetPath)) {
     wirePath = targetPath;
-  } else {
-    // Fall back to locate the wire by wwuid or filename inside flat/.
-    const candidates = fs.readdirSync(flatDir).filter((f) => f.endsWith('.json'));
-    let currentMemo: Record<string, unknown> | null = null;
-    try {
-      currentMemo = JSON.parse(fs.readFileSync(memoPath, 'utf8')) as Record<string, unknown>;
-    } catch {
-      currentMemo = null;
-    }
-    const targetWwuid = currentMemo?.['wwuid'] as string | undefined;
-    const targetFilename = currentMemo?.['filename'] as string | undefined || memoFile;
-
-    for (const candidate of candidates) {
-      const candidatePath = path.join(flatDir, candidate);
-      try {
-        const candidateWire = JSON.parse(fs.readFileSync(candidatePath, 'utf8')) as Record<string, unknown>;
-        if (candidate === memoFile || candidateWire['wwuid'] === targetWwuid || candidateWire['filename'] === targetFilename) {
-          wirePath = candidatePath;
-          break;
-        }
-      } catch {
-        continue;
-      }
-    }
   }
 
   if (!wirePath) {

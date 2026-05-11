@@ -5,12 +5,16 @@ import { FlatWire, createFlatWire, writeFlatWire, writeDraftWire, parseFilenameA
 import { readRegistryAlias } from './TelegraphService';
 import { PromptIndexService } from './PromptIndexService';
 
+/** New protocol: wire files are always {wwuid}.json */
+const UUID_FILE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.json$/;
+
 export class TelegraphPanel {
   static readonly viewType = 'wildwest.telegraphPanel';
   private static instance: TelegraphPanel | undefined;
 
   private readonly panel: vscode.WebviewPanel;
   private disposables: vscode.Disposable[] = [];
+  private static outputChannel = vscode.window.createOutputChannel('Wild West Telegraph');
 
   static open(exportPath: string, promptIndex?: PromptIndexService): void {
     if (TelegraphPanel.instance) {
@@ -110,6 +114,15 @@ export class TelegraphPanel {
    * - Local .wildwest/telegraph/flat/ holds draft/pending wires (sender's local PO) only.
    *   These are merged in for Outbox view; territory wins on any wwuid conflict.
    */
+  /**
+   * Find the actual file path for a wire by wwuid in a given directory.
+   * New protocol: wire files are always named {wwuid}.json.
+   */
+  private findWireFilePath(wwuid: string, dir: string): string | null {
+    const p = path.join(dir, `${wwuid}.json`);
+    return fs.existsSync(p) ? p : null;
+  }
+
   private readAllFlatWires(): FlatWire[] {
     const territoryDir = this.getFlatDir();
     const wsDir = this.getWorkspaceFlatDir();
@@ -121,7 +134,7 @@ export class TelegraphPanel {
       let entries: string[];
       try { entries = fs.readdirSync(territoryDir); } catch { entries = []; }
       for (const f of entries) {
-        if (!f.endsWith('.json') || f.startsWith('.')) continue;
+        if (!f.endsWith('.json') || f.startsWith('.') || !UUID_FILE_RE.test(f)) continue;
         try {
           const wire = JSON.parse(fs.readFileSync(path.join(territoryDir, f), 'utf8')) as FlatWire;
           if (!wire.from || !wire.to) {
@@ -140,7 +153,7 @@ export class TelegraphPanel {
       let entries: string[];
       try { entries = fs.readdirSync(wsDir); } catch { entries = []; }
       for (const f of entries) {
-        if (!f.endsWith('.json') || f.startsWith('.')) continue;
+        if (!f.endsWith('.json') || f.startsWith('.') || !UUID_FILE_RE.test(f)) continue;
         try {
           const wire = JSON.parse(fs.readFileSync(path.join(wsDir, f), 'utf8')) as FlatWire;
           if (!wire.from || !wire.to) {
@@ -190,7 +203,12 @@ export class TelegraphPanel {
 
   // ── Inbound from webview ──────────────────────────────────────────────────
 
+  private log(msg: string): void {
+    TelegraphPanel.outputChannel.appendLine(`[TelegraphPanel ${new Date().toISOString()}] ${msg}`);
+  }
+
   private async onMessage(msg: Record<string, unknown>): Promise<void> {
+    this.log(`onMessage: type=${msg['type']} wwuid=${msg['wwuid'] ?? ''} wwuids=${JSON.stringify(msg['wwuids'] ?? '')} status=${msg['status'] ?? ''}`);
     switch (msg['type']) {
       case 'refresh':
         this.sendWires();
@@ -268,7 +286,8 @@ export class TelegraphPanel {
   private handleBulkStatus(wwuids: string[], status: string): void {
     const flatDir = this.getFlatDir();
     const wsDir = this.getWorkspaceFlatDir();
-    if (!wwuids?.length || !status) return;
+    this.log(`handleBulkStatus: wwuids=${JSON.stringify(wwuids)} status=${status} flatDir=${flatDir} wsDir=${wsDir}`);
+    if (!wwuids?.length || !status) { this.log('handleBulkStatus: early exit — no wwuids or status'); return; }
     // Archive uses overlay pattern — delegate to handleArchiveWire per wire
     if (status === 'archived') {
       for (const wwuid of wwuids) this.handleArchiveWire(wwuid);
@@ -284,8 +303,8 @@ export class TelegraphPanel {
       const dirs = flatDir ? [flatDir] : [];
       if (wsDir) dirs.push(wsDir);
       for (const dir of dirs) {
-        const filePath = path.join(dir, `${wwuid}.json`);
-        if (!fs.existsSync(filePath)) continue;
+        const filePath = this.findWireFilePath(wwuid, dir);
+        if (!filePath) continue;
         try {
           const wire = JSON.parse(fs.readFileSync(filePath, 'utf8')) as FlatWire;
           wire.status = status;
@@ -331,18 +350,20 @@ export class TelegraphPanel {
   private handleMarkRead(wwuid: string): void {
     const flatDir = this.getFlatDir();
     const wsDir = this.getWorkspaceFlatDir();
-    if (!wwuid) return;
+    this.log(`handleMarkRead: wwuid=${wwuid} flatDir=${flatDir} wsDir=${wsDir}`);
+    if (!wwuid) { this.log('handleMarkRead: early exit — no wwuid'); return; }
     // Try territory first (authoritative), fall back to workspace local
     const dirs: string[] = [];
     if (flatDir) dirs.push(flatDir);
     if (wsDir) dirs.push(wsDir);
     const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
     for (const dir of dirs) {
-      const filePath = path.join(dir, `${wwuid}.json`);
-      if (!fs.existsSync(filePath)) continue;
+      const filePath = this.findWireFilePath(wwuid, dir);
+      this.log(`handleMarkRead: checking ${dir} → ${filePath ?? 'not found'}`);
+      if (!filePath) continue;
       try {
         const wire = JSON.parse(fs.readFileSync(filePath, 'utf8')) as FlatWire;
-        if (wire.status === 'read') return; // already read
+        if (wire.status === 'read') { this.log('handleMarkRead: already read, skip'); return; }
         wire.status = 'read';
         wire.read_at = isoNow;
         wire.status_transitions = [
@@ -350,18 +371,22 @@ export class TelegraphPanel {
           { status: 'read', timestamp: isoNow, repos: ['vscode'] },
         ];
         fs.writeFileSync(filePath, JSON.stringify(wire, null, 2), 'utf8');
+        this.log(`handleMarkRead: wrote read status to ${filePath}`);
         this.sendWires();
-      } catch { /* skip */ }
-      break;
+      } catch (err) { this.log(`handleMarkRead: error ${err}`); }
+      return;
     }
+    this.log(`handleMarkRead: no file found in dirs=${JSON.stringify(dirs)}`);
   }
 
   private handleArchiveWire(wwuid: string): void {
     const flatDir = this.getFlatDir();
     const wsDir = this.getWorkspaceFlatDir();
-    if (!wwuid) return;
+    this.log(`handleArchiveWire: wwuid=${wwuid} flatDir=${flatDir} wsDir=${wsDir}`);
+    if (!wwuid) { this.log('handleArchiveWire: early exit — no wwuid'); return; }
     const alias = this.getActorAlias();
     const identity = vscode.workspace.getConfiguration('wildwest').get<string>('identity') ?? '';
+    this.log(`handleArchiveWire: alias=${alias} identity=${identity}`);
     const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
     // Archive is a local per-actor view action — writes overlay field to local copy only.
@@ -370,16 +395,20 @@ export class TelegraphPanel {
       vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '', '.wildwest', 'telegraph', 'flat'
     ) : null);
     if (!localDir) {
+      this.log(`handleArchiveWire: ERROR — no local or territory dir found`);
       console.error('Wild West: handleArchiveWire — no local or territory dir found', wwuid);
       return;
     }
 
     // Determine which overlay field to set based on sender vs recipient
+    // Use findWireFilePath to handle both UUID-named and legacy timestamp-named files
+    const sourcePath = this.findWireFilePath(wwuid, localDir)
+      ?? (flatDir ? this.findWireFilePath(wwuid, flatDir) : null);
     const localPath = path.join(localDir, `${wwuid}.json`);
-    const territoryPath = flatDir ? path.join(flatDir, `${wwuid}.json`) : null;
-    const sourcePath = fs.existsSync(localPath) ? localPath : (territoryPath && fs.existsSync(territoryPath) ? territoryPath : null);
+    this.log(`handleArchiveWire: localDir=${localDir} sourcePath=${sourcePath}`);
     if (!sourcePath) {
-      console.error('Wild West: handleArchiveWire — wire not found in local or territory', { wwuid, localPath, territoryPath });
+      this.log(`handleArchiveWire: ERROR — wire not found in local or territory`);
+      console.error('Wild West: handleArchiveWire — wire not found in local or territory', { wwuid, localDir, flatDir });
       return;
     }
 
@@ -387,6 +416,7 @@ export class TelegraphPanel {
       const wire = JSON.parse(fs.readFileSync(sourcePath, 'utf8')) as FlatWire;
       const isSender = this.addressMatchesSelf(wire.from ?? '', alias, identity);
       const overlayField = isSender ? 'sender_archived_at' : 'recipient_archived_at';
+      this.log(`handleArchiveWire: wire.from=${wire.from} wire.to=${wire.to} isSender=${isSender} overlayField=${overlayField}`);
 
       // Write overlay to local flat/ (not territory)
       fs.mkdirSync(localDir, { recursive: true });
@@ -400,9 +430,10 @@ export class TelegraphPanel {
       // If both parties have now archived (overlay fields both set), promote territory to archived
       const bothArchived =
         localWire['sender_archived_at'] && localWire['recipient_archived_at'];
-      if (bothArchived && territoryPath && fs.existsSync(territoryPath)) {
+      const territoryFilePath = flatDir ? this.findWireFilePath(wwuid, flatDir) : null;
+      if (bothArchived && territoryFilePath) {
         try {
-          const tw = JSON.parse(fs.readFileSync(territoryPath, 'utf8')) as Record<string, unknown>;
+          const tw = JSON.parse(fs.readFileSync(territoryFilePath, 'utf8')) as Record<string, unknown>;
           tw['status'] = 'archived';
           tw['sender_archived_at'] = localWire['sender_archived_at'];
           tw['recipient_archived_at'] = localWire['recipient_archived_at'];
@@ -410,8 +441,8 @@ export class TelegraphPanel {
             ...((tw['status_transitions'] as unknown[]) ?? []),
             { status: 'archived', timestamp: isoNow, repos: ['vscode'] },
           ];
-          fs.writeFileSync(territoryPath, JSON.stringify(tw, null, 2), 'utf8');
-          console.log('Wild West: promoted archive to territory', { wwuid, path: territoryPath });
+          fs.writeFileSync(territoryFilePath, JSON.stringify(tw, null, 2), 'utf8');
+          this.log(`handleArchiveWire: promoted archive to territory ${territoryFilePath}`);
         } catch (err) { console.error('Wild West: territory promotion failed', err); }
       }
 

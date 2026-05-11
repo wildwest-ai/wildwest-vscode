@@ -178,15 +178,12 @@ export class TelegraphCommands {
       }) || '';
     }
 
-    // Build ack filename: YYYYMMDD-HHMMZ-to-<FromActor>-from-<ToActor>--ack-<status>--<subject>.json
-    const timestamp = this.getTimestamp();
     const isoTimestamp = this.getISO8601Timestamp();
-    const ackFileName = `${timestamp}-to-${fromActor}-from-${toActor}--ack-${status}--${subject}.json`;
+    const wwuid = generateWwuid('wire', toActor, fromActor, isoTimestamp, `ack-${status}--${subject}`);
+    const ackFileName = `${wwuid}.json`;
     const outboxDir = path.join(telegraphDir, 'outbox');
     fs.mkdirSync(outboxDir, { recursive: true });
     const ackPath = path.join(outboxDir, ackFileName);
-
-    const wwuid = generateWwuid('wire', toActor, fromActor, isoTimestamp, `ack-${status}--${subject}`);
 
     let body = '';
     if (status === 'question') {
@@ -312,17 +309,14 @@ export class TelegraphCommands {
     const role = roleMatch ? roleMatch[1] : 'TM';
     const fromActor = alias ? `${role}(${alias})` : (identitySetting || 'TM');
 
-    // Build filename: YYYYMMDD-HHMMZ-to-<ToActor>-from-<FromActor>--<subject>.json
-    const timestamp = this.getTimestamp();
     const isoTimestamp = this.getISO8601Timestamp();
-    const fileName = `${timestamp}-to-${toActor}-from-${fromActor}--${subject}.json`;
+    const wwuid = generateWwuid('wire', fromActor, toActor, isoTimestamp, subject);
+    const fileName = `${wwuid}.json`;
 
     // Write to outbox/
     const outboxDir = path.join(telegraphDir, 'outbox');
     fs.mkdirSync(outboxDir, { recursive: true });
     const filePath = path.join(outboxDir, fileName);
-
-    const wwuid = generateWwuid('wire', fromActor, toActor, isoTimestamp, subject);
 
     // Extract body (remove the template line)
     const cleanBody = body.split('\n')
