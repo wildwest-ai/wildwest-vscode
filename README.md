@@ -2,7 +2,7 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.37.10
+**Current version:** v0.37.11
 
 ---
 
