@@ -343,13 +343,19 @@ export class TelegraphPanel {
     const localDir = wsDir ?? (flatDir ? path.join(
       vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '', '.wildwest', 'telegraph', 'flat'
     ) : null);
-    if (!localDir) return;
+    if (!localDir) {
+      console.error('Wild West: handleArchiveWire — no local or territory dir found', wwuid);
+      return;
+    }
 
     // Determine which overlay field to set based on sender vs recipient
     const localPath = path.join(localDir, `${wwuid}.json`);
     const territoryPath = flatDir ? path.join(flatDir, `${wwuid}.json`) : null;
     const sourcePath = fs.existsSync(localPath) ? localPath : (territoryPath && fs.existsSync(territoryPath) ? territoryPath : null);
-    if (!sourcePath) return;
+    if (!sourcePath) {
+      console.error('Wild West: handleArchiveWire — wire not found in local or territory', { wwuid, localPath, territoryPath });
+      return;
+    }
 
     try {
       const wire = JSON.parse(fs.readFileSync(sourcePath, 'utf8')) as FlatWire;
@@ -363,6 +369,7 @@ export class TelegraphPanel {
         : { ...wire } as Record<string, unknown>;
       localWire[overlayField] = isoNow;
       fs.writeFileSync(localPath, JSON.stringify(localWire, null, 2), 'utf8');
+      console.log('Wild West: archived wire locally', { wwuid, overlayField, path: localPath });
 
       // If both parties have now archived (overlay fields both set), promote territory to archived
       const bothArchived =
@@ -378,11 +385,14 @@ export class TelegraphPanel {
             { status: 'archived', timestamp: isoNow, repos: ['vscode'] },
           ];
           fs.writeFileSync(territoryPath, JSON.stringify(tw, null, 2), 'utf8');
-        } catch { /* skip territory promotion on error */ }
+          console.log('Wild West: promoted archive to territory', { wwuid, path: territoryPath });
+        } catch (err) { console.error('Wild West: territory promotion failed', err); }
       }
 
       this.sendWires();
-    } catch { /* skip */ }
+    } catch (err) {
+      console.error('Wild West: handleArchiveWire error', err);
+    }
   }
 
   private async pushToCopilot(formatted: string): Promise<void> {
@@ -609,11 +619,12 @@ export class TelegraphPanel {
   let actorAlias = '';
   let flatAvailable = false;
   let activeTab = 'inbox';
-  let statusFilter = 'sent';   // default: New for inbox
+  let statusFilter = null;   // will be initialized to first chip's status
   let selectedWwuid = null;
   let pendingFormatted = '';
   let searchQuery = '';
   let selectedWwuids = new Set();
+  let tabStatusFilters = {};   // persist statusFilter per tab
 
   const CHIP_CONFIG = {
     inbox:  [
@@ -633,6 +644,16 @@ export class TelegraphPanel {
     ],
   };
 
+  // Initialize statusFilter to first chip's status for current tab
+  function initStatusFilter(tab) {
+    if (!tabStatusFilters[tab]) {
+      const chips = CHIP_CONFIG[tab] || [];
+      tabStatusFilters[tab] = chips.length > 0 ? chips[0].status : 'all';
+    }
+    return tabStatusFilters[tab];
+  }
+  statusFilter = initStatusFilter('inbox');
+
   // ── Chip rendering ────────────────────────────────────────────────────────
 
   function renderChips(tab) {
@@ -646,6 +667,7 @@ export class TelegraphPanel {
         bar.querySelectorAll('.sf-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         statusFilter = btn.dataset.status;
+        tabStatusFilters[activeTab] = statusFilter;   // persist for this tab
         clearSelection();
         renderList();
       });
@@ -660,9 +682,8 @@ export class TelegraphPanel {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
       activeTab = tab.dataset.tab;
-      // Reset to first chip for the new tab
-      const chips = CHIP_CONFIG[activeTab];
-      statusFilter = chips ? chips[0].status : 'all';
+      // Restore or initialize statusFilter for the tab
+      statusFilter = initStatusFilter(activeTab);
       document.getElementById('searchBar').classList.toggle('visible', activeTab === 'all');
       clearSelection();
       renderChips(activeTab);
@@ -741,6 +762,12 @@ export class TelegraphPanel {
     if (markReadBtn) { vscode.postMessage({ type: 'markRead', wwuid: markReadBtn.dataset.markRead }); return; }
     const archiveBtn = e.target.closest('[data-archive]');
     if (archiveBtn) { vscode.postMessage({ type: 'archive', wwuid: archiveBtn.dataset.archive }); return; }
+    const replyBtn = e.target.closest('[data-reply]');
+    if (replyBtn) {
+      const ww = [...inboxWires, ...outboxWires, ...allWires].find(x => x.wwuid === replyBtn.dataset.reply);
+      if (ww) handleReply(ww);
+      return;
+    }
     const sendDraftBtn = e.target.closest('[data-send-draft]');
     if (sendDraftBtn) { vscode.postMessage({ type: 'sendDraft', wwuid: sendDraftBtn.dataset.sendDraft }); }
   });
@@ -947,6 +974,7 @@ export class TelegraphPanel {
       + '<button class="btn btn-secondary" data-push="codex">→ Codex</button>'
       + (status === 'draft' ? '<button class="btn" data-send-draft="' + esc(w.wwuid) + '">Send</button>' : '')
       + (isInboxWire && (status === 'received' || status === 'delivered') ? '<button class="btn" data-mark-read="' + esc(w.wwuid) + '">Mark Read</button>' : '')
+      + (isInboxWire && (status === 'received' || status === 'delivered' || status === 'read') ? '<button class="btn" data-reply="' + esc(w.wwuid) + '">↻ Reply</button>' : '')
       + (status !== 'archived' ? '<button class="btn btn-secondary" data-archive="' + esc(w.wwuid) + '">Archive</button>' : '')
       + '</div>';
 
@@ -1002,6 +1030,25 @@ export class TelegraphPanel {
 
   function esc(s) {
     return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function handleReply(wire) {
+    // Swap sender/recipient for reply
+    const replyTo = wire.from;
+    const originalSubject = wire.subject || 'untitled';
+    const reSubject = originalSubject.startsWith('re:') ? originalSubject : 're: ' + originalSubject;
+
+    // Open compose drawer with reply fields pre-filled
+    document.getElementById('cTo').value = replyTo;
+    document.getElementById('cSubject').value = reSubject;
+    document.getElementById('cBody').value = '';
+    document.getElementById('cType').value = 'status-update';
+    document.getElementById('composeError').textContent = '';
+    toggleCompose(true);
+    document.getElementById('cBody').focus();
+
+    // Store reply metadata for sending
+    window.replyToWwuid = wire.wwuid;
   }
 
   refresh();
