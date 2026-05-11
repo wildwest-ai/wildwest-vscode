@@ -162,17 +162,21 @@ function updateDestinationFlatWire(
       wire['wwuid'] = wwuid;
     }
 
-    // Update wire status to delivered
-    wire['status'] = 'delivered';
-    wire['delivered_at'] = wire['delivered_at'] || new Date().toISOString();
-    const transitions = Array.isArray(wire['status_transitions']) ? wire['status_transitions'] as Array<Record<string, unknown>> : [];
-    transitions.push({ status: 'delivered', timestamp: wire['delivered_at'], repos: ['vscode'] });
-    wire['status_transitions'] = transitions;
+    // DO NOT change status to "delivered" at destination scope.
+    // Wire status should remain "sent" so it appears as "New" in recipient's Inbox.
+    // Recipient will mark as read/acted-upon separately.
+    // Only track arrival in received_at timestamp (separate from delivered_at which is sender-side).
+    wire['received_at'] = wire['received_at'] || new Date().toISOString();
+    // Preserve current status (typically "sent" at this point) - don't promote to "delivered"
+    if (wire['status'] === 'delivered') {
+      // If somehow it came through as delivered, reset to "sent" for recipient view
+      wire['status'] = 'sent';
+    }
 
     // Write to destination flat/ using wwuid as filename
     const destWirePath = path.join(destFlatDir, `${wwuid}.json`);
     fs.writeFileSync(destWirePath, JSON.stringify(wire, null, 2), 'utf8');
-    outputChannel.appendLine(`[HeartbeatMonitor] destination flat wire created: ${destPath}/.wildwest/telegraph/flat/${wwuid}.json`);
+    outputChannel.appendLine(`[HeartbeatMonitor] destination flat wire received: ${destPath}/.wildwest/telegraph/flat/${wwuid}.json (status: ${wire['status']})`);
   } catch (err) {
     outputChannel.appendLine(`[HeartbeatMonitor] failed to update destination flat wire: ${err}`);
   }

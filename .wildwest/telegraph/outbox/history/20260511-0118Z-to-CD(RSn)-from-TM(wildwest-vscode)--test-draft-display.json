@@ -1,0 +1,30 @@
+{
+  "schema_version": "2",
+  "wwuid": "wire-new-draft-20260511-0118Z",
+  "wwuid_type": "wire",
+  "from": "TM(wildwest-vscode)",
+  "to": "CD(RSn)",
+  "type": "status-update",
+  "date": "2026-05-11T01:18:03Z",
+  "subject": "test-draft-display",
+  "status": "delivered",
+  "body": "New test draft wire. Should appear in Telegraph panel Inbox>Draft tab.",
+  "filename": "20260511-0118Z-to-CD(RSn)-from-TM(wildwest-vscode)--test-draft-display.json",
+  "status_transitions": [
+    {
+      "status": "draft",
+      "timestamp": "2026-05-11T01:18:03Z",
+      "repos": [
+        "vscode"
+      ]
+    },
+    {
+      "status": "pending",
+      "timestamp": "2026-05-11T01:19:40Z",
+      "repos": [
+        "vscode"
+      ]
+    }
+  ],
+  "delivered_at": "2026-05-11T01:19:40.600Z"
+}
