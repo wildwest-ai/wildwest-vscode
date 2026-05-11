@@ -1,0 +1,30 @@
+{
+  "schema_version": "2",
+  "wwuid": "wire-v0.37.12-read-label-20260511-0235Z",
+  "wwuid_type": "wire",
+  "from": "TM(wildwest-vscode)",
+  "to": "CD(RSn)",
+  "type": "status-update",
+  "date": "2026-05-11T02:35:48Z",
+  "subject": "v0.37.12-inbox-read-label",
+  "status": "delivered",
+  "body": "v0.37.12 released. Fix: Inbox tab now shows 'Read' instead of 'Delivered' for wires with status:delivered. Clearer recipient-side semantics — 'New' means unread, 'Read' means seen/acknowledged, 'Archived' means dismissed. Outbox still shows 'Delivered' (correct from sender perspective).",
+  "filename": "20260511-0235Z-to-CD(RSn)-from-TM(wildwest-vscode)--v0.37.12-inbox-read-label.json",
+  "status_transitions": [
+    {
+      "status": "draft",
+      "timestamp": "2026-05-11T02:35:48Z",
+      "repos": [
+        "vscode"
+      ]
+    },
+    {
+      "status": "pending",
+      "timestamp": "2026-05-11T02:36:15Z",
+      "repos": [
+        "vscode"
+      ]
+    }
+  ],
+  "delivered_at": "2026-05-11T02:36:16.056Z"
+}

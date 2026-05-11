@@ -48,6 +48,18 @@ export class TelegraphPanel {
     return fs.existsSync(flatDir) ? flatDir : null;
   }
 
+  /**
+   * Returns the workspace-local flat/ directory, which HeartbeatMonitor writes
+   * delivered wires into with status 'sent' (recipient perspective).
+   * Different from the territory flat/ which holds the sender's 'delivered' view.
+   */
+  private getWorkspaceFlatDir(): string | null {
+    const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+    if (!wsPath) return null;
+    const dir = path.join(wsPath, '.wildwest', 'telegraph', 'flat');
+    return fs.existsSync(dir) ? dir : null;
+  }
+
   private getActorAlias(): string {
     const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
     return readRegistryAlias(path.join(wsPath, '.wildwest')) ?? '';
@@ -88,32 +100,36 @@ export class TelegraphPanel {
   // ── Read flat/ wires ──────────────────────────────────────────────────────
 
   private readAllFlatWires(): FlatWire[] {
-    const flatDir = this.getFlatDir();
-    if (!flatDir) return [];
+    const territoryDir = this.getFlatDir();     // ~/wildwest/telegraph/flat/ — sender view (delivered)
+    const wsDir = this.getWorkspaceFlatDir();   // <ws>/.wildwest/telegraph/flat/ — recipient view (sent)
 
-    const results: FlatWire[] = [];
-    let entries: string[];
-    try {
-      entries = fs.readdirSync(flatDir);
-    } catch {
-      return [];
+    // Merge both dirs; workspace-local wins on wwuid conflict.
+    // This ensures recipient sees "New" (status: sent) not "Read" (status: delivered)
+    // which is written to territory by HeartbeatMonitor after delivery.
+    const byWwuid = new Map<string, FlatWire>();
+
+    for (const [dir, overwrite] of [[territoryDir, false], [wsDir, true]] as [string | null, boolean][]) {
+      if (!dir) continue;
+      let entries: string[];
+      try { entries = fs.readdirSync(dir); } catch { continue; }
+      for (const f of entries) {
+        if (!f.endsWith('.json') || f.startsWith('.')) continue;
+        try {
+          const wire = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) as FlatWire;
+          if (!wire.from || !wire.to) {
+            const parsed = parseFilenameActors(wire.filename);
+            if (!wire.from && parsed.from) wire.from = parsed.from;
+            if (!wire.to && parsed.to) wire.to = parsed.to;
+          }
+          const key = wire.wwuid ?? f.replace('.json', '');
+          if (overwrite || !byWwuid.has(key)) {
+            byWwuid.set(key, wire);
+          }
+        } catch { /* skip corrupt */ }
+      }
     }
 
-    for (const f of entries) {
-      if (!f.endsWith('.json') || f.startsWith('.')) continue;
-      try {
-        const wire = JSON.parse(fs.readFileSync(path.join(flatDir, f), 'utf8')) as FlatWire;
-        // Backfill from/to from filename if missing in JSON
-        if (!wire.from || !wire.to) {
-          const parsed = parseFilenameActors(wire.filename);
-          if (!wire.from && parsed.from) wire.from = parsed.from;
-          if (!wire.to && parsed.to) wire.to = parsed.to;
-        }
-        results.push(wire);
-      } catch { /* skip corrupt */ }
-    }
-
-    return results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return [...byWwuid.values()].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }
 
   private filterWires(all: FlatWire[], alias: string, identity: string): { inbox: FlatWire[]; outbox: FlatWire[] } {
@@ -220,19 +236,24 @@ export class TelegraphPanel {
   private handleBulkStatus(wwuids: string[], status: string): void {
     const flatDir = this.getFlatDir();
     if (!flatDir || !wwuids?.length || !status) return;
+    const wsDir = this.getWorkspaceFlatDir();
     const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
     for (const wwuid of wwuids) {
-      const filePath = path.join(flatDir, `${wwuid}.json`);
-      if (!fs.existsSync(filePath)) continue;
-      try {
-        const wire = JSON.parse(fs.readFileSync(filePath, 'utf8')) as FlatWire;
-        wire.status = status;
-        wire.status_transitions = [
-          ...(wire.status_transitions ?? []),
-          { status, timestamp: isoNow, repos: ['vscode'] },
-        ];
-        fs.writeFileSync(filePath, JSON.stringify(wire, null, 2), 'utf8');
-      } catch { /* skip */ }
+      // Write to both dirs so recipient-local view stays in sync with territory
+      for (const dir of [flatDir, wsDir]) {
+        if (!dir) continue;
+        const filePath = path.join(dir, `${wwuid}.json`);
+        if (!fs.existsSync(filePath)) continue;
+        try {
+          const wire = JSON.parse(fs.readFileSync(filePath, 'utf8')) as FlatWire;
+          wire.status = status;
+          wire.status_transitions = [
+            ...(wire.status_transitions ?? []),
+            { status, timestamp: isoNow, repos: ['vscode'] },
+          ];
+          fs.writeFileSync(filePath, JSON.stringify(wire, null, 2), 'utf8');
+        } catch { /* skip */ }
+      }
     }
     this.sendWires();
   }
@@ -267,18 +288,24 @@ export class TelegraphPanel {
   private handleArchiveWire(wwuid: string): void {
     const flatDir = this.getFlatDir();
     if (!flatDir || !wwuid) return;
-    const filePath = path.join(flatDir, `${wwuid}.json`);
-    if (!fs.existsSync(filePath)) return;
-    try {
-      const wire = JSON.parse(fs.readFileSync(filePath, 'utf8')) as FlatWire;
-      wire.status = 'archived';
-      wire.status_transitions = [
-        ...(wire.status_transitions ?? []),
-        { status: 'archived', timestamp: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'), repos: ['vscode'] },
-      ];
-      fs.writeFileSync(filePath, JSON.stringify(wire, null, 2), 'utf8');
-      this.sendWires();
-    } catch { /* skip on error */ }
+    const wsDir = this.getWorkspaceFlatDir();
+    const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+    // Write to both dirs so recipient-local view stays in sync
+    for (const dir of [flatDir, wsDir]) {
+      if (!dir) continue;
+      const filePath = path.join(dir, `${wwuid}.json`);
+      if (!fs.existsSync(filePath)) continue;
+      try {
+        const wire = JSON.parse(fs.readFileSync(filePath, 'utf8')) as FlatWire;
+        wire.status = 'archived';
+        wire.status_transitions = [
+          ...(wire.status_transitions ?? []),
+          { status: 'archived', timestamp: isoNow, repos: ['vscode'] },
+        ];
+        fs.writeFileSync(filePath, JSON.stringify(wire, null, 2), 'utf8');
+      } catch { /* skip on error */ }
+    }
+    this.sendWires();
   }
 
   private async pushToCopilot(formatted: string): Promise<void> {

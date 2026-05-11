@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.37.12
+**Current version:** v0.37.13
 
 ---
 
 ## What's New
+
+**v0.37.13** — Bug fix: Telegraph panel now merges territory flat/ and workspace-local flat/, with workspace-local taking precedence. Recipient (county) now sees "New" instead of "Read" for unread wires. Status changes (Mark as Read, Archive) propagate to both directories.
 
 **v0.37.12** — UI: Inbox tab now shows "Read" instead of "Delivered" for wires with `status: delivered`. Clearer recipient-side semantics — "New" means unread, "Read" means seen/acknowledged, "Archived" means dismissed.
 
