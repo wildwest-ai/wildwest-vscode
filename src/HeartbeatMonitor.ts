@@ -128,24 +128,21 @@ function readMigratedRegistry(rootPath: string): Record<string, unknown> | null 
 }
 
 /**
- * Update destination flat/ directory with delivered wire.
+ * Update territory SSOT flat/ wire to status 'received' when it arrives at the destination.
  * Called after wire is delivered to destination inbox/.
- * If destination has a flat/ directory (flat SSOT), copies/updates wire there.
- * 
- * This reconciles legacy inbox/ delivery with SSOT flat/ model.
+ * Sets received_at + appends 'received' transition in territory SSOT.
+ * No local cache copy is written — territory is the single source of truth.
  */
 function updateDestinationFlatWire(
   destPath: string,
   memoPath: string,
   memoFile: string,
   outputChannel: vscode.OutputChannel,
+  worldRoot: string,
 ): void {
   if (!memoFile.endsWith('.json')) return;
 
   try {
-    const destFlatDir = path.join(destPath, '.wildwest', 'telegraph', 'flat');
-    fs.mkdirSync(destFlatDir, { recursive: true });
-
     let wire: Record<string, unknown>;
     try {
       wire = JSON.parse(fs.readFileSync(memoPath, 'utf8')) as Record<string, unknown>;
@@ -157,34 +154,32 @@ function updateDestinationFlatWire(
     // Extract wwuid or derive from filename
     let wwuid = wire['wwuid'] as string | undefined;
     if (!wwuid) {
-      // Fallback: use memoFile without .json extension as wwuid
       wwuid = memoFile.replace('.json', '');
       wire['wwuid'] = wwuid;
     }
 
-    // DO NOT change status to "delivered" at destination scope.
-    // Wire status should be "sent" so it appears as "New" in recipient's Inbox.
-    // Recipient will mark as read/acted-upon separately.
-    // Only track arrival in received_at timestamp (separate from delivered_at which is sender-side).
-    const receivedAt = wire['received_at'] || new Date().toISOString();
+    // Update territory SSOT: wire has arrived at recipient — status -> 'received'.
+    // received_at records the delivery moment.
+    const receivedAt = wire['received_at'] as string | undefined || new Date().toISOString();
     wire['received_at'] = receivedAt;
-    // Always normalize to "sent" at destination — wire may arrive as "pending" or "delivered"
-    // depending on when the outbox snapshot was taken. Recipient always sees "New" (sent).
-    wire['status'] = 'sent';
-    // Record the arrival transition so recipient timeline shows "sent" entry
+    wire['status'] = 'received';
+
     const transitions = Array.isArray(wire['status_transitions'])
       ? wire['status_transitions'] as Array<Record<string, unknown>>
       : [];
-    const alreadyHasSent = transitions.some((t) => t['status'] === 'sent');
-    if (!alreadyHasSent) {
-      transitions.push({ status: 'sent', timestamp: receivedAt, repos: ['vscode'] });
+    const alreadyHasReceived = transitions.some((t) => t['status'] === 'received');
+    if (!alreadyHasReceived) {
+      transitions.push({ status: 'received', timestamp: receivedAt, repos: ['vscode'] });
       wire['status_transitions'] = transitions;
     }
 
-    // Write to destination flat/ using wwuid as filename
-    const destWirePath = path.join(destFlatDir, `${wwuid}.json`);
-    fs.writeFileSync(destWirePath, JSON.stringify(wire, null, 2), 'utf8');
-    outputChannel.appendLine(`[HeartbeatMonitor] destination flat wire received: ${destPath}/.wildwest/telegraph/flat/${wwuid}.json (status: ${wire['status']})`);
+    // Write back to territory flat/ (not destination local)
+    const territoryFlatDir = path.join(worldRoot, 'telegraph', 'flat');
+    const territoryWirePath = path.join(territoryFlatDir, `${wwuid}.json`);
+    if (fs.existsSync(territoryWirePath)) {
+      fs.writeFileSync(territoryWirePath, JSON.stringify(wire, null, 2), 'utf8');
+      outputChannel.appendLine(`[HeartbeatMonitor] territory wire → received: ${wwuid}.json`);
+    }
   } catch (err) {
     outputChannel.appendLine(`[HeartbeatMonitor] failed to update destination flat wire: ${err}`);
   }
@@ -229,13 +224,14 @@ function updateFlatWireDeliveryStatus(worldRoot: string, memoPath: string, memoF
   if (!wirePath) {
     try {
       const wire = JSON.parse(fs.readFileSync(memoPath, 'utf8')) as Record<string, unknown>;
-      wire['status'] = 'delivered';
-      wire['delivered_at'] = wire['delivered_at'] || new Date().toISOString();
+      // Operator dispatched wire — territory SSOT status is 'sent'
+      wire['status'] = 'sent';
+      wire['sent_at'] = wire['sent_at'] || new Date().toISOString();
       const transitions = Array.isArray(wire['status_transitions']) ? wire['status_transitions'] as Array<Record<string, unknown>> : [];
-      transitions.push({ status: 'delivered', timestamp: wire['delivered_at'], repos: ['vscode'] });
+      transitions.push({ status: 'sent', timestamp: wire['sent_at'], repos: ['vscode'] });
       wire['status_transitions'] = transitions;
       fs.writeFileSync(targetPath, JSON.stringify(wire, null, 2), 'utf8');
-      outputChannel.appendLine(`[HeartbeatMonitor] flat wire created: ${memoFile} in territory SSOT`);
+      outputChannel.appendLine(`[HeartbeatMonitor] flat wire created: ${memoFile} in territory SSOT (status: sent)`);
       return;
     } catch (err) {
       outputChannel.appendLine(`[HeartbeatMonitor] failed to create flat wire for ${memoFile}: ${err}`);
@@ -245,13 +241,14 @@ function updateFlatWireDeliveryStatus(worldRoot: string, memoPath: string, memoF
 
   try {
     const wire = JSON.parse(fs.readFileSync(wirePath, 'utf8')) as Record<string, unknown>;
-    wire['status'] = 'delivered';
-    wire['delivered_at'] = wire['delivered_at'] || new Date().toISOString();
+    // Operator dispatched wire — territory SSOT status is 'sent'
+    wire['status'] = 'sent';
+    wire['sent_at'] = wire['sent_at'] || new Date().toISOString();
     const transitions = Array.isArray(wire['status_transitions']) ? wire['status_transitions'] as Array<Record<string, unknown>> : [];
-    transitions.push({ status: 'delivered', timestamp: wire['delivered_at'], repos: ['vscode'] });
+    transitions.push({ status: 'sent', timestamp: wire['sent_at'], repos: ['vscode'] });
     wire['status_transitions'] = transitions;
     fs.writeFileSync(wirePath, JSON.stringify(wire, null, 2), 'utf8');
-    outputChannel.appendLine(`[HeartbeatMonitor] flat wire updated: ${path.basename(wirePath)} set to delivered`);
+    outputChannel.appendLine(`[HeartbeatMonitor] flat wire updated: ${path.basename(wirePath)} → sent`);
   } catch (err) {
     outputChannel.appendLine(`[HeartbeatMonitor] failed to update flat wire status for ${memoFile}: ${err}`);
   }
@@ -890,18 +887,18 @@ function deliverPendingOutbox(
             `[HeartbeatMonitor] delivery: ${memoFile} → ${destPath}/.wildwest/telegraph/inbox/${deliveredFilename}`,
           );
 
-          // Also update destination scope's flat/ SSOT (if it exists)
-          updateDestinationFlatWire(destPath, destMemoPath, deliveredFilename, outputChannel);
+          // Update territory SSOT: wire arrived at recipient → status 'received'
+          updateDestinationFlatWire(destPath, destMemoPath, deliveredFilename, outputChannel, worldRoot);
         }
 
-        // Stamp delivered_at in our copy
+        // Stamp sent_at in our copy (operator dispatched)
         let content = fs.readFileSync(memoPath, 'utf8');
         const now = new Date().toISOString();
         if (memoFile.endsWith('.json')) {
           try {
             const json = JSON.parse(content) as Record<string, unknown>;
-            json['delivered_at'] = now;
-            json['status'] = 'delivered';
+            json['sent_at'] = now;
+            json['status'] = 'sent';
             content = JSON.stringify(json, null, 2);
           } catch {
             // If JSON parse fails, leave the content unchanged.
