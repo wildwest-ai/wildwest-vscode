@@ -127,6 +127,57 @@ function readMigratedRegistry(rootPath: string): Record<string, unknown> | null 
   return reg;
 }
 
+/**
+ * Update destination flat/ directory with delivered wire.
+ * Called after wire is delivered to destination inbox/.
+ * If destination has a flat/ directory (flat SSOT), copies/updates wire there.
+ * 
+ * This reconciles legacy inbox/ delivery with SSOT flat/ model.
+ */
+function updateDestinationFlatWire(
+  destPath: string,
+  memoPath: string,
+  memoFile: string,
+  outputChannel: vscode.OutputChannel,
+): void {
+  if (!memoFile.endsWith('.json')) return;
+
+  try {
+    const destFlatDir = path.join(destPath, '.wildwest', 'telegraph', 'flat');
+    fs.mkdirSync(destFlatDir, { recursive: true });
+
+    let wire: Record<string, unknown>;
+    try {
+      wire = JSON.parse(fs.readFileSync(memoPath, 'utf8')) as Record<string, unknown>;
+    } catch {
+      outputChannel.appendLine(`[HeartbeatMonitor] failed to read wire from ${memoFile}`);
+      return;
+    }
+
+    // Extract wwuid or derive from filename
+    let wwuid = wire['wwuid'] as string | undefined;
+    if (!wwuid) {
+      // Fallback: use memoFile without .json extension as wwuid
+      wwuid = memoFile.replace('.json', '');
+      wire['wwuid'] = wwuid;
+    }
+
+    // Update wire status to delivered
+    wire['status'] = 'delivered';
+    wire['delivered_at'] = wire['delivered_at'] || new Date().toISOString();
+    const transitions = Array.isArray(wire['status_transitions']) ? wire['status_transitions'] as Array<Record<string, unknown>> : [];
+    transitions.push({ status: 'delivered', timestamp: wire['delivered_at'], repos: ['vscode'] });
+    wire['status_transitions'] = transitions;
+
+    // Write to destination flat/ using wwuid as filename
+    const destWirePath = path.join(destFlatDir, `${wwuid}.json`);
+    fs.writeFileSync(destWirePath, JSON.stringify(wire, null, 2), 'utf8');
+    outputChannel.appendLine(`[HeartbeatMonitor] destination flat wire created: ${destPath}/.wildwest/telegraph/flat/${wwuid}.json`);
+  } catch (err) {
+    outputChannel.appendLine(`[HeartbeatMonitor] failed to update destination flat wire: ${err}`);
+  }
+}
+
 function updateFlatWireDeliveryStatus(worldRoot: string, memoPath: string, memoFile: string, outputChannel: vscode.OutputChannel): void {
   if (!memoFile.endsWith('.json')) return;
 
@@ -826,6 +877,9 @@ function deliverPendingOutbox(
           outputChannel.appendLine(
             `[HeartbeatMonitor] delivery: ${memoFile} → ${destPath}/.wildwest/telegraph/inbox/${deliveredFilename}`,
           );
+
+          // Also update destination scope's flat/ SSOT (if it exists)
+          updateDestinationFlatWire(destPath, destMemoPath, deliveredFilename, outputChannel);
         }
 
         // Stamp delivered_at in our copy

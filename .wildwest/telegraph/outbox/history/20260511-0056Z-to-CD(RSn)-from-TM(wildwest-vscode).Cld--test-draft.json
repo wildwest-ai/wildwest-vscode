@@ -1,0 +1,30 @@
+{
+  "schema_version": "2",
+  "wwuid": "wire-test-draft-20260511-0056Z",
+  "wwuid_type": "wire",
+  "from": "TM(wildwest-vscode).Cld",
+  "to": "CD(RSn)",
+  "type": "status-update",
+  "date": "2026-05-11T00:56:42Z",
+  "subject": "test-draft",
+  "status": "delivered",
+  "body": "Testing draft wire creation and send workflow.",
+  "filename": "20260511-0056Z-to-CD(RSn)-from-TM(wildwest-vscode).Cld--test-draft.json",
+  "status_transitions": [
+    {
+      "status": "draft",
+      "timestamp": "2026-05-11T00:56:42Z",
+      "repos": [
+        "vscode"
+      ]
+    },
+    {
+      "status": "pending",
+      "timestamp": "2026-05-11T01:00:02Z",
+      "repos": [
+        "vscode"
+      ]
+    }
+  ],
+  "delivered_at": "2026-05-11T01:00:02.763Z"
+}

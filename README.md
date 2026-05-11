@@ -8,6 +8,8 @@ Governance framework for AI-assisted development. Tracks dyad activity, exports 
 
 ## What's New
 
+**v0.37.7** — Bug fix: heartbeat now reconciles wires to destination scope SSOT. When delivering from town outbox to county inbox, heartbeat also creates the wire in county's `flat/` directory (SSOT). Fixes: wires invisible at destination scope in Telegraph panel because they only existed in legacy `inbox/` directory.
+
 **v0.37.6** — Bug fix: added heartbeat debug logging and fixed TM→CD county delivery routing so pending outbox wires are correctly resolved and delivered to the parent county inbox.
 
 **v0.37.1** — Draft detail pane: Send button (draft only) sets status → `pending` in flat/ and writes wire to workspace `outbox/` for heartbeat operator pickup. Archive button hidden when already archived.
