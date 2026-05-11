@@ -839,41 +839,17 @@ function deliverPendingOutbox(
           updateDestinationFlatWire(destPath, memoPath, deliveredFilename, outputChannel, worldRoot);
         }
 
-        // Stamp sent_at in our copy (operator dispatched)
-        let content = fs.readFileSync(memoPath, 'utf8');
-        const now = new Date().toISOString();
-        if (memoFile.endsWith('.json')) {
-          try {
-            const json = JSON.parse(content) as Record<string, unknown>;
-            json['sent_at'] = now;
-            json['status'] = 'sent';
-            content = JSON.stringify(json, null, 2);
-          } catch {
-            // If JSON parse fails, leave the content unchanged.
-          }
-        } else {
-          const deliveredLine = `delivered_at: ${now}\n`;
-          // Insert delivered_at after the opening ---
-          const frontmatterMatch = content.match(/^(---\n)/);
-          if (frontmatterMatch) {
-            content =
-              frontmatterMatch[1] +
-              deliveredLine +
-              content.substring(frontmatterMatch[1].length);
-          }
-        }
-
-        // Update the flat/ SSOT wire status so UI panels reflect the delivered result.
+        // Update territory SSOT: sender's copy → status 'sent'.
         updateFlatWireDeliveryStatus(worldRoot, memoPath, memoFile, outputChannel);
 
-        // Move to outbox/history/
-        const historyDir = path.join(outboxDir, 'history');
-        if (!fs.existsSync(historyDir)) {
-          fs.mkdirSync(historyDir, { recursive: true });
-        }
-        const historyPath = path.join(historyDir, memoFile);
-        fs.writeFileSync(historyPath, content, 'utf8');
+        // Remove outbox wire — territory SSOT is now authoritative.
         fs.unlinkSync(memoPath);
+
+        // Remove local flat copy if present — territory wins; panel reads SSOT.
+        const localFlatFile = path.join(rootPath, '.wildwest', 'telegraph', 'flat', memoFile);
+        if (fs.existsSync(localFlatFile)) {
+          try { fs.unlinkSync(localFlatFile); } catch { /* already gone */ }
+        }
 
         delivered++;
       } catch (err) {

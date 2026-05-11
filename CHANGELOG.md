@@ -4,6 +4,10 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.39.13] - 2026-05-11
+
+Remove `outbox/history/` from `deliverPendingOutbox` — territory `flat/` SSOT is the record; history folder was a duplicate. After delivery, outbox wire is deleted (not archived). Local flat copy is also deleted after heartbeat delivers to SSOT (territory wins; panel reads SSOT). Dead content-stamping block removed.
+
 ## [0.39.12] - 2026-05-11
 
 Remove legacy `inbox/` folder write from `deliverPendingOutbox`. Territory `flat/` is the unified SSOT (per queue/IMAP best practice); Inbox/Outbox are panel views filtered by `to`/`from`, not physical folders. `updateDestinationFlatWire` now reads directly from outbox wire instead of an inbox copy.
