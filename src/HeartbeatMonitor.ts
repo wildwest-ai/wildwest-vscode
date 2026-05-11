@@ -166,10 +166,20 @@ function updateDestinationFlatWire(
     // Wire status should be "sent" so it appears as "New" in recipient's Inbox.
     // Recipient will mark as read/acted-upon separately.
     // Only track arrival in received_at timestamp (separate from delivered_at which is sender-side).
-    wire['received_at'] = wire['received_at'] || new Date().toISOString();
+    const receivedAt = wire['received_at'] || new Date().toISOString();
+    wire['received_at'] = receivedAt;
     // Always normalize to "sent" at destination — wire may arrive as "pending" or "delivered"
     // depending on when the outbox snapshot was taken. Recipient always sees "New" (sent).
     wire['status'] = 'sent';
+    // Record the arrival transition so recipient timeline shows "sent" entry
+    const transitions = Array.isArray(wire['status_transitions'])
+      ? wire['status_transitions'] as Array<Record<string, unknown>>
+      : [];
+    const alreadyHasSent = transitions.some((t) => t['status'] === 'sent');
+    if (!alreadyHasSent) {
+      transitions.push({ status: 'sent', timestamp: receivedAt, repos: ['vscode'] });
+      wire['status_transitions'] = transitions;
+    }
 
     // Write to destination flat/ using wwuid as filename
     const destWirePath = path.join(destFlatDir, `${wwuid}.json`);

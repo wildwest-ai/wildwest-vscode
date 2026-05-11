@@ -7,14 +7,23 @@
   "type": "status-update",
   "date": "2026-05-11T02:14:00Z",
   "subject": "test-again",
-  "status": "draft",
+  "status": "archived",
   "body": "Testing draft visibility with bare role TM.",
   "filename": "20260511-0214Z-to-CD(RSn)-from-TM--test-again.json",
   "status_transitions": [
     {
       "status": "draft",
       "timestamp": "2026-05-11T02:14:00Z",
-      "repos": ["vscode"]
+      "repos": [
+        "vscode"
+      ]
+    },
+    {
+      "status": "archived",
+      "timestamp": "2026-05-11T02:42:45Z",
+      "repos": [
+        "vscode"
+      ]
     }
   ]
 }

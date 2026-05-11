@@ -792,7 +792,8 @@ export class TelegraphPanel {
     const active = w.wwuid === selectedWwuid ? ' active' : '';
     const checked = selectedWwuids.has(w.wwuid) ? ' checked' : '';
     const dateStr = w.date ? new Date(w.date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
-    const statusBadge = '<span class="badge-status badge-' + esc(w.status || 'sent') + '">' + esc(w.status || '') + '</span>';
+    const statusLabel = w.status === 'sent' ? 'New' : (w.status || '');
+    const statusBadge = '<span class="badge-status badge-' + esc(w.status || 'sent') + '">' + esc(statusLabel) + '</span>';
     const shortId = w.wwuid ? w.wwuid.slice(0, 8) : '—';
     return '<div class="wire-row' + active + '" data-wwuid="' + esc(w.wwuid) + '">'
       + '<input type="checkbox" class="wire-check"' + checked + ' data-wwuid="' + esc(w.wwuid) + '">'
