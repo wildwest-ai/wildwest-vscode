@@ -188,17 +188,21 @@ git status  # Should show "up to date with 'origin/main'"
 
 ### 8. Update README "Current version" Line (AFTER release)
 
-NOW that the release is pushed, update the README header:
+**⚠️ GIT OPERATION ONLY — DO NOT REBUILD OR REPACKAGE**
+
+The VSIX was already built and packaged in Step 3. This step updates only the git repo documentation.
 
 ```bash
 # Edit README.md:
-# OLD: **Current version:** v0.37.8
-# NEW: **Current version:** v0.37.9
+# OLD: **Current version:** v0.37.9
+# NEW: **Current version:** v0.37.10
 
 git add README.md
-git commit -m "Sync README version to v0.37.9"
+git commit -m "Sync README version to v0.37.10"
 git push origin main
 ```
+
+**CRITICAL:** Do NOT run npm run esbuild or npx vsce package here. The VSIX is already correct from Step 3.
 
 ---
 
@@ -310,7 +314,21 @@ code --install-extension build/wildwest-vscode-0.37.7.vsix --force
 3. Test: `npm run esbuild && code --install-extension build/...`
 4. Commit fix separately
 5. Restart release process
+### Rebuilt VSIX After Step 8 (README Version Update)
 
+**Problem:** After updating README version line in Step 8, you rebuilt the extension with `npm run esbuild` and repackaged it. This overwrites the correct VSIX with an incorrect one containing the old README.
+
+**Root Cause:** Step 8 is a **git-only operation**. The VSIX was already correctly packaged in Step 3.
+
+**Prevention:**
+- Step 8 updates README for **git documentation only**
+- Do NOT run `npm run esbuild`, `npm run package`, or `npx vsce package` in Step 8
+- The installed extension is correct; git history stays in sync
+
+**If Already Done:**
+1. Repackage the VSIX: `npm run esbuild && npx vsce package --no-dependencies --out build/`
+2. Reinstall: `code --install-extension build/wildwest-vscode-X.Y.Z.vsix --force`
+3. Verify: Check that README shows correct version in extension Details
 ---
 
 ## Quick Reference
