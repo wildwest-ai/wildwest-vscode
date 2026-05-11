@@ -144,10 +144,14 @@ export class TelegraphPanel {
             if (!wire.to && parsed.to) wire.to = parsed.to;
           }
           const key = wire.wwuid ?? f.replace('.json', '');
-          // Only add local wire if territory does NOT already have it
-          // (draft/pending are local-only; once sent they live in territory)
+          // Only add local wire if territory does NOT already have it.
+          // Exception: merge overlay fields (archive) from local onto territory wire.
           if (!byWwuid.has(key)) {
             byWwuid.set(key, wire);
+          } else {
+            const existing = byWwuid.get(key)!;
+            if (wire.sender_archived_at) existing.sender_archived_at = wire.sender_archived_at;
+            if (wire.recipient_archived_at) existing.recipient_archived_at = wire.recipient_archived_at;
           }
         } catch { /* skip corrupt */ }
       }
@@ -628,7 +632,7 @@ export class TelegraphPanel {
 
   const CHIP_CONFIG = {
     inbox:  [
-      { status: 'received',  label: 'New'       },
+      { status: 'sent',      label: 'New'       },
       { status: 'read',      label: 'Read'      },
       { status: 'archived',  label: 'Archived'  },
       { status: 'all',       label: 'All'       },
@@ -849,6 +853,12 @@ export class TelegraphPanel {
     return 'town';
   }
 
+  function isArchivedForActor(w) {
+    if (activeTab === 'inbox') return !!w.recipient_archived_at;
+    if (activeTab === 'outbox') return !!w.sender_archived_at;
+    return w.status === 'archived';
+  }
+
   function currentList() {
     if (activeTab === 'all') {
       if (!searchQuery) return allWires;
@@ -862,7 +872,8 @@ export class TelegraphPanel {
     }
     const base = activeTab === 'inbox' ? inboxWires : outboxWires;
     if (statusFilter === 'all') return base;
-    return base.filter(w => (w.status || 'sent') === statusFilter);
+    if (statusFilter === 'archived') return base.filter(w => isArchivedForActor(w));
+    return base.filter(w => !isArchivedForActor(w) && (w.status || 'sent') === statusFilter);
   }
 
   function renderList() {
@@ -968,14 +979,15 @@ export class TelegraphPanel {
     // Push bar + actions
     const status = w.status || 'received';
     const isInboxWire = !!inboxWires.find(x => x.wwuid === w.wwuid);
+    const isArchivedActor = isInboxWire ? !!w.recipient_archived_at : !!w.sender_archived_at;
     html += '<div class="push-bar">'
       + '<button class="btn" data-push="copilot">→ Copilot</button>'
       + '<button class="btn btn-secondary" data-push="claude">→ Claude</button>'
       + '<button class="btn btn-secondary" data-push="codex">→ Codex</button>'
       + (status === 'draft' ? '<button class="btn" data-send-draft="' + esc(w.wwuid) + '">Send</button>' : '')
-      + (isInboxWire && (status === 'received' || status === 'delivered') ? '<button class="btn" data-mark-read="' + esc(w.wwuid) + '">Mark Read</button>' : '')
-      + (isInboxWire && (status === 'received' || status === 'delivered' || status === 'read') ? '<button class="btn" data-reply="' + esc(w.wwuid) + '">↻ Reply</button>' : '')
-      + (status !== 'archived' ? '<button class="btn btn-secondary" data-archive="' + esc(w.wwuid) + '">Archive</button>' : '')
+      + (isInboxWire && !isArchivedActor && (status === 'sent' || status === 'received' || status === 'delivered') ? '<button class="btn" data-mark-read="' + esc(w.wwuid) + '">Mark Read</button>' : '')
+      + (isInboxWire && !isArchivedActor && status !== 'draft' ? '<button class="btn" data-reply="' + esc(w.wwuid) + '">↻ Reply</button>' : '')
+      + (!isArchivedActor ? '<button class="btn btn-secondary" data-archive="' + esc(w.wwuid) + '">Archive</button>' : '')
       + '</div>';
 
     pane.innerHTML = html;

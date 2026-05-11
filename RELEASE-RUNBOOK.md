@@ -46,39 +46,25 @@ cat package.json | grep '"version"'
 - `MINOR (0.x.0)` — new features, backwards-compatible (new commands, participants)
 - `MAJOR (x.0.0)` — breaking changes, incompatible API
 
-### 2. Update README.md (BEFORE running release)
+### 2. Write the What's New entry in CHANGELOG.md (BEFORE running release)
 
-**IMPORTANT:** Update README while package.json still has the CURRENT version.
-
-1. Do NOT change the "Current version:" line yet
-2. Add a NEW entry to "What's New" section for the CURRENT version
-3. The release script will validate that README mentions the current version before bumping
+**IMPORTANT:** Add your What's New entry under `## [Unreleased]` in `CHANGELOG.md`.
+The release script reads this entry, promotes it to a versioned heading, and generates `README.md` automatically. Do **not** edit `README.md` directly — it is generated.
 
 ```markdown
-**Current version:** v0.37.8      ← DO NOT CHANGE THIS YET
+## [Unreleased]
 
----
-
-## What's New
-
-**v0.37.8** — [ONE-LINE DESCRIPTION]. [DETAILS].    ← ADD THIS ENTRY NOW
-
-**v0.37.7** — [Previous version entry...]
+Bug fix: heartbeat now reconciles wires to destination scope SSOT. When delivering
+from town outbox to county inbox, heartbeat also creates the wire in county's
+`flat/` directory (SSOT). Fixes: wires invisible at destination scope in Telegraph
+panel because they only existed in legacy `inbox/` directory.
 ```
 
 **Format:**
-- Start with version number: `**vX.Y.Z**` (use CURRENT version from package.json)
-- One-line summary of main change
-- Bullet points or short sentences for details
-- Link-friendly (avoid special chars in subject lines)
-
-**Example:**
-```markdown
-**v0.37.8** — Bug fix: heartbeat now reconciles wires to destination scope SSOT. 
-When delivering from town outbox to county inbox, heartbeat also creates the wire 
-in county's `flat/` directory (SSOT). Fixes: wires invisible at destination scope 
-in Telegraph panel because they only existed in legacy `inbox/` directory.
-```
+- Plain prose under `## [Unreleased]` — no bold version prefix (script adds that)
+- One paragraph, one or more sentences
+- Keep HTML comments (`<!-- ... -->`) in place — script skips them
+- `README.md` is the source of truth for stable feature docs; edit it directly for capabilities changes
 
 ### 3. Run Release Script
 
@@ -98,14 +84,15 @@ npm run release -- --major
 ```
 
 **What the script does:**
-1. ✅ Validates README.md contains current version
+1. ✅ Validates `CHANGELOG.md` has non-empty `[Unreleased]` section
 2. ✅ Bumps `package.json` version
-3. ✅ Runs `npm run esbuild` (sourcemap build)
-4. ✅ Runs `npm install` (audit dependencies)
-5. ✅ Runs `npm run compile` (TypeScript check)
-6. ✅ Runs `npm run package` (creates `.vsix`)
-7. ✅ Creates local git commit: "Release vX.Y.Z"
-8. ⏸️ **WAITS FOR AUTHORIZATION** (manual push required)
+3. ✅ Promotes `[Unreleased]` → `## [X.Y.Z] - YYYY-MM-DD` in `CHANGELOG.md`
+4. ✅ Runs `npm run esbuild` (sourcemap build)
+5. ✅ Runs `npm install` (audit dependencies)
+6. ✅ Runs `npm run compile` (TypeScript check)
+7. ✅ Runs `npm run package` (creates `.vsix`)
+8. ✅ Creates local git commit: "Release vX.Y.Z"
+9. ⏸️ **WAITS FOR AUTHORIZATION** (manual push required)
 
 **Expected output:**
 ```
