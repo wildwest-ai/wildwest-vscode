@@ -8,6 +8,8 @@ Governance framework for AI-assisted development. Tracks dyad activity, exports 
 
 ## What's New
 
+**v0.37.10** — Documentation: Release runbook clarified — Step 2 (Update README) explicitly occurs BEFORE Step 3 (Run release script). Removed ambiguity about when to add What's New entries vs. update version number line.
+
 **v0.37.9** — Bug fix: wire status now correctly shows as "New" at recipient scope (not "Delivered"). Heartbeat no longer sets status to "delivered" when syncing to destination flat/. Wires show as "New" in recipient inbox until read/acted upon; "Delivered" only in sender outbox.
 
 **v0.37.8** — Bug fix: heartbeat now reconciles wires to destination scope SSOT. When delivering from town outbox to county inbox, heartbeat also creates the wire in county's `flat/` directory (SSOT). Fixes: wires invisible at destination scope in Telegraph panel because they only existed in legacy `inbox/` directory.
