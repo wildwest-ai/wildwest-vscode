@@ -448,6 +448,18 @@ function resolveRoleToScope(role: string): WildWestScope | null {
  *   "TM(*vscode)"   → { role: "TM", pattern: "*vscode" }  (glob)
  *   "CD(wildwest-ai)" → { role: "CD", pattern: "wildwest-ai" } (exact)
  */
+function normalizeToField(toField: string): { normalized: string; deprecated: boolean } {
+  const match = toField.match(/^([A-Za-z]+)\(([A-Za-z0-9]+)\)(?:\.[A-Za-z]+)?$/);
+  if (match) {
+    const inner = match[2];
+    const isLikelyIdentity = /[A-Z]/.test(inner) && !inner.includes('-') && !inner.includes('_') && !inner.includes('.');
+    if (isLikelyIdentity) {
+      return { normalized: match[1], deprecated: true };
+    }
+  }
+  return { normalized: toField, deprecated: false };
+}
+
 function extractRolePattern(toField: string): { role: string; pattern: string | null } | null {
   // Match: word, optionally followed by (*pattern) or (pattern)
   const match = toField.match(/^([A-Za-z]+)(?:\((\*?[^)]+)\))?$/);
@@ -725,15 +737,11 @@ function deliverPendingOutbox(
           continue;
         }
 
-        // Detect and normalize old format: "CD(RSn).Cpt" or "CD(RSn)" → "CD"
-        // Old format: parenthetical suffix that does NOT start with * (identity suffix, not town pattern)
-        const isOldFormat = /\([^*][^)]*\)/.test(toField);
-        const normalizedToField = isOldFormat
-          ? toField.replace(/\([^*][^)]*\)(\.\w+)?/g, '').trim()
-          : toField;
-        if (isOldFormat) {
+        const normalized = normalizeToField(toField);
+        const normalizedToField = normalized.normalized;
+        if (normalized.deprecated) {
           outputChannel.appendLine(
-            `[HeartbeatMonitor] delivery: ${memoFile} — old format '${toField}' normalized to '${normalizedToField}' (deprecated in v0.18.0, will break in v0.19.0). Use role-only format.`,
+            `[HeartbeatMonitor] delivery: ${memoFile} — old/identity format '${toField}' normalized to '${normalizedToField}' (deprecated in v0.18.0, will break in v0.19.0). Use role-only format.`,
           );
         }
 
@@ -1166,6 +1174,7 @@ export class HeartbeatMonitor {
       const townDelivery = deliverPendingOutbox(town.rootPath, town.scope, this.outputChannel, this.worldRoot, this.countiesDir);
       let refreshNeeded = townDelivery.delivered > 0;
       const countyRoot = findCountyRoot(town.rootPath);
+      this.outputChannel.appendLine(`[HeartbeatMonitor] deliverOutboxNow town=${town.rootPath} countyRoot=${countyRoot ?? '<none>'}`);
       if (countyRoot) {
         const countyDelivery = deliverPendingOutbox(countyRoot, 'county', this.outputChannel, this.worldRoot, this.countiesDir);
         refreshNeeded = refreshNeeded || countyDelivery.delivered > 0;
