@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.37.11
+**Current version:** v0.37.12
 
 ---
 
 ## What's New
+
+**v0.37.12** — UI: Inbox tab now shows "Read" instead of "Delivered" for wires with `status: delivered`. Clearer recipient-side semantics — "New" means unread, "Read" means seen/acknowledged, "Archived" means dismissed.
 
 **v0.37.11** — Bug fix: heartbeat now always writes `status: "sent"` at destination scope (previously wrote `status: "pending"` when wire arrived from outbox before sender-side promotion). Recipient inbox now consistently shows "New". Also: draft wire creation guide corrected — territory `~/wildwest/telegraph/flat/` (not town-local), and `from` must be `Role(alias)` format.
 

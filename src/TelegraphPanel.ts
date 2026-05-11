@@ -512,7 +512,7 @@ export class TelegraphPanel {
   const CHIP_CONFIG = {
     inbox:  [
       { status: 'sent',      label: 'New'       },
-      { status: 'delivered', label: 'Delivered' },
+      { status: 'delivered', label: 'Read'      },
       { status: 'archived',  label: 'Archived'  },
       { status: 'all',       label: 'All'       },
     ],
