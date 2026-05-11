@@ -2,11 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.37.14
+**Current version:** v0.38.0
 
 ---
 
 ## What's New
+
+**v0.38.0** — Wire lifecycle refactor: full `draft → pending → sent → received → read → archived` pipeline. Recipient heartbeat now writes `status: received` to territory SSOT (not local cache). New `WireStatus` type; new fields `sent_at`, `received_at`, `read_at`, `sender_archived_at`, `recipient_archived_at`. Archive is a per-actor local overlay — promotes to `archived` in territory only when both sender and recipient have archived. Mark Read button in detail pane sets `status: read` + `read_at` in territory. `createFlatWire()` defaults to `status: 'draft'`. Telegraph panel reads territory-first; local flat/ only surfaced for drafts/pending.
 
 **v0.37.14** — Bug fix: wire row badge now displays "New" instead of raw "sent" for inbox wires. HeartbeatMonitor now records a `sent` transition on arrival so recipient timeline shows full `draft → pending → sent` sequence.
 
