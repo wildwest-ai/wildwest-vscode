@@ -36,6 +36,7 @@ export interface CreateWireParams {
   type: string;
   subject: string;
   body: string;
+  status?: string;
   re?: string;
   original_wire?: string;
 }
@@ -44,13 +45,15 @@ export interface CreateWireParams {
 
 /**
  * Build a schema v2 FlatWire ready to drop into ~/wildwest/telegraph/flat/.
- * Generates wwuid, filename, date, and seeds status_transitions with 'sent'.
+ * Generates wwuid, filename, date, and seeds status_transitions with the initial status.
+ * Default status is 'draft' — callers that immediately dispatch should pass status: 'sent'.
  */
 export function createFlatWire(params: CreateWireParams): FlatWire {
   const isoNow = telegraphISOTimestamp();
   const ts = telegraphTimestamp();
   const filename = `${ts}-to-${params.to}-from-${params.from}--${params.subject}.json`;
   const wwuid = generateWwuid('wire', params.from, params.to, isoNow, params.subject);
+  const status = params.status ?? 'draft';
 
   const wire: FlatWire = {
     schema_version: '2',
@@ -61,12 +64,12 @@ export function createFlatWire(params: CreateWireParams): FlatWire {
     type: params.type,
     date: isoNow,
     subject: params.subject,
-    status: 'sent',
+    status,
     body: params.body,
     filename,
     status_transitions: [
       {
-        status: 'sent',
+        status,
         timestamp: isoNow,
         instances: 1,
         repos: ['vscode'],

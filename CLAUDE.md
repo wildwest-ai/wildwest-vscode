@@ -218,7 +218,29 @@ On each activation:
 
 ---
 
-## 11. Quick Commands
+## 11. Wire Creation Rules
+
+> **🚫 Never hand-write wire JSON.** `wwuid` is a UUIDv5 — slugs like `wire-test-20260511-0256Z` are invalid and break deduplication and merge logic.
+
+| Method | When to use |
+|--------|-------------|
+| **Telegraph panel → Compose → Save Draft** | Preferred for AI models creating draft wires |
+| **`@wildwest send CD(RSn) "msg"`** | Copilot Chat; shows preview + Confirm Send |
+| **`createFlatWire()` TypeScript API** | Extension code; defaults to `status: 'draft'` |
+
+```typescript
+// Correct — factory generates UUIDv5 wwuid, filename, timestamp, transitions
+const wire = createFlatWire({ from: 'TM(wildwest-vscode)', to: 'CD(RSn)', type: 'status-update', subject: 'slug', body: '...' });
+writeFlatWire(wire, path.join(worldRoot, 'telegraph', 'flat'));
+```
+
+- `from` **must** be `Role(alias)` format — bare `TM` won't appear in Outbox
+- Write to `~/wildwest/telegraph/flat/` (territory SSOT), **not** `.wildwest/telegraph/flat/`
+- See `docs/draft-wire-creation-guide.md` for full reference
+
+---
+
+## 12. Quick Commands
 
 ```bash
 # Release workflow (docs → bump → build → install → commit)

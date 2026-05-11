@@ -214,7 +214,7 @@ export class TelegraphPanel {
     const role = roleMatch?.[1] ?? 'TM';
     const fromActor = alias ? `${role}(${alias})` : (identity || 'TM');
 
-    const wire = createFlatWire({ from: fromActor, to, type, subject, body });
+    const wire = createFlatWire({ from: fromActor, to, type, subject, body, status: 'sent' });
 
     // Primary: write directly to flat/ (territory SSOT)
     const flatDir = this.getFlatDir();
