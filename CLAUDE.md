@@ -180,7 +180,7 @@ On each activation:
 | **WorktreeManager** | `src/WorktreeManager.ts` | Manages git worktree operations |
 | **TownInit** | `src/TownInit.ts` | Scaffolds new town `.wildwest/registry.json` + `.claude/settings.json` |
 | **AIToolBridge** | `src/AIToolBridge.ts` | HTTP hook receiver (port 7379) for Claude Code stop/file-change events |
-| **wwMCP** | `src/mcp/` | Read-only MCP server over stdio; exposes `wildwest_status`, `wildwest_inbox`, `wildwest_board` |
+| **wwMCP** | `src/mcp/` | MCP server over stdio; read tools: `wildwest_status`, `wildwest_inbox`, `wildwest_board`, `wildwest_telegraph_check`; write tools: `wildwest_draft_wire` (local draft), `wildwest_send_wire` (territory SSOT) |
 | **SessionPipeline** | `src/sessionPipeline/` | Cursor-based delta export: adapter, orchestrator, packet writer, transformers (cpt/cld/ccx) |
 
 **Settings (v0.11.0+):**

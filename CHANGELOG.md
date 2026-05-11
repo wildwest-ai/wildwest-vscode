@@ -4,6 +4,10 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.39.3] - 2026-05-11
+
+New `wildwest.createWire` command (Command Palette → Wild West: Create Wire) — available in any VSCode window regardless of workspace. Multi-step input: To, Subject, Body, then Draft or Send. Draft writes to local `.wildwest/telegraph/flat/`; Send writes to territory `~/wildwest/telegraph/flat/`. Also aligned `scripts/create-wire.js` with WireFactory (reads sender from registry, normalizes subject, adds `--send` and `--re` flags); registered `npm run wire` in package.json.
+
 ## [0.39.2] - 2026-05-11
 
 Fixed 3 Telegraph Panel bugs: (1) Inbox "New" tab correctly filters `status: sent` wires — chip was matching `received`, causing the tab to appear empty after navigation. (2) Archive button now works — overlay fields (`recipient_archived_at`/`sender_archived_at`) are merged from local flat/ onto the territory wire on read; `isArchivedForActor()` drives the Archived chip and hides the Archive/Reply buttons once dismissed. (3) Reply button now shows for all inbox wires — was gated on `status: received/delivered/read` but inbox wires have `status: sent`.

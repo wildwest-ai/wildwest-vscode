@@ -22,6 +22,8 @@ import { SessionPreviewProvider, SESSION_PREVIEW_SCHEME } from './SessionPreview
 import { TelegraphPanel } from './TelegraphPanel';
 import { PromptIndexService } from './PromptIndexService';
 import { PromptCompletionProvider } from './PromptCompletionProvider';
+import { createFlatWire, writeDraftWire, writeFlatWire } from './WireFactory';
+import { readRegistryAlias } from './TelegraphService';
 
 // ── Configuration types & helpers ──────────────────────────────────────────
 
@@ -289,6 +291,72 @@ export function activate(context: vscode.ExtensionContext) {
     }),
     vscode.commands.registerCommand('wildwest.refreshTelegraphPanel', () => {
       TelegraphPanel.refresh();
+    }),
+    vscode.commands.registerCommand('wildwest.createWire', async () => {
+      const folders = vscode.workspace.workspaceFolders;
+      const wsPath = folders?.[0]?.uri.fsPath ?? '';
+      const wwConfig2 = getWildwestConfig();
+
+      // Resolve sender alias from registry (works in any workspace)
+      const alias = wsPath
+        ? readRegistryAlias(path.join(wsPath, '.wildwest')) ?? 'wildwest-vscode'
+        : 'wildwest-vscode';
+      const from = `TM(${alias})`;
+
+      const to = await vscode.window.showInputBox({
+        title: 'Create Wire (1/3) — To',
+        prompt: 'Recipient in Role(alias) format',
+        placeHolder: 'e.g. CD(RSn) or TM(wildwest-vscode)',
+        validateInput: v => v.trim() ? null : 'Required',
+      });
+      if (!to) return;
+
+      const subject = await vscode.window.showInputBox({
+        title: 'Create Wire (2/3) — Subject',
+        prompt: 'Short slug (auto-normalized to kebab-case)',
+        placeHolder: 'e.g. v0.39.3-released',
+        validateInput: v => v.trim() ? null : 'Required',
+      });
+      if (!subject) return;
+
+      const body = await vscode.window.showInputBox({
+        title: 'Create Wire (3/3) — Body',
+        prompt: 'Wire body text',
+        placeHolder: 'Message body',
+        validateInput: v => v.trim() ? null : 'Required',
+      });
+      if (!body) return;
+
+      const action = await vscode.window.showQuickPick(
+        [
+          { label: '$(save) Save as Draft', value: 'draft', description: 'local only — open Telegraph panel to send' },
+          { label: '$(send) Send Now',       value: 'send',  description: `writes to territory ${wwConfig2.worldRoot}/telegraph/flat/` },
+        ],
+        { title: 'Create Wire — Action', placeHolder: 'Draft or Send?' },
+      );
+      if (!action) return;
+
+      try {
+        const normalizedSubject = subject.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        const wire = createFlatWire({ from, to: to.trim(), type: 'status-update', subject: normalizedSubject, body: body.trim(), status: action.value === 'send' ? 'sent' : 'draft' });
+
+        if (action.value === 'send') {
+          const territoryFlatDir = path.join(wwConfig2.worldRoot, 'telegraph', 'flat');
+          writeFlatWire(wire, territoryFlatDir);
+          vscode.window.showInformationMessage(`Wild West: wire sent — ${wire.filename}`);
+        } else {
+          if (!wsPath) {
+            vscode.window.showErrorMessage('Wild West: no workspace folder open — cannot save draft.');
+            return;
+          }
+          writeDraftWire(wire, wsPath);
+          vscode.window
+            .showInformationMessage(`Wild West: draft saved — ${wire.filename}`, 'Open Telegraph Panel')
+            .then(sel => { if (sel) TelegraphPanel.open(exporter.getExportPath(), promptIndexService); });
+        }
+      } catch (err) {
+        vscode.window.showErrorMessage(`Wild West: createWire failed — ${err}`);
+      }
     }),
     vscode.commands.registerCommand('wildwest.showReceipts', async () => {
       const allReceipts = getTelegraphDirs().flatMap((dir) => getDeliveryReceipts(dir));
