@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { FlatWire, createFlatWire, writeFlatWire, writeDraftWire, parseFilenameActors } from './WireFactory';
+import { FlatWire, createFlatWire, writeFlatWire, parseFilenameActors } from './WireFactory';
 import { readRegistryAlias } from './TelegraphService';
 import { PromptIndexService } from './PromptIndexService';
 
@@ -43,6 +43,14 @@ export class TelegraphPanel {
   }
 
   // ── Flat directory resolution ─────────────────────────────────────────────
+
+  /** Returns the territory flat/ path unconditionally (for writing — creates dir on use). */
+  private getTerritoryFlatDirPath(): string {
+    const cfg = vscode.workspace.getConfiguration('wildwest');
+    const home = process.env['HOME'] ?? '~';
+    const worldRoot = (cfg.get<string>('worldRoot') ?? '~/wildwest').replace(/^~/, home);
+    return path.join(worldRoot, 'telegraph', 'flat');
+  }
 
   private getFlatDir(): string | null {
     const cfg = vscode.workspace.getConfiguration('wildwest');
@@ -269,17 +277,12 @@ export class TelegraphPanel {
     const role = roleMatch?.[1] ?? 'TM';
     const fromActor = alias ? `${role}(${alias})` : (identity || 'TM');
 
-    const wire = createFlatWire({ from: fromActor, to, type, subject, body, status: 'pending' });
+    const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+    const wire = createFlatWire({ from: fromActor, to, type, subject, body, status: 'sent' });
+    wire.sent_at = wire.sent_at || isoNow;
 
-    // Compose Send → write as pending to local outbox/ for heartbeat pickup.
-    // Heartbeat operator promotes to territory SSOT as 'sent'.
-    // Use {wwuid}.json so territory SSOT gets written with UUID filename (panel UUID filter).
-    const outboxDir = path.join(wsPath, '.wildwest', 'telegraph', 'outbox');
-    fs.mkdirSync(outboxDir, { recursive: true });
-    fs.writeFileSync(path.join(outboxDir, `${wire.wwuid}.json`), JSON.stringify(wire, null, 2), 'utf8');
-
-    // Also save to local flat/ so it shows in Outbox > Pending immediately
-    writeDraftWire(wire, wsPath);
+    // Write directly to territory SSOT — no heartbeat delivery step needed.
+    writeFlatWire(wire, this.getTerritoryFlatDirPath());
 
     this.panel.webview.postMessage({ type: 'sent', wire });
     this.sendWires();
@@ -323,7 +326,7 @@ export class TelegraphPanel {
   }
 
   private handleSendDraft(wwuid: string): void {
-    // Draft lives in local flat/; promote to pending and move to outbox for heartbeat pickup.
+    // Draft lives in local flat/; promote to sent and write directly to territory SSOT.
     const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
     const localFlatDir = path.join(wsPath, '.wildwest', 'telegraph', 'flat');
     const localFilePath = path.join(localFlatDir, `${wwuid}.json`);
@@ -331,19 +334,16 @@ export class TelegraphPanel {
     try {
       const wire = JSON.parse(fs.readFileSync(localFilePath, 'utf8')) as FlatWire;
       const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
-      wire.status = 'pending';
+      wire.status = 'sent';
+      wire.sent_at = wire.sent_at || isoNow;
       wire.status_transitions = [
         ...(wire.status_transitions ?? []),
-        { status: 'pending', timestamp: isoNow, repos: ['vscode'] },
+        { status: 'sent', timestamp: isoNow, repos: ['vscode'] },
       ];
-      // Update local flat/ so Outbox shows Pending
-      fs.writeFileSync(localFilePath, JSON.stringify(wire, null, 2), 'utf8');
-      // Drop in workspace outbox/ for heartbeat pickup
-      // Use {wwuid}.json so territory SSOT gets written with UUID filename (panel UUID filter).
-      const outboxDir = path.join(wsPath, '.wildwest', 'telegraph', 'outbox');
-      fs.mkdirSync(outboxDir, { recursive: true });
-      fs.writeFileSync(path.join(outboxDir, `${wire.wwuid}.json`), JSON.stringify(wire, null, 2), 'utf8');
-      vscode.window.showInformationMessage(`Wild West: wire pending — operator will deliver on next heartbeat.`);
+      // Write directly to territory SSOT — no heartbeat delivery step needed.
+      writeFlatWire(wire, this.getTerritoryFlatDirPath());
+      // Remove local draft (territory is now authoritative)
+      try { fs.unlinkSync(localFilePath); } catch { /* already gone */ }
       this.sendWires();
     } catch (err) {
       vscode.window.showErrorMessage(`Wild West: send draft failed — ${err}`);

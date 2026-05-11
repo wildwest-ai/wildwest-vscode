@@ -4,6 +4,10 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.39.10] - 2026-05-11
+
+Fix pending delay: `handleSend` (Compose) and `handleSendDraft` now write directly to territory flat as `status: 'sent'` instead of routing through `.wildwest/telegraph/outbox/` for heartbeat pickup. Eliminates 2–3 min pending window. Removes `.wildwest/telegraph/outbox/` and `inbox/` folder creation side effects.
+
 ## [0.39.9] - 2026-05-11
 
 Remove legacy Rule-23 text memo inbox/outbox wiring. `TelegraphWatcher` (file watcher for `.wildwest/telegraph/inbox/`) and `TelegraphInbox` (Rule-23 enforcement processor) are no longer instantiated or registered. `wildwest.processInbox` command removed from extension and package manifest. Status bar tooltip no longer reads legacy inbox `.md` files when flagged. Source files retained; flat-wire panel (`TelegraphPanel`) is the active implementation.
