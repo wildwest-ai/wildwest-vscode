@@ -46,24 +46,28 @@ cat package.json | grep '"version"'
 - `MINOR (0.x.0)` — new features, backwards-compatible (new commands, participants)
 - `MAJOR (x.0.0)` — breaking changes, incompatible API
 
-### 2. Update README.md
+### 2. Update README.md (BEFORE running release)
 
-Edit the "What's New" section with the new version's changelog entry.
+**IMPORTANT:** Update README while package.json still has the CURRENT version.
+
+1. Do NOT change the "Current version:" line yet
+2. Add a NEW entry to "What's New" section for the CURRENT version
+3. The release script will validate that README mentions the current version before bumping
 
 ```markdown
-**Current version:** v0.37.8
+**Current version:** v0.37.8      ← DO NOT CHANGE THIS YET
 
 ---
 
 ## What's New
 
-**v0.37.8** — [ONE-LINE DESCRIPTION]. [DETAILS].
+**v0.37.8** — [ONE-LINE DESCRIPTION]. [DETAILS].    ← ADD THIS ENTRY NOW
 
 **v0.37.7** — [Previous version entry...]
 ```
 
 **Format:**
-- Start with version number: `**vX.Y.Z**`
+- Start with version number: `**vX.Y.Z**` (use CURRENT version from package.json)
 - One-line summary of main change
 - Bullet points or short sentences for details
 - Link-friendly (avoid special chars in subject lines)
@@ -180,6 +184,20 @@ git status  # Should show "up to date with 'origin/main'"
 #   - Tag name: v0.37.8
 #   - Release title: Release v0.37.8
 #   - Changelog from commit message
+```
+
+### 8. Update README "Current version" Line (AFTER release)
+
+NOW that the release is pushed, update the README header:
+
+```bash
+# Edit README.md:
+# OLD: **Current version:** v0.37.8
+# NEW: **Current version:** v0.37.9
+
+git add README.md
+git commit -m "Sync README version to v0.37.9"
+git push origin main
 ```
 
 ---
