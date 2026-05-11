@@ -4,6 +4,10 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.39.8] - 2026-05-11
+
+Fix Archive perspective: single-click Archive from Inbox now sets only `recipient_archived_at`; from Outbox sets only `sender_archived_at`. Previously self-addressed wires stamped both fields on one click, conflating sender and recipient perspectives. Fix: `handleArchiveWire` now accepts a `perspective` param; webview passes `activeTab === 'inbox' ? 'recipient' : 'sender'` with both the single-wire `archive` and `bulkStatus` messages.
+
 ## [0.39.7] - 2026-05-11
 
 Fix Archive button no-op for self-addressed wires. `handleArchiveWire` only set `sender_archived_at`, but the Inbox tab's `isArchivedForActor` checks `recipient_archived_at` — so archived wires never disappeared from the inbox view. Fix: when actor is both sender and recipient (self-addressed wire), both overlay fields are now set.

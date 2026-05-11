@@ -223,7 +223,7 @@ export class TelegraphPanel {
         await this.pushToTerminal(msg['formatted'] as string, msg['label'] as string);
         break;
       case 'archive':
-        this.handleArchiveWire(msg['wwuid'] as string);
+        this.handleArchiveWire(msg['wwuid'] as string, (msg['perspective'] as 'recipient' | 'sender') ?? 'recipient');
         break;
       case 'markRead':
         this.handleMarkRead(msg['wwuid'] as string);
@@ -234,7 +234,8 @@ export class TelegraphPanel {
       case 'bulkStatus': {
         const wwuids = msg['wwuids'] as string[];
         const status = msg['status'] as string;
-        this.handleBulkStatus(wwuids, status);
+        const perspective = (msg['perspective'] as 'recipient' | 'sender') ?? 'recipient';
+        this.handleBulkStatus(wwuids, status, perspective);
         break;
       }
       case 'promptSearch': {
@@ -284,14 +285,14 @@ export class TelegraphPanel {
     this.sendWires();
   }
 
-  private handleBulkStatus(wwuids: string[], status: string): void {
+  private handleBulkStatus(wwuids: string[], status: string, perspective: 'recipient' | 'sender' = 'recipient'): void {
     const flatDir = this.getFlatDir();
     const wsDir = this.getWorkspaceFlatDir();
     this.log(`handleBulkStatus: wwuids=${JSON.stringify(wwuids)} status=${status} flatDir=${flatDir} wsDir=${wsDir}`);
     if (!wwuids?.length || !status) { this.log('handleBulkStatus: early exit — no wwuids or status'); return; }
     // Archive uses overlay pattern — delegate to handleArchiveWire per wire
     if (status === 'archived') {
-      for (const wwuid of wwuids) this.handleArchiveWire(wwuid);
+      for (const wwuid of wwuids) this.handleArchiveWire(wwuid, perspective);
       return; // sendWires called inside handleArchiveWire
     }
     if (status === 'read') {
@@ -381,7 +382,7 @@ export class TelegraphPanel {
     this.log(`handleMarkRead: no file found in dirs=${JSON.stringify(dirs)}`);
   }
 
-  private handleArchiveWire(wwuid: string): void {
+  private handleArchiveWire(wwuid: string, perspective: 'recipient' | 'sender' = 'recipient'): void {
     const flatDir = this.getFlatDir();
     const wsDir = this.getWorkspaceFlatDir();
     this.log(`handleArchiveWire: wwuid=${wwuid} flatDir=${flatDir} wsDir=${wsDir}`);
@@ -416,20 +417,17 @@ export class TelegraphPanel {
 
     try {
       const wire = JSON.parse(fs.readFileSync(sourcePath, 'utf8')) as FlatWire;
-      const isSender = this.addressMatchesSelf(wire.from ?? '', alias, identity);
-      const isRecipient = this.addressMatchesSelf(wire.to ?? '', alias, identity);
-      this.log(`handleArchiveWire: wire.from=${wire.from} wire.to=${wire.to} isSender=${isSender} isRecipient=${isRecipient}`);
+      const overlayField = perspective === 'recipient' ? 'recipient_archived_at' : 'sender_archived_at';
+      this.log(`handleArchiveWire: wire.from=${wire.from} wire.to=${wire.to} perspective=${perspective} overlayField=${overlayField}`);
 
       // Write overlay to local flat/ (not territory)
       fs.mkdirSync(localDir, { recursive: true });
       const localWire = fs.existsSync(localPath)
         ? JSON.parse(fs.readFileSync(localPath, 'utf8')) as Record<string, unknown>
         : { ...wire } as Record<string, unknown>;
-      // Self-addressed: set both overlay fields so both Inbox and Outbox archive views work
-      if (isSender) localWire['sender_archived_at'] = isoNow;
-      if (isRecipient) localWire['recipient_archived_at'] = isoNow;
+      localWire[overlayField] = isoNow;
       fs.writeFileSync(localPath, JSON.stringify(localWire, null, 2), 'utf8');
-      console.log('Wild West: archived wire locally', { wwuid, isSender, isRecipient, path: localPath });
+      console.log('Wild West: archived wire locally', { wwuid, perspective, overlayField, path: localPath });
 
       // If both parties have now archived (overlay fields both set), promote territory to archived
       const bothArchived =
@@ -792,7 +790,7 @@ export class TelegraphPanel {
   document.getElementById('bulkApply').addEventListener('click', () => {
     const status = document.getElementById('bulkStatus').value;
     if (!status || selectedWwuids.size === 0) return;
-    vscode.postMessage({ type: 'bulkStatus', wwuids: [...selectedWwuids], status });
+    vscode.postMessage({ type: 'bulkStatus', wwuids: [...selectedWwuids], status, perspective: activeTab === 'inbox' ? 'recipient' : 'sender' });
     clearSelection();
   });
 
@@ -822,7 +820,7 @@ export class TelegraphPanel {
     const markReadBtn = e.target.closest('[data-mark-read]');
     if (markReadBtn) { vscode.postMessage({ type: 'markRead', wwuid: markReadBtn.dataset.markRead }); return; }
     const archiveBtn = e.target.closest('[data-archive]');
-    if (archiveBtn) { vscode.postMessage({ type: 'archive', wwuid: archiveBtn.dataset.archive }); return; }
+    if (archiveBtn) { vscode.postMessage({ type: 'archive', wwuid: archiveBtn.dataset.archive, perspective: activeTab === 'inbox' ? 'recipient' : 'sender' }); return; }
     const replyBtn = e.target.closest('[data-reply]');
     if (replyBtn) {
       const ww = [...inboxWires, ...outboxWires, ...allWires].find(x => x.wwuid === replyBtn.dataset.reply);
