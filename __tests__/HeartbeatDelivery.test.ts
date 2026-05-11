@@ -9,6 +9,9 @@ jest.mock('vscode', () => ({
       get: jest.fn((_key: string, defaultValue: unknown) => defaultValue),
     })),
   },
+  commands: {
+    executeCommand: jest.fn(() => Promise.resolve()),
+  },
 }), { virtual: true });
 
 import { __test__ as HeartbeatMonitorTest } from '../src/HeartbeatMonitor';
@@ -107,5 +110,56 @@ Self-addressed mail should arrive in the local inbox.
     expect(Array.isArray(flatWire.status_transitions)).toBe(true);
     expect((flatWire.status_transitions as Array<Record<string, unknown>>).some((t) => t.status === 'delivered')).toBe(true);
     expect(logs.some((line) => line.includes('flat wire updated'))).toBe(true);
+  });
+
+  it('beatTown sends TM->CD wires into parent county inbox and logs the delivery path', () => {
+    const worldRoot = tempDir;
+    const countyPath = path.join(worldRoot, 'counties', 'wildwest-ai');
+    const townPath = path.join(countyPath, 'wildwest-vscode');
+    const outboxDir = path.join(townPath, '.wildwest', 'telegraph', 'outbox');
+    const countyInboxDir = path.join(countyPath, '.wildwest', 'telegraph', 'inbox');
+
+    fs.mkdirSync(outboxDir, { recursive: true });
+    fs.mkdirSync(path.join(countyPath, '.wildwest'), { recursive: true });
+
+    fs.writeFileSync(
+      path.join(townPath, '.wildwest', 'registry.json'),
+      JSON.stringify({ scope: 'town', alias: 'wildwest-vscode', wwuid: 'town-uid' }, null, 2),
+      'utf8',
+    );
+    fs.writeFileSync(
+      path.join(countyPath, '.wildwest', 'registry.json'),
+      JSON.stringify({ scope: 'county', alias: 'wildwest-ai', wwuid: 'county-uid' }, null, 2),
+      'utf8',
+    );
+
+    const filename = '20260510-0000Z-to-CD-from-TM--test.json';
+    const memo = {
+      schema_version: '2',
+      wwuid: 'bug-wire',
+      wwuid_type: 'wire',
+      from: 'TM',
+      to: 'CD',
+      type: 'status-update',
+      date: '2026-05-10T00:00:00Z',
+      subject: 'county delivery test',
+      status: 'sent',
+      body: 'Test TM to CD delivery',
+      filename,
+    };
+    fs.writeFileSync(path.join(outboxDir, filename), JSON.stringify(memo, null, 2), 'utf8');
+
+    const logs: string[] = [];
+    const outputChannel = {
+      appendLine: (message: string) => logs.push(message),
+    } as unknown as vscode.OutputChannel;
+
+    const state = HeartbeatMonitorTest.beatTown(townPath, outputChannel, worldRoot, 'counties');
+
+    expect(state).toBe('alive');
+    expect(fs.existsSync(path.join(countyInboxDir, filename))).toBe(true);
+    expect(fs.existsSync(path.join(outboxDir, 'history', filename))).toBe(true);
+    expect(logs.some((line) => line.includes(`town beat countyRoot=${countyPath}`))).toBe(true);
+    expect(logs.some((line) => line.includes(`delivery: ${filename}`))).toBe(true);
   });
 });

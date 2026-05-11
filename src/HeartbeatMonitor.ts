@@ -127,22 +127,55 @@ function readMigratedRegistry(rootPath: string): Record<string, unknown> | null 
   return reg;
 }
 
-function updateFlatWireDeliveryStatus(worldRoot: string, memoFile: string, outputChannel: vscode.OutputChannel): void {
+function updateFlatWireDeliveryStatus(worldRoot: string, memoPath: string, memoFile: string, outputChannel: vscode.OutputChannel): void {
   if (!memoFile.endsWith('.json')) return;
 
   const flatDir = path.join(worldRoot, 'telegraph', 'flat');
-  const flatPath = path.join(flatDir, memoFile);
-  if (!fs.existsSync(flatPath)) return;
+  if (!fs.existsSync(flatDir)) return;
+
+  let wirePath: string | null = null;
+  const targetPath = path.join(flatDir, memoFile);
+  if (fs.existsSync(targetPath)) {
+    wirePath = targetPath;
+  } else {
+    // Fall back to locate the wire by wwuid or filename inside flat/.
+    const candidates = fs.readdirSync(flatDir).filter((f) => f.endsWith('.json'));
+    let currentMemo: Record<string, unknown> | null = null;
+    try {
+      currentMemo = JSON.parse(fs.readFileSync(memoPath, 'utf8')) as Record<string, unknown>;
+    } catch {
+      currentMemo = null;
+    }
+    const targetWwuid = currentMemo?.['wwuid'] as string | undefined;
+    const targetFilename = currentMemo?.['filename'] as string | undefined || memoFile;
+
+    for (const candidate of candidates) {
+      const candidatePath = path.join(flatDir, candidate);
+      try {
+        const candidateWire = JSON.parse(fs.readFileSync(candidatePath, 'utf8')) as Record<string, unknown>;
+        if (candidate === memoFile || candidateWire['wwuid'] === targetWwuid || candidateWire['filename'] === targetFilename) {
+          wirePath = candidatePath;
+          break;
+        }
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  if (!wirePath) {
+    return;
+  }
 
   try {
-    const wire = JSON.parse(fs.readFileSync(flatPath, 'utf8')) as Record<string, unknown>;
+    const wire = JSON.parse(fs.readFileSync(wirePath, 'utf8')) as Record<string, unknown>;
     wire['status'] = 'delivered';
     wire['delivered_at'] = wire['delivered_at'] || new Date().toISOString();
     const transitions = Array.isArray(wire['status_transitions']) ? wire['status_transitions'] as Array<Record<string, unknown>> : [];
     transitions.push({ status: 'delivered', timestamp: wire['delivered_at'], repos: ['vscode'] });
     wire['status_transitions'] = transitions;
-    fs.writeFileSync(flatPath, JSON.stringify(wire, null, 2), 'utf8');
-    outputChannel.appendLine(`[HeartbeatMonitor] flat wire updated: ${memoFile} set to delivered`);
+    fs.writeFileSync(wirePath, JSON.stringify(wire, null, 2), 'utf8');
+    outputChannel.appendLine(`[HeartbeatMonitor] flat wire updated: ${path.basename(wirePath)} set to delivered`);
   } catch (err) {
     outputChannel.appendLine(`[HeartbeatMonitor] failed to update flat wire status for ${memoFile}: ${err}`);
   }
@@ -661,12 +694,19 @@ function deliverPendingOutbox(
       (e) => (e.endsWith('.md') || e.endsWith('.json')) && !e.startsWith('.') && !e.startsWith('!'),
     );
 
+    outputChannel.appendLine(
+      `[HeartbeatMonitor] deliverPendingOutbox root=${rootPath} scope=${scope} outboxDir=${outboxDir} files=${memoFiles.length}`,
+    );
+
     for (const memoFile of memoFiles) {
       try {
         const memoPath = path.join(outboxDir, memoFile);
         const frontmatter = parseMemoFrontmatter(memoPath);
         const toField = frontmatter['to'] as string | undefined;
         const fromField = (frontmatter['from'] as string | undefined) ?? '';
+        outputChannel.appendLine(
+          `[HeartbeatMonitor] processing memo=${memoFile} from=${fromField || '<none>'} to=${toField || '<none>'} scope=${scope}`,
+        );
 
         // Warn if from: is bare role with no town specifier in multi-town county
         if (scope === 'county' && /^TM$/i.test(fromField.trim())) {
@@ -706,6 +746,9 @@ function deliverPendingOutbox(
         }
 
         const { role, pattern } = rolePattern;
+        outputChannel.appendLine(
+          `[HeartbeatMonitor] ${memoFile} role=${role} pattern=${pattern ?? '<none>'}`,
+        );
 
         const destScope = resolveRoleToScope(role);
         if (!destScope) {
@@ -715,6 +758,9 @@ function deliverPendingOutbox(
         }
 
         const destPath = resolveScopePath(scope, rootPath, destScope, worldRoot, countiesDir, pattern);
+        outputChannel.appendLine(
+          `[HeartbeatMonitor] ${memoFile} destScope=${destScope} destPath=${destPath === 'AMBIGUOUS' ? 'AMBIGUOUS' : destPath || '<none>'}`,
+        );
 
         if (destPath === 'AMBIGUOUS') {
           const hint = destScope === 'town'
@@ -768,6 +814,7 @@ function deliverPendingOutbox(
           try {
             const json = JSON.parse(content) as Record<string, unknown>;
             json['delivered_at'] = now;
+            json['status'] = 'delivered';
             content = JSON.stringify(json, null, 2);
           } catch {
             // If JSON parse fails, leave the content unchanged.
@@ -785,7 +832,7 @@ function deliverPendingOutbox(
         }
 
         // Update the flat/ SSOT wire status so UI panels reflect the delivered result.
-        updateFlatWireDeliveryStatus(worldRoot, memoFile, outputChannel);
+        updateFlatWireDeliveryStatus(worldRoot, memoPath, memoFile, outputChannel);
 
         // Move to outbox/history/
         const historyDir = path.join(outboxDir, 'history');
@@ -879,6 +926,7 @@ function beatTown(
 
     // Also deliver county outbox if we can find the county root
     const countyRoot = findCountyRoot(rootPath);
+    outputChannel.appendLine(`[HeartbeatMonitor] town beat countyRoot=${countyRoot ?? '<none>'}`);
     if (countyRoot) {
       const countyDelivery = deliverPendingOutbox(countyRoot, 'county', outputChannel, worldRoot, countiesDir);
       refreshNeeded = refreshNeeded || countyDelivery.delivered > 0;
@@ -1269,4 +1317,5 @@ export class HeartbeatMonitor {
 
 export const __test__ = {
   deliverPendingOutbox,
+  beatTown,
 };

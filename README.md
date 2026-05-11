@@ -2,13 +2,13 @@
 
 Governance framework for AI-assisted development. Tracks dyad activity, exports chat sessions, monitors heartbeat, and coordinates identities across the Wild West county model.
 
-**Current version:** v0.37.3
+**Current version:** v0.37.4
 
 ---
 
 ## What's New
 
-**v0.37.3** — Bug fix: heartbeat outbox delivery now processes JSON-only telegraph wires, updates flat/ SSOT wire status on delivery, and refreshes the Telegraph panel after heartbeat delivery.
+**v0.37.4** — Bug fix: added heartbeat debug logging and fixed TM→CD county delivery routing so pending outbox wires are correctly resolved and delivered to the parent county inbox.
 
 **v0.37.1** — Draft detail pane: Send button (draft only) sets status → `pending` in flat/ and writes wire to workspace `outbox/` for heartbeat operator pickup. Archive button hidden when already archived.
 
