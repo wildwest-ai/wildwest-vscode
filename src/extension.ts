@@ -301,12 +301,12 @@ export function activate(context: vscode.ExtensionContext) {
       const alias = wsPath
         ? readRegistryAlias(path.join(wsPath, '.wildwest')) ?? 'wildwest-vscode'
         : 'wildwest-vscode';
-      const from = `TM(${alias})`;
+      const from = `TM[${alias}]`;
 
       const to = await vscode.window.showInputBox({
         title: 'Create Wire (1/3) — To',
-        prompt: 'Recipient in Role(alias) format',
-        placeHolder: 'e.g. CD(RSn) or TM(wildwest-vscode)',
+        prompt: 'Recipient in Role[alias] or Role(dyad) format',
+        placeHolder: 'e.g. CD(RSn) or TM[wildwest-vscode]',
         validateInput: v => v.trim() ? null : 'Required',
       });
       if (!to) return;

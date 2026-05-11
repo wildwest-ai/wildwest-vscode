@@ -135,7 +135,7 @@ export function toolDraftWire(ctx: MCPScopeContext, input: DraftWireInput): Wire
   }
 
   const wire = createFlatWire({
-    from: `TM(${fromAlias})`,
+    from: `TM[${fromAlias}]`,
     to: input.to,
     type: input.type ?? 'status-update',
     subject: normalizeWireSubject(input.subject),
@@ -162,7 +162,7 @@ export function toolSendWire(ctx: MCPScopeContext, input: SendWireInput): WireWr
   }
 
   const wire = createFlatWire({
-    from: `TM(${fromAlias})`,
+    from: `TM[${fromAlias}]`,
     to: input.to,
     type: input.type ?? 'status-update',
     subject: normalizeWireSubject(input.subject),

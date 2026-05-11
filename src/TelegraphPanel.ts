@@ -85,11 +85,16 @@ export class TelegraphPanel {
     if (id && (f === id || f.startsWith(id + '.'))) return true;
 
     if (a) {
-      // Alias in parens: TM(wildwest-vscode)
+      // Alias in parens: TM(wildwest-vscode) [legacy]
       if (f.includes('(' + a + ')')) return true;
+      // Alias in brackets: TM[wildwest-vscode] or TM(RHk)[wildwest-vscode]
+      if (f.includes('[' + a + ']')) return true;
       // Glob in parens: TM(*vscode) — alias ends with suffix
       const glob = f.match(/\(\*([^)]+)\)/);
       if (glob && a.endsWith(glob[1])) return true;
+      // Glob in brackets: TM[*vscode]
+      const globB = f.match(/\[\*([^\]]+)\]/);
+      if (globB && a.endsWith(globB[1])) return true;
       // Bare alias as whole field
       if (f === a) return true;
     }
@@ -264,6 +269,15 @@ export class TelegraphPanel {
     const flatDir = this.getFlatDir();
     const wsDir = this.getWorkspaceFlatDir();
     if (!wwuids?.length || !status) return;
+    // Archive uses overlay pattern — delegate to handleArchiveWire per wire
+    if (status === 'archived') {
+      for (const wwuid of wwuids) this.handleArchiveWire(wwuid);
+      return; // sendWires called inside handleArchiveWire
+    }
+    if (status === 'read') {
+      for (const wwuid of wwuids) this.handleMarkRead(wwuid);
+      return; // sendWires called inside handleMarkRead
+    }
     const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
     for (const wwuid of wwuids) {
       // Prefer territory for sent/received/read; fall back to local for draft/pending
@@ -316,22 +330,30 @@ export class TelegraphPanel {
 
   private handleMarkRead(wwuid: string): void {
     const flatDir = this.getFlatDir();
-    if (!flatDir || !wwuid) return;
-    const filePath = path.join(flatDir, `${wwuid}.json`);
-    if (!fs.existsSync(filePath)) return;
-    try {
-      const wire = JSON.parse(fs.readFileSync(filePath, 'utf8')) as FlatWire;
-      if (wire.status === 'read') return; // already read
-      const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
-      wire.status = 'read';
-      wire.read_at = isoNow;
-      wire.status_transitions = [
-        ...(wire.status_transitions ?? []),
-        { status: 'read', timestamp: isoNow, repos: ['vscode'] },
-      ];
-      fs.writeFileSync(filePath, JSON.stringify(wire, null, 2), 'utf8');
-      this.sendWires();
-    } catch { /* skip */ }
+    const wsDir = this.getWorkspaceFlatDir();
+    if (!wwuid) return;
+    // Try territory first (authoritative), fall back to workspace local
+    const dirs: string[] = [];
+    if (flatDir) dirs.push(flatDir);
+    if (wsDir) dirs.push(wsDir);
+    const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+    for (const dir of dirs) {
+      const filePath = path.join(dir, `${wwuid}.json`);
+      if (!fs.existsSync(filePath)) continue;
+      try {
+        const wire = JSON.parse(fs.readFileSync(filePath, 'utf8')) as FlatWire;
+        if (wire.status === 'read') return; // already read
+        wire.status = 'read';
+        wire.read_at = isoNow;
+        wire.status_transitions = [
+          ...(wire.status_transitions ?? []),
+          { status: 'read', timestamp: isoNow, repos: ['vscode'] },
+        ];
+        fs.writeFileSync(filePath, JSON.stringify(wire, null, 2), 'utf8');
+        this.sendWires();
+      } catch { /* skip */ }
+      break;
+    }
   }
 
   private handleArchiveWire(wwuid: string): void {

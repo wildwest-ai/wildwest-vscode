@@ -534,12 +534,13 @@ function normalizeToField(toField: string): { normalized: string; deprecated: bo
 }
 
 function extractRolePattern(toField: string): { role: string; pattern: string | null } | null {
-  // Match: word, optionally followed by (*pattern) or (pattern)
-  const match = toField.match(/^([A-Za-z]+)(?:\((\*?[^)]+)\))?$/);
-  if (!match) return null;
-  const role = match[1];
-  const pattern = match[2] ?? null;
-  return { role, pattern };
+  // Bracket format (v1.1+): TM[alias] or TM(dyad)[alias] — routing anchor is in brackets
+  const bracketMatch = toField.match(/^([A-Za-z]+)(?:\([^)]+\))?\[(\*?[^\]]+)\]$/);
+  if (bracketMatch) return { role: bracketMatch[1], pattern: bracketMatch[2] };
+  // Legacy paren format: TM(alias) or bare TM
+  const parenMatch = toField.match(/^([A-Za-z]+)(?:\((\*?[^)]+)\))?$/);
+  if (!parenMatch) return null;
+  return { role: parenMatch[1], pattern: parenMatch[2] ?? null };
 }
 
 /**

@@ -4,6 +4,10 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.39.4] - 2026-05-11
+
+Fixed Mark Read and Archive buttons being no-ops for inbox wires: `handleMarkRead` now falls back to workspace local flat/ when the wire is not in territory (fixes wires delivered via heartbeat to workspace inbox). Bulk archive now correctly delegates to `handleArchiveWire` per wire — was comparing `status === 'archive'` but the bulk select sends `'archived'`, causing it to bypass the overlay pattern entirely. Updated wire `from` notation from `TM(alias)` to `TM[alias]` per v1.1 bracket spec (wwMCPTools, extension.ts, create-wire.js). Added bracket address format recognition (`TM[alias]`, `TM[*suffix]`) to `addressMatchesSelf` and `extractRolePattern` alongside legacy paren format.
+
 ## [0.39.3] - 2026-05-11
 
 New `wildwest.createWire` command (Command Palette → Wild West: Create Wire) — available in any VSCode window regardless of workspace. Multi-step input: To, Subject, Body, then Draft or Send. Draft writes to local `.wildwest/telegraph/flat/`; Send writes to territory `~/wildwest/telegraph/flat/`. Also aligned `scripts/create-wire.js` with WireFactory (reads sender from registry, normalizes subject, adds `--send` and `--re` flags); registered `npm run wire` in package.json.
