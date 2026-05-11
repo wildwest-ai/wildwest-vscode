@@ -4,10 +4,8 @@ import { SessionExporter } from './sessionExporter';
 import { HeartbeatMonitor } from './HeartbeatMonitor';
 import { StatusBarManager } from './StatusBarManager';
 import { SoloModeController } from './SoloModeController';
-import { TelegraphWatcher } from './TelegraphWatcher';
 import { WorktreeManager } from './WorktreeManager';
 import { initTown, initCounty, initTerritory } from './TownInit';
-import { TelegraphInbox } from './TelegraphInbox';
 import { TelegraphCommands } from './TelegraphCommands';
 import { AIToolBridge } from './AIToolBridge';
 import { ClaudeCodeAdapter } from './aiToolAdapters/ClaudeCodeAdapter';
@@ -45,11 +43,9 @@ function getWildwestConfig(): WildwestConfig {
 let exporter: SessionExporter;
 let heartbeatMonitor: HeartbeatMonitor;
 let statusBarManager: StatusBarManager;
-let telegraphWatcher: TelegraphWatcher;
 let soloModeController: SoloModeController;
 let worktreeManager: WorktreeManager;
 let telegraphCommands: TelegraphCommands;
-let telegraphInbox: TelegraphInbox;
 let aiToolBridge: AIToolBridge;
 let sidePanelProvider: SidePanelProvider;
 let promptIndexService: PromptIndexService;
@@ -78,9 +74,7 @@ export function activate(context: vscode.ExtensionContext) {
       sidePanelProvider?.refresh();
     }).catch(() => { /* silent */ });
   });
-  telegraphWatcher = new TelegraphWatcher(outputChannel, worktreeManager, heartbeatMonitor);
   soloModeController = new SoloModeController(outputChannel, worktreeManager, heartbeatMonitor);
-  telegraphInbox = new TelegraphInbox(outputChannel);
   telegraphCommands = new TelegraphCommands(outputChannel, heartbeatMonitor, exporter.getExportPath());
   telegraphCommands.register(context);
 
@@ -229,21 +223,14 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('wildwest.initTerritory', () => initTerritory(outputChannel)),
   );
 
-  // ── Command — telegraph inbox (rule 23 enforcement) ───────────────────────
-  context.subscriptions.push(
-    vscode.commands.registerCommand('wildwest.processInbox', () => telegraphInbox.processInbox()),
-  );
-
   // ── Commands — heartbeat ──────────────────────────────────────────────────
   context.subscriptions.push(
     vscode.commands.registerCommand('wildwest.startHeartbeat', () => {
       heartbeatMonitor.start();
-      telegraphWatcher.start();
       outputChannel.appendLine('[wildwest] heartbeat started');
     }),
     vscode.commands.registerCommand('wildwest.stopHeartbeat', () => {
       heartbeatMonitor.stop();
-      telegraphWatcher.stop();
       outputChannel.appendLine('[wildwest] heartbeat stopped');
     }),
     vscode.commands.registerCommand('wildwest.restartAdapter', async () => {
@@ -384,7 +371,6 @@ export function activate(context: vscode.ExtensionContext) {
   if (config.get<boolean>('enabled') !== false) {
     statusBarManager.startListening();
     heartbeatMonitor.start();
-    telegraphWatcher.start();
 
     // Session export requires explicit first-run consent (OWASP A01: access
     // control — don't read user data stores without permission).
@@ -419,22 +405,19 @@ export function activate(context: vscode.ExtensionContext) {
       const enabled = newConfig.get<boolean>('enabled');
       if (enabled && !heartbeatMonitor.isRunning()) {
         heartbeatMonitor.start();
-        telegraphWatcher.start();
       } else if (!enabled && heartbeatMonitor.isRunning()) {
         heartbeatMonitor.stop();
-        telegraphWatcher.stop();
       }
     }),
   );
 
-  context.subscriptions.push(heartbeatMonitor, telegraphWatcher, soloModeController, statusBarManager);
+  context.subscriptions.push(heartbeatMonitor, soloModeController, statusBarManager);
 }
 
 export async function deactivate(): Promise<void> {
   await exporter?.stop(true);
   exporter?.dispose();
   heartbeatMonitor?.dispose();
-  telegraphWatcher?.dispose();
   statusBarManager?.dispose();
   sidePanelProvider?.dispose();
   await aiToolBridge?.stop();

@@ -4,6 +4,10 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.39.9] - 2026-05-11
+
+Remove legacy Rule-23 text memo inbox/outbox wiring. `TelegraphWatcher` (file watcher for `.wildwest/telegraph/inbox/`) and `TelegraphInbox` (Rule-23 enforcement processor) are no longer instantiated or registered. `wildwest.processInbox` command removed from extension and package manifest. Status bar tooltip no longer reads legacy inbox `.md` files when flagged. Source files retained; flat-wire panel (`TelegraphPanel`) is the active implementation.
+
 ## [0.39.8] - 2026-05-11
 
 Fix Archive perspective: single-click Archive from Inbox now sets only `recipient_archived_at`; from Outbox sets only `sender_archived_at`. Previously self-addressed wires stamped both fields on one click, conflating sender and recipient perspectives. Fix: `handleArchiveWire` now accepts a `perspective` param; webview passes `activeTab === 'inbox' ? 'recipient' : 'sender'` with both the single-wire `archive` and `bulkStatus` messages.

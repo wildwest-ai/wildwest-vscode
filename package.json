@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
   },
-  "version": "0.39.8",
+  "version": "0.39.9",
   "publisher": "wildwest-ai",
   "engines": {
     "vscode": "^1.90.0"
@@ -108,11 +108,6 @@
       {
         "command": "wildwest.initTerritory",
         "title": "Init Territory",
-        "category": "Wild West"
-      },
-      {
-        "command": "wildwest.processInbox",
-        "title": "Process Inbox (rule 23)",
         "category": "Wild West"
       },
       {
