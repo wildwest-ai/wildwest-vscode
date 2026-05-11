@@ -1,9 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { FlatWire, createFlatWire, writeFlatWire, parseFilenameActors } from './WireFactory';
+import { FlatWire, createFlatWire, writeFlatWire, writeDraftWire, parseFilenameActors } from './WireFactory';
 import { readRegistryAlias } from './TelegraphService';
 import { PromptIndexService } from './PromptIndexService';
+import type { HeartbeatMonitor } from './HeartbeatMonitor';
 
 /** New protocol: wire files are always {wwuid}.json */
 const UUID_FILE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.json$/;
@@ -16,7 +17,7 @@ export class TelegraphPanel {
   private disposables: vscode.Disposable[] = [];
   private static outputChannel = vscode.window.createOutputChannel('Wild West Telegraph');
 
-  static open(exportPath: string, promptIndex?: PromptIndexService): void {
+  static open(exportPath: string, promptIndex?: PromptIndexService, heartbeat?: HeartbeatMonitor): void {
     if (TelegraphPanel.instance) {
       TelegraphPanel.instance.panel.reveal();
       return;
@@ -27,12 +28,13 @@ export class TelegraphPanel {
       vscode.ViewColumn.Beside,
       { enableScripts: true, retainContextWhenHidden: true },
     );
-    TelegraphPanel.instance = new TelegraphPanel(panel, promptIndex);
+    TelegraphPanel.instance = new TelegraphPanel(panel, promptIndex, heartbeat);
   }
 
   private constructor(
     panel: vscode.WebviewPanel,
     private readonly promptIndex?: PromptIndexService,
+    private readonly heartbeat?: HeartbeatMonitor,
   ) {
     this.panel = panel;
     this.panel.webview.html = this.buildHtml();
@@ -43,14 +45,6 @@ export class TelegraphPanel {
   }
 
   // ── Flat directory resolution ─────────────────────────────────────────────
-
-  /** Returns the territory flat/ path unconditionally (for writing — creates dir on use). */
-  private getTerritoryFlatDirPath(): string {
-    const cfg = vscode.workspace.getConfiguration('wildwest');
-    const home = process.env['HOME'] ?? '~';
-    const worldRoot = (cfg.get<string>('worldRoot') ?? '~/wildwest').replace(/^~/, home);
-    return path.join(worldRoot, 'telegraph', 'flat');
-  }
 
   private getFlatDir(): string | null {
     const cfg = vscode.workspace.getConfiguration('wildwest');
@@ -277,14 +271,19 @@ export class TelegraphPanel {
     const role = roleMatch?.[1] ?? 'TM';
     const fromActor = alias ? `${role}(${alias})` : (identity || 'TM');
 
-    const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
-    const wire = createFlatWire({ from: fromActor, to, type, subject, body, status: 'sent' });
-    wire.sent_at = wire.sent_at || isoNow;
+    const wire = createFlatWire({ from: fromActor, to, type, subject, body, status: 'pending' });
 
-    // Write directly to territory SSOT — no heartbeat delivery step needed.
-    writeFlatWire(wire, this.getTerritoryFlatDirPath());
+    // Write to local outbox for heartbeat pickup → heartbeat promotes to SSOT.
+    // Call deliverOutboxNow() immediately so there's no waiting for the next tick.
+    const outboxDir = path.join(wsPath, '.wildwest', 'telegraph', 'outbox');
+    fs.mkdirSync(outboxDir, { recursive: true });
+    fs.writeFileSync(path.join(outboxDir, `${wire.wwuid}.json`), JSON.stringify(wire, null, 2), 'utf8');
+
+    // Also save to local flat/ so it shows in Outbox > Pending while delivery runs
+    writeDraftWire(wire, wsPath);
 
     this.panel.webview.postMessage({ type: 'sent', wire });
+    this.heartbeat?.deliverOutboxNow();
     this.sendWires();
   }
 
@@ -326,7 +325,8 @@ export class TelegraphPanel {
   }
 
   private handleSendDraft(wwuid: string): void {
-    // Draft lives in local flat/; promote to sent and write directly to territory SSOT.
+    // Draft lives in local flat/; promote to pending and move to outbox for heartbeat pickup.
+    // Call deliverOutboxNow() immediately so there's no waiting for the next tick.
     const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
     const localFlatDir = path.join(wsPath, '.wildwest', 'telegraph', 'flat');
     const localFilePath = path.join(localFlatDir, `${wwuid}.json`);
@@ -334,16 +334,18 @@ export class TelegraphPanel {
     try {
       const wire = JSON.parse(fs.readFileSync(localFilePath, 'utf8')) as FlatWire;
       const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
-      wire.status = 'sent';
-      wire.sent_at = wire.sent_at || isoNow;
+      wire.status = 'pending';
       wire.status_transitions = [
         ...(wire.status_transitions ?? []),
-        { status: 'sent', timestamp: isoNow, repos: ['vscode'] },
+        { status: 'pending', timestamp: isoNow, repos: ['vscode'] },
       ];
-      // Write directly to territory SSOT — no heartbeat delivery step needed.
-      writeFlatWire(wire, this.getTerritoryFlatDirPath());
-      // Remove local draft (territory is now authoritative)
-      try { fs.unlinkSync(localFilePath); } catch { /* already gone */ }
+      // Update local flat/ so Outbox shows Pending while delivery runs
+      fs.writeFileSync(localFilePath, JSON.stringify(wire, null, 2), 'utf8');
+      // Drop in workspace outbox/ for heartbeat pickup
+      const outboxDir = path.join(wsPath, '.wildwest', 'telegraph', 'outbox');
+      fs.mkdirSync(outboxDir, { recursive: true });
+      fs.writeFileSync(path.join(outboxDir, `${wire.wwuid}.json`), JSON.stringify(wire, null, 2), 'utf8');
+      this.heartbeat?.deliverOutboxNow();
       this.sendWires();
     } catch (err) {
       vscode.window.showErrorMessage(`Wild West: send draft failed — ${err}`);

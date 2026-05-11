@@ -274,7 +274,7 @@ export function activate(context: vscode.ExtensionContext) {
       runDoctor(context, outputChannel, heartbeatMonitor),
     ),
     vscode.commands.registerCommand('wildwest.openTelegraphPanel', () => {
-      TelegraphPanel.open(exporter.getExportPath(), promptIndexService);
+      TelegraphPanel.open(exporter.getExportPath(), promptIndexService, heartbeatMonitor);
     }),
     vscode.commands.registerCommand('wildwest.refreshTelegraphPanel', () => {
       TelegraphPanel.refresh();
@@ -339,7 +339,7 @@ export function activate(context: vscode.ExtensionContext) {
           writeDraftWire(wire, wsPath);
           vscode.window
             .showInformationMessage(`Wild West: draft saved — ${wire.filename}`, 'Open Telegraph Panel')
-            .then(sel => { if (sel) TelegraphPanel.open(exporter.getExportPath(), promptIndexService); });
+            .then(sel => { if (sel) TelegraphPanel.open(exporter.getExportPath(), promptIndexService, heartbeatMonitor); });
         }
       } catch (err) {
         vscode.window.showErrorMessage(`Wild West: createWire failed — ${err}`);

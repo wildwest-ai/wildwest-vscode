@@ -4,6 +4,10 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.39.11] - 2026-05-11
+
+Fix v0.39.10 architectural regression: revert direct-to-territory writes in `handleSend`/`handleSendDraft`. Wire send goes through `.wildwest/telegraph/outbox/` (correct for future remote SSOT) and calls `heartbeatMonitor.deliverOutboxNow()` immediately to eliminate the 2–3 min delay. `HeartbeatMonitor` is now passed into `TelegraphPanel.open()` and stored on the instance.
+
 ## [0.39.10] - 2026-05-11
 
 Fix pending delay: `handleSend` (Compose) and `handleSendDraft` now write directly to territory flat as `status: 'sent'` instead of routing through `.wildwest/telegraph/outbox/` for heartbeat pickup. Eliminates 2–3 min pending window. Removes `.wildwest/telegraph/outbox/` and `inbox/` folder creation side effects.
