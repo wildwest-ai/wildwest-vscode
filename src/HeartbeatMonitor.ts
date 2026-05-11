@@ -131,7 +131,7 @@ function updateFlatWireDeliveryStatus(worldRoot: string, memoPath: string, memoF
   if (!memoFile.endsWith('.json')) return;
 
   const flatDir = path.join(worldRoot, 'telegraph', 'flat');
-  if (!fs.existsSync(flatDir)) return;
+  fs.mkdirSync(flatDir, { recursive: true });
 
   let wirePath: string | null = null;
   const targetPath = path.join(flatDir, memoFile);
@@ -164,7 +164,20 @@ function updateFlatWireDeliveryStatus(worldRoot: string, memoPath: string, memoF
   }
 
   if (!wirePath) {
-    return;
+    try {
+      const wire = JSON.parse(fs.readFileSync(memoPath, 'utf8')) as Record<string, unknown>;
+      wire['status'] = 'delivered';
+      wire['delivered_at'] = wire['delivered_at'] || new Date().toISOString();
+      const transitions = Array.isArray(wire['status_transitions']) ? wire['status_transitions'] as Array<Record<string, unknown>> : [];
+      transitions.push({ status: 'delivered', timestamp: wire['delivered_at'], repos: ['vscode'] });
+      wire['status_transitions'] = transitions;
+      fs.writeFileSync(targetPath, JSON.stringify(wire, null, 2), 'utf8');
+      outputChannel.appendLine(`[HeartbeatMonitor] flat wire created: ${memoFile} in territory SSOT`);
+      return;
+    } catch (err) {
+      outputChannel.appendLine(`[HeartbeatMonitor] failed to create flat wire for ${memoFile}: ${err}`);
+      return;
+    }
   }
 
   try {
