@@ -6,6 +6,8 @@ export const TOOL_STATUS = 'wildwest_status';
 export const TOOL_INBOX = 'wildwest_inbox';
 export const TOOL_BOARD = 'wildwest_board';
 export const TOOL_TELEGRAPH_CHECK = 'wildwest_telegraph_check';
+export const TOOL_DRAFT_WIRE = 'wildwest_draft_wire';
+export const TOOL_SEND_WIRE = 'wildwest_send_wire';
 
 // ── Scope context ──────────────────────────────────────────────────────────
 
@@ -55,6 +57,30 @@ export interface BranchSummary {
 
 export interface BoardOutput {
   branches: BranchSummary[];
+}
+
+export interface DraftWireInput {
+  to: string;
+  subject: string;
+  body: string;
+  type?: string;
+  re?: string;
+}
+
+export interface SendWireInput {
+  to: string;
+  subject: string;
+  body: string;
+  type?: string;
+  re?: string;
+}
+
+export interface WireWriteOutput {
+  wwuid: string;
+  filename: string;
+  status: string;
+  date: string;
+  path: string;
 }
 
 export interface TelegraphCheckOutput {

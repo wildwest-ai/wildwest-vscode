@@ -7,13 +7,24 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { HeartbeatMonitor } from '../HeartbeatMonitor';
 import { checkActorAccess } from './wwMCPAuth';
-import { toolBoard, toolInbox, toolStatus, toolTelegraphCheck } from './wwMCPTools';
+import {
+  toolBoard,
+  toolDraftWire,
+  toolInbox,
+  toolSendWire,
+  toolStatus,
+  toolTelegraphCheck,
+} from './wwMCPTools';
 import {
   BoardInput,
+  DraftWireInput,
   InboxInput,
   MCPScopeContext,
+  SendWireInput,
   TOOL_BOARD,
+  TOOL_DRAFT_WIRE,
   TOOL_INBOX,
+  TOOL_SEND_WIRE,
   TOOL_STATUS,
   TOOL_TELEGRAPH_CHECK,
 } from './types';
@@ -90,6 +101,36 @@ export class wwMCPServer {
           description: 'Return wire counts for inbox, outbox, history, and dead-letter.',
           inputSchema: { type: 'object', properties: {} },
         },
+        {
+          name: TOOL_DRAFT_WIRE,
+          description: 'Create a draft wire in the local workspace .wildwest/telegraph/flat directory for review before dispatch.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              to: { type: 'string', description: 'Recipient role in Role(alias) format' },
+              subject: { type: 'string', description: 'Kebab-case wire subject slug' },
+              body: { type: 'string', description: 'Wire body text' },
+              type: { type: 'string', description: 'Wire type (default: status-update)' },
+              re: { type: 'string', description: 'Reference wire wwuid' },
+            },
+            required: ['to', 'subject', 'body'],
+          },
+        },
+        {
+          name: TOOL_SEND_WIRE,
+          description: 'Create and immediately dispatch a wire to territory and local outbox.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              to: { type: 'string', description: 'Recipient role in Role(alias) format' },
+              subject: { type: 'string', description: 'Kebab-case wire subject slug' },
+              body: { type: 'string', description: 'Wire body text' },
+              type: { type: 'string', description: 'Wire type (default: status-update)' },
+              re: { type: 'string', description: 'Reference wire wwuid' },
+            },
+            required: ['to', 'subject', 'body'],
+          },
+        },
       ],
     }));
 
@@ -123,6 +164,14 @@ export class wwMCPServer {
           }
           case TOOL_TELEGRAPH_CHECK: {
             const result = toolTelegraphCheck(ctx);
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+          }
+          case TOOL_DRAFT_WIRE: {
+            const result = toolDraftWire(ctx, args as unknown as DraftWireInput);
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+          }
+          case TOOL_SEND_WIRE: {
+            const result = toolSendWire(ctx, args as unknown as SendWireInput);
             return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
           }
           default:

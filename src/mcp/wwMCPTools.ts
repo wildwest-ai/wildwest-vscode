@@ -1,15 +1,26 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {
+  createFlatWire,
+  writeDraftWire,
+  writeFlatWire,
+} from '../WireFactory';
+import {
+  readRegistryAlias,
+} from '../TelegraphService';
+import {
   BoardInput,
   BoardOutput,
   BranchSummary,
+  DraftWireInput,
   InboxInput,
   InboxOutput,
   MCPScopeContext,
+  SendWireInput,
+  TelegraphCheckOutput,
   WireSummary,
   StatusOutput,
-  TelegraphCheckOutput,
+  WireWriteOutput,
 } from './types';
 
 // ── wildwest_status ─────────────────────────────────────────────────────────
@@ -115,6 +126,79 @@ export function toolTelegraphCheck(ctx: MCPScopeContext): TelegraphCheckOutput {
     deadLetter: count(inboxDir, (f) => f.startsWith('!')) +
                 count(outboxDir, (f) => f.startsWith('!')),
   };
+}
+
+export function toolDraftWire(ctx: MCPScopeContext, input: DraftWireInput): WireWriteOutput {
+  const fromAlias = readRegistryAlias(path.join(ctx.rootPath, '.wildwest'));
+  if (!fromAlias) {
+    throw new Error('Missing registry alias in .wildwest/registry.json');
+  }
+
+  const wire = createFlatWire({
+    from: `TM(${fromAlias})`,
+    to: input.to,
+    type: input.type ?? 'status-update',
+    subject: normalizeWireSubject(input.subject),
+    body: input.body,
+    status: 'draft',
+    re: input.re,
+  });
+
+  writeDraftWire(wire, ctx.rootPath);
+
+  return {
+    wwuid: wire.wwuid,
+    filename: wire.filename,
+    status: wire.status,
+    date: wire.date,
+    path: path.join(ctx.rootPath, '.wildwest', 'telegraph', 'flat', `${wire.wwuid}.json`),
+  };
+}
+
+export function toolSendWire(ctx: MCPScopeContext, input: SendWireInput): WireWriteOutput {
+  const fromAlias = readRegistryAlias(path.join(ctx.rootPath, '.wildwest'));
+  if (!fromAlias) {
+    throw new Error('Missing registry alias in .wildwest/registry.json');
+  }
+
+  const wire = createFlatWire({
+    from: `TM(${fromAlias})`,
+    to: input.to,
+    type: input.type ?? 'status-update',
+    subject: normalizeWireSubject(input.subject),
+    body: input.body,
+    status: 'sent',
+    re: input.re,
+  });
+
+  const territoryFlatDir = path.join(ctx.worldRoot, 'telegraph', 'flat');
+  writeFlatWire(wire, territoryFlatDir);
+
+  const localOutboxDir = path.join(ctx.rootPath, '.wildwest', 'telegraph', 'outbox');
+  fs.mkdirSync(localOutboxDir, { recursive: true });
+  fs.writeFileSync(path.join(localOutboxDir, wire.filename), JSON.stringify(wire, null, 2), 'utf8');
+
+  return {
+    wwuid: wire.wwuid,
+    filename: wire.filename,
+    status: wire.status,
+    date: wire.date,
+    path: path.join(territoryFlatDir, `${wire.wwuid}.json`),
+  };
+}
+
+function normalizeWireSubject(subject: string): string {
+  const normalized = subject
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  if (!normalized) {
+    throw new Error('Subject must contain at least one alphanumeric character');
+  }
+
+  return normalized;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
