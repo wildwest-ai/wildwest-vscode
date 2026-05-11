@@ -227,7 +227,7 @@ async function handleSend(wwRoot: string, rawPrompt: string, stream: vscode.Chat
   const subject = body.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '').toLowerCase().slice(0, 40);
   const flatDir = resolveFlatDir();
 
-  const wire = createFlatWire({ from: senderAlias, to: toRole, type: 'status-update', subject, body });
+  const wire = createFlatWire({ from: senderAlias, to: toRole, type: 'status-update', subject, body, status: 'sent' });
 
   stream.markdown(`**Draft wire** — preview before sending:\n\n`);
   stream.markdown('```json\n' + JSON.stringify(wire, null, 2) + '\n```\n\n');
@@ -272,6 +272,7 @@ async function handleAck(wwRoot: string, timestampArg: string, stream: vscode.Ch
     type: 'ack',
     subject: ackSubject,
     body: ackBody,
+    status: 'sent',
     re: matched,
     original_wire: matched,
   });

@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { FlatWire, createFlatWire, writeFlatWire, parseFilenameActors } from './WireFactory';
+import { FlatWire, createFlatWire, writeFlatWire, writeDraftWire, parseFilenameActors } from './WireFactory';
 import { readRegistryAlias } from './TelegraphService';
 import { PromptIndexService } from './PromptIndexService';
 
@@ -99,30 +99,54 @@ export class TelegraphPanel {
 
   // ── Read flat/ wires ──────────────────────────────────────────────────────
 
+  /**
+   * Read all wires for panel display.
+   * - Territory flat/ (~/wildwest/telegraph/flat/) is the SSOT for sent/received/read/archived.
+   * - Local .wildwest/telegraph/flat/ holds draft/pending wires (sender's local PO) only.
+   *   These are merged in for Outbox view; territory wins on any wwuid conflict.
+   */
   private readAllFlatWires(): FlatWire[] {
-    const territoryDir = this.getFlatDir();     // ~/wildwest/telegraph/flat/ — sender view (delivered)
-    const wsDir = this.getWorkspaceFlatDir();   // <ws>/.wildwest/telegraph/flat/ — recipient view (sent)
+    const territoryDir = this.getFlatDir();
+    const wsDir = this.getWorkspaceFlatDir();
 
-    // Merge both dirs; workspace-local wins on wwuid conflict.
-    // This ensures recipient sees "New" (status: sent) not "Read" (status: delivered)
-    // which is written to territory by HeartbeatMonitor after delivery.
     const byWwuid = new Map<string, FlatWire>();
 
-    for (const [dir, overwrite] of [[territoryDir, false], [wsDir, true]] as [string | null, boolean][]) {
-      if (!dir) continue;
+    // 1. Load territory first (authoritative for sent and beyond)
+    if (territoryDir) {
       let entries: string[];
-      try { entries = fs.readdirSync(dir); } catch { continue; }
+      try { entries = fs.readdirSync(territoryDir); } catch { entries = []; }
       for (const f of entries) {
         if (!f.endsWith('.json') || f.startsWith('.')) continue;
         try {
-          const wire = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) as FlatWire;
+          const wire = JSON.parse(fs.readFileSync(path.join(territoryDir, f), 'utf8')) as FlatWire;
           if (!wire.from || !wire.to) {
             const parsed = parseFilenameActors(wire.filename);
             if (!wire.from && parsed.from) wire.from = parsed.from;
             if (!wire.to && parsed.to) wire.to = parsed.to;
           }
           const key = wire.wwuid ?? f.replace('.json', '');
-          if (overwrite || !byWwuid.has(key)) {
+          byWwuid.set(key, wire);
+        } catch { /* skip corrupt */ }
+      }
+    }
+
+    // 2. Load local draft/pending wires (territory does NOT have these yet)
+    if (wsDir) {
+      let entries: string[];
+      try { entries = fs.readdirSync(wsDir); } catch { entries = []; }
+      for (const f of entries) {
+        if (!f.endsWith('.json') || f.startsWith('.')) continue;
+        try {
+          const wire = JSON.parse(fs.readFileSync(path.join(wsDir, f), 'utf8')) as FlatWire;
+          if (!wire.from || !wire.to) {
+            const parsed = parseFilenameActors(wire.filename);
+            if (!wire.from && parsed.from) wire.from = parsed.from;
+            if (!wire.to && parsed.to) wire.to = parsed.to;
+          }
+          const key = wire.wwuid ?? f.replace('.json', '');
+          // Only add local wire if territory does NOT already have it
+          // (draft/pending are local-only; once sent they live in territory)
+          if (!byWwuid.has(key)) {
             byWwuid.set(key, wire);
           }
         } catch { /* skip corrupt */ }
@@ -174,6 +198,9 @@ export class TelegraphPanel {
       case 'archive':
         this.handleArchiveWire(msg['wwuid'] as string);
         break;
+      case 'markRead':
+        this.handleMarkRead(msg['wwuid'] as string);
+        break;
       case 'sendDraft':
         this.handleSendDraft(msg['wwuid'] as string);
         break;
@@ -214,20 +241,16 @@ export class TelegraphPanel {
     const role = roleMatch?.[1] ?? 'TM';
     const fromActor = alias ? `${role}(${alias})` : (identity || 'TM');
 
-    const wire = createFlatWire({ from: fromActor, to, type, subject, body });
+    const wire = createFlatWire({ from: fromActor, to, type, subject, body, status: 'pending' });
 
-    // Primary: write directly to flat/ (territory SSOT)
-    const flatDir = this.getFlatDir();
-    if (flatDir) {
-      writeFlatWire(wire, flatDir);
-    }
-
-    // Secondary: also drop in workspace outbox for actors relying on inbox delivery
+    // Compose Send → write as pending to local outbox/ for heartbeat pickup.
+    // Heartbeat operator promotes to territory SSOT as 'sent'.
     const outboxDir = path.join(wsPath, '.wildwest', 'telegraph', 'outbox');
-    if (fs.existsSync(path.dirname(outboxDir))) {
-      fs.mkdirSync(outboxDir, { recursive: true });
-      fs.writeFileSync(path.join(outboxDir, wire.filename), JSON.stringify(wire, null, 2), 'utf8');
-    }
+    fs.mkdirSync(outboxDir, { recursive: true });
+    fs.writeFileSync(path.join(outboxDir, wire.filename), JSON.stringify(wire, null, 2), 'utf8');
+
+    // Also save to local flat/ so it shows in Outbox > Pending immediately
+    writeDraftWire(wire, wsPath);
 
     this.panel.webview.postMessage({ type: 'sent', wire });
     this.sendWires();
@@ -235,13 +258,14 @@ export class TelegraphPanel {
 
   private handleBulkStatus(wwuids: string[], status: string): void {
     const flatDir = this.getFlatDir();
-    if (!flatDir || !wwuids?.length || !status) return;
     const wsDir = this.getWorkspaceFlatDir();
+    if (!wwuids?.length || !status) return;
     const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
     for (const wwuid of wwuids) {
-      // Write to both dirs so recipient-local view stays in sync with territory
-      for (const dir of [flatDir, wsDir]) {
-        if (!dir) continue;
+      // Prefer territory for sent/received/read; fall back to local for draft/pending
+      const dirs = flatDir ? [flatDir] : [];
+      if (wsDir) dirs.push(wsDir);
+      for (const dir of dirs) {
         const filePath = path.join(dir, `${wwuid}.json`);
         if (!fs.existsSync(filePath)) continue;
         try {
@@ -253,28 +277,29 @@ export class TelegraphPanel {
           ];
           fs.writeFileSync(filePath, JSON.stringify(wire, null, 2), 'utf8');
         } catch { /* skip */ }
+        break; // only write to first dir that has the file
       }
     }
     this.sendWires();
   }
 
   private handleSendDraft(wwuid: string): void {
-    const flatDir = this.getFlatDir();
-    if (!flatDir || !wwuid) return;
-    const filePath = path.join(flatDir, `${wwuid}.json`);
-    if (!fs.existsSync(filePath)) return;
+    // Draft lives in local flat/; promote to pending and move to outbox for heartbeat pickup.
+    const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+    const localFlatDir = path.join(wsPath, '.wildwest', 'telegraph', 'flat');
+    const localFilePath = path.join(localFlatDir, `${wwuid}.json`);
+    if (!wwuid || !fs.existsSync(localFilePath)) return;
     try {
-      const wire = JSON.parse(fs.readFileSync(filePath, 'utf8')) as FlatWire;
+      const wire = JSON.parse(fs.readFileSync(localFilePath, 'utf8')) as FlatWire;
       const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
       wire.status = 'pending';
       wire.status_transitions = [
         ...(wire.status_transitions ?? []),
         { status: 'pending', timestamp: isoNow, repos: ['vscode'] },
       ];
-      // Update flat/ SSOT
-      fs.writeFileSync(filePath, JSON.stringify(wire, null, 2), 'utf8');
+      // Update local flat/ so Outbox shows Pending
+      fs.writeFileSync(localFilePath, JSON.stringify(wire, null, 2), 'utf8');
       // Drop in workspace outbox/ for heartbeat pickup
-      const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
       const outboxDir = path.join(wsPath, '.wildwest', 'telegraph', 'outbox');
       fs.mkdirSync(outboxDir, { recursive: true });
       fs.writeFileSync(path.join(outboxDir, wire.filename), JSON.stringify(wire, null, 2), 'utf8');
@@ -285,27 +310,79 @@ export class TelegraphPanel {
     }
   }
 
-  private handleArchiveWire(wwuid: string): void {
+  private handleMarkRead(wwuid: string): void {
     const flatDir = this.getFlatDir();
     if (!flatDir || !wwuid) return;
+    const filePath = path.join(flatDir, `${wwuid}.json`);
+    if (!fs.existsSync(filePath)) return;
+    try {
+      const wire = JSON.parse(fs.readFileSync(filePath, 'utf8')) as FlatWire;
+      if (wire.status === 'read') return; // already read
+      const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+      wire.status = 'read';
+      wire.read_at = isoNow;
+      wire.status_transitions = [
+        ...(wire.status_transitions ?? []),
+        { status: 'read', timestamp: isoNow, repos: ['vscode'] },
+      ];
+      fs.writeFileSync(filePath, JSON.stringify(wire, null, 2), 'utf8');
+      this.sendWires();
+    } catch { /* skip */ }
+  }
+
+  private handleArchiveWire(wwuid: string): void {
+    const flatDir = this.getFlatDir();
     const wsDir = this.getWorkspaceFlatDir();
+    if (!wwuid) return;
+    const alias = this.getActorAlias();
+    const identity = vscode.workspace.getConfiguration('wildwest').get<string>('identity') ?? '';
     const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
-    // Write to both dirs so recipient-local view stays in sync
-    for (const dir of [flatDir, wsDir]) {
-      if (!dir) continue;
-      const filePath = path.join(dir, `${wwuid}.json`);
-      if (!fs.existsSync(filePath)) continue;
-      try {
-        const wire = JSON.parse(fs.readFileSync(filePath, 'utf8')) as FlatWire;
-        wire.status = 'archived';
-        wire.status_transitions = [
-          ...(wire.status_transitions ?? []),
-          { status: 'archived', timestamp: isoNow, repos: ['vscode'] },
-        ];
-        fs.writeFileSync(filePath, JSON.stringify(wire, null, 2), 'utf8');
-      } catch { /* skip on error */ }
-    }
-    this.sendWires();
+
+    // Archive is a local per-actor view action — writes overlay field to local copy only.
+    // Does NOT write to territory SSOT (so the other party's view is unaffected).
+    const localDir = wsDir ?? (flatDir ? path.join(
+      vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '', '.wildwest', 'telegraph', 'flat'
+    ) : null);
+    if (!localDir) return;
+
+    // Determine which overlay field to set based on sender vs recipient
+    const localPath = path.join(localDir, `${wwuid}.json`);
+    const territoryPath = flatDir ? path.join(flatDir, `${wwuid}.json`) : null;
+    const sourcePath = fs.existsSync(localPath) ? localPath : (territoryPath && fs.existsSync(territoryPath) ? territoryPath : null);
+    if (!sourcePath) return;
+
+    try {
+      const wire = JSON.parse(fs.readFileSync(sourcePath, 'utf8')) as FlatWire;
+      const isSender = this.addressMatchesSelf(wire.from ?? '', alias, identity);
+      const overlayField = isSender ? 'sender_archived_at' : 'recipient_archived_at';
+
+      // Write overlay to local flat/ (not territory)
+      fs.mkdirSync(localDir, { recursive: true });
+      const localWire = fs.existsSync(localPath)
+        ? JSON.parse(fs.readFileSync(localPath, 'utf8')) as Record<string, unknown>
+        : { ...wire } as Record<string, unknown>;
+      localWire[overlayField] = isoNow;
+      fs.writeFileSync(localPath, JSON.stringify(localWire, null, 2), 'utf8');
+
+      // If both parties have now archived (overlay fields both set), promote territory to archived
+      const bothArchived =
+        localWire['sender_archived_at'] && localWire['recipient_archived_at'];
+      if (bothArchived && territoryPath && fs.existsSync(territoryPath)) {
+        try {
+          const tw = JSON.parse(fs.readFileSync(territoryPath, 'utf8')) as Record<string, unknown>;
+          tw['status'] = 'archived';
+          tw['sender_archived_at'] = localWire['sender_archived_at'];
+          tw['recipient_archived_at'] = localWire['recipient_archived_at'];
+          tw['status_transitions'] = [
+            ...((tw['status_transitions'] as unknown[]) ?? []),
+            { status: 'archived', timestamp: isoNow, repos: ['vscode'] },
+          ];
+          fs.writeFileSync(territoryPath, JSON.stringify(tw, null, 2), 'utf8');
+        } catch { /* skip territory promotion on error */ }
+      }
+
+      this.sendWires();
+    } catch { /* skip */ }
   }
 
   private async pushToCopilot(formatted: string): Promise<void> {
@@ -398,7 +475,9 @@ export class TelegraphPanel {
 
   /* ── Status badges ── */
   .badge-status { font-size: 9px; padding: 1px 4px; border-radius: 3px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
-  .badge-sent { background: #6b6b00; color: #ffff80; }
+  .badge-sent { background: #00407a; color: #80cfff; }
+  .badge-received { background: #6b6b00; color: #ffff80; }
+  .badge-read { background: #1a4a1a; color: #80ff80; }
   .badge-delivered { background: #003d6b; color: #80cfff; }
   .badge-archived { background: #333; color: #aaa; }
 
@@ -538,8 +617,8 @@ export class TelegraphPanel {
 
   const CHIP_CONFIG = {
     inbox:  [
-      { status: 'sent',      label: 'New'       },
-      { status: 'delivered', label: 'Read'      },
+      { status: 'received',  label: 'New'       },
+      { status: 'read',      label: 'Read'      },
       { status: 'archived',  label: 'Archived'  },
       { status: 'all',       label: 'All'       },
     ],
@@ -547,7 +626,8 @@ export class TelegraphPanel {
       { status: 'draft',     label: 'Draft'     },
       { status: 'pending',   label: 'Pending'   },
       { status: 'sent',      label: 'Sent'      },
-      { status: 'delivered', label: 'Delivered' },
+      { status: 'received',  label: 'Delivered' },
+      { status: 'read',      label: 'Read'      },
       { status: 'archived',  label: 'Archived'  },
       { status: 'all',       label: 'All'       },
     ],
@@ -657,6 +737,8 @@ export class TelegraphPanel {
   document.getElementById('detailPane').addEventListener('click', (e) => {
     const pushBtn = e.target.closest('[data-push]');
     if (pushBtn) { pushTo(pendingFormatted, pushBtn.dataset.push); return; }
+    const markReadBtn = e.target.closest('[data-mark-read]');
+    if (markReadBtn) { vscode.postMessage({ type: 'markRead', wwuid: markReadBtn.dataset.markRead }); return; }
     const archiveBtn = e.target.closest('[data-archive]');
     if (archiveBtn) { vscode.postMessage({ type: 'archive', wwuid: archiveBtn.dataset.archive }); return; }
     const sendDraftBtn = e.target.closest('[data-send-draft]');
@@ -857,12 +939,14 @@ export class TelegraphPanel {
     html += '<div style="font-family:monospace;font-size:10px;opacity:0.5;word-break:break-all">' + esc(w.wwuid || '') + '</div>';
 
     // Push bar + actions
-    const status = w.status || 'sent';
+    const status = w.status || 'received';
+    const isInboxWire = !!inboxWires.find(x => x.wwuid === w.wwuid);
     html += '<div class="push-bar">'
       + '<button class="btn" data-push="copilot">→ Copilot</button>'
       + '<button class="btn btn-secondary" data-push="claude">→ Claude</button>'
       + '<button class="btn btn-secondary" data-push="codex">→ Codex</button>'
       + (status === 'draft' ? '<button class="btn" data-send-draft="' + esc(w.wwuid) + '">Send</button>' : '')
+      + (isInboxWire && (status === 'received' || status === 'delivered') ? '<button class="btn" data-mark-read="' + esc(w.wwuid) + '">Mark Read</button>' : '')
       + (status !== 'archived' ? '<button class="btn btn-secondary" data-archive="' + esc(w.wwuid) + '">Archive</button>' : '')
       + '</div>';
 
