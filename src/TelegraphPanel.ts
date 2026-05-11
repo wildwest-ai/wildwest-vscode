@@ -417,17 +417,19 @@ export class TelegraphPanel {
     try {
       const wire = JSON.parse(fs.readFileSync(sourcePath, 'utf8')) as FlatWire;
       const isSender = this.addressMatchesSelf(wire.from ?? '', alias, identity);
-      const overlayField = isSender ? 'sender_archived_at' : 'recipient_archived_at';
-      this.log(`handleArchiveWire: wire.from=${wire.from} wire.to=${wire.to} isSender=${isSender} overlayField=${overlayField}`);
+      const isRecipient = this.addressMatchesSelf(wire.to ?? '', alias, identity);
+      this.log(`handleArchiveWire: wire.from=${wire.from} wire.to=${wire.to} isSender=${isSender} isRecipient=${isRecipient}`);
 
       // Write overlay to local flat/ (not territory)
       fs.mkdirSync(localDir, { recursive: true });
       const localWire = fs.existsSync(localPath)
         ? JSON.parse(fs.readFileSync(localPath, 'utf8')) as Record<string, unknown>
         : { ...wire } as Record<string, unknown>;
-      localWire[overlayField] = isoNow;
+      // Self-addressed: set both overlay fields so both Inbox and Outbox archive views work
+      if (isSender) localWire['sender_archived_at'] = isoNow;
+      if (isRecipient) localWire['recipient_archived_at'] = isoNow;
       fs.writeFileSync(localPath, JSON.stringify(localWire, null, 2), 'utf8');
-      console.log('Wild West: archived wire locally', { wwuid, overlayField, path: localPath });
+      console.log('Wild West: archived wire locally', { wwuid, isSender, isRecipient, path: localPath });
 
       // If both parties have now archived (overlay fields both set), promote territory to archived
       const bothArchived =

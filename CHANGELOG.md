@@ -4,6 +4,10 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.39.7] - 2026-05-11
+
+Fix Archive button no-op for self-addressed wires. `handleArchiveWire` only set `sender_archived_at`, but the Inbox tab's `isArchivedForActor` checks `recipient_archived_at` — so archived wires never disappeared from the inbox view. Fix: when actor is both sender and recipient (self-addressed wire), both overlay fields are now set.
+
 ## [0.39.6] - 2026-05-11
 
 Fixed wire delivery pipeline writing territory flat files under timestamp filenames instead of `{wwuid}.json`. Root cause: `handleSendDraft` and `handleSend` dropped the outbox file as `wire.filename` (timestamp string), so `HeartbeatMonitor.updateFlatWireDeliveryStatus()` wrote territory SSOT under that same timestamp name — invisible to the panel's UUID filter. Additionally, `updateDestinationFlatWire()` skipped territory write if the file didn't already exist (new wires were never promoted). Fix: outbox files now written as `{wwuid}.json` in both `handleSend` and `handleSendDraft`; `updateFlatWireDeliveryStatus()` simplified to always upsert `{wwuid}.json` in territory; `updateDestinationFlatWire()` now creates territory wire unconditionally.
