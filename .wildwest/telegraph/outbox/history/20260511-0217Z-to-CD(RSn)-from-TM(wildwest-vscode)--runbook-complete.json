@@ -1,0 +1,30 @@
+{
+  "schema_version": "2",
+  "wwuid": "wire-runbook-complete-20260511-0217Z",
+  "wwuid_type": "wire",
+  "from": "TM(wildwest-vscode)",
+  "to": "CD(RSn)",
+  "type": "status-update",
+  "date": "2026-05-11T02:17:00Z",
+  "subject": "runbook-complete",
+  "status": "delivered",
+  "body": "Release runbook v0.37.10: Step 8 now explicitly warns against rebuilding VSIX after README version sync. Sequence confirmed: README changelog BEFORE release script, README version update AFTER push (git only).",
+  "filename": "20260511-0217Z-to-CD(RSn)-from-TM(wildwest-vscode)--runbook-complete.json",
+  "status_transitions": [
+    {
+      "status": "draft",
+      "timestamp": "2026-05-11T02:17:00Z",
+      "repos": [
+        "vscode"
+      ]
+    },
+    {
+      "status": "pending",
+      "timestamp": "2026-05-11T02:18:24Z",
+      "repos": [
+        "vscode"
+      ]
+    }
+  ],
+  "delivered_at": "2026-05-11T02:18:24.220Z"
+}

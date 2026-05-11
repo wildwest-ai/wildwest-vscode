@@ -163,15 +163,13 @@ function updateDestinationFlatWire(
     }
 
     // DO NOT change status to "delivered" at destination scope.
-    // Wire status should remain "sent" so it appears as "New" in recipient's Inbox.
+    // Wire status should be "sent" so it appears as "New" in recipient's Inbox.
     // Recipient will mark as read/acted-upon separately.
     // Only track arrival in received_at timestamp (separate from delivered_at which is sender-side).
     wire['received_at'] = wire['received_at'] || new Date().toISOString();
-    // Preserve current status (typically "sent" at this point) - don't promote to "delivered"
-    if (wire['status'] === 'delivered') {
-      // If somehow it came through as delivered, reset to "sent" for recipient view
-      wire['status'] = 'sent';
-    }
+    // Always normalize to "sent" at destination — wire may arrive as "pending" or "delivered"
+    // depending on when the outbox snapshot was taken. Recipient always sees "New" (sent).
+    wire['status'] = 'sent';
 
     // Write to destination flat/ using wwuid as filename
     const destWirePath = path.join(destFlatDir, `${wwuid}.json`);

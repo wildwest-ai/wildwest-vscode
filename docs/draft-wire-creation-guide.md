@@ -8,6 +8,10 @@
 
 A **draft wire** is a JSON file stored in the territory-level SSOT (Single Source of Truth) at `~/wildwest/telegraph/flat/` with status `"draft"`. Draft wires can be reviewed, edited, sent, or archived through the Telegraph panel UI.
 
+> **⚠️ CRITICAL: Write to `~/wildwest/telegraph/flat/` — NOT `.wildwest/telegraph/flat/`**
+> 
+> The Telegraph panel reads from the **territory** flat directory (`~/wildwest/telegraph/flat/`), which is the global SSOT for all scopes. Writing to the town-local `.wildwest/telegraph/flat/` will NOT appear in the panel.
+
 ---
 
 ## Schema v2 FlatWire Structure
@@ -19,14 +23,14 @@ All wires use **schema_version: "2"** and follow this JSON structure:
   "schema_version": "2",
   "wwuid": "wire-<unique-identifier>",
   "wwuid_type": "wire",
-  "from": "TM(wildwest-vscode).Cld",
+  "from": "TM(wildwest-vscode)",
   "to": "CD(RSn)",
   "type": "status-update",
   "date": "2026-05-11T00:56:42Z",
   "subject": "short-kebab-case-subject",
   "status": "draft",
   "body": "Wire body text. Can be multi-line.",
-  "filename": "20260511-0056Z-to-CD(RSn)-from-TM(wildwest-vscode).Cld--short-subject.json",
+  "filename": "20260511-0056Z-to-CD(RSn)-from-TM(wildwest-vscode)--short-subject.json",
   "status_transitions": [
     {
       "status": "draft",
@@ -46,7 +50,7 @@ All wires use **schema_version: "2"** and follow this JSON structure:
 | `schema_version` | string | `"2"` | Always `"2"` for current version |
 | `wwuid` | string | `"wire-test-draft-20260511-0056Z"` | Unique wire identifier. Used as flat/ filename. |
 | `wwuid_type` | string | `"wire"` | Always `"wire"` |
-| `from` | string | `"TM(wildwest-vscode).Cld"` | Sender. Format: `Role(alias)` or `Role(alias).Channel` |
+| `from` | string | `"TM(wildwest-vscode)"` | Sender. **Must be `Role(alias)` format** — bare role (`TM`) will NOT appear in Outbox. Channel suffix optional. |
 | `to` | string | `"CD(RSn)"` | Recipient. Format: `Role` or `Role(dyad)` or `Role(dyad).Channel` |
 | `type` | string | `"status-update"` | Wire type: `status-update`, `assignment`, `ack`, `question`, etc. |
 | `date` | string | `"2026-05-11T00:56:42Z"` | ISO 8601 timestamp (UTC). No milliseconds. |
@@ -99,8 +103,8 @@ Each status transition records when the wire changed state:
 iso=$(date -u +"%Y-%m-%dT%H:%M:%SZ")        # e.g., 2026-05-11T00:56:42Z
 ts=$(date -u +"%Y%m%d-%H%MZ")               # e.g., 20260511-0056Z
 wwuid="wire-<purpose>-${ts}"                # e.g., wire-test-draft-20260511-0056Z
-telegraph_filename="${ts}-to-CD(RSn)-from-TM(alias).Cld--subject.json"
-flatfile=~/wildwest/telegraph/flat/${wwuid}.json
+telegraph_filename="${ts}-to-CD(RSn)-from-TM(wildwest-vscode)--subject.json"
+flatfile=~/wildwest/telegraph/flat/${wwuid}.json   # ← TERRITORY flat/, NOT .wildwest/telegraph/flat/
 ```
 
 ### Step 2: Create the JSON File
@@ -111,14 +115,14 @@ cat > "$flatfile" <<'EOF'
   "schema_version": "2",
   "wwuid": "wire-test-draft-20260511-0056Z",
   "wwuid_type": "wire",
-  "from": "TM(wildwest-vscode).Cld",
+  "from": "TM(wildwest-vscode)",
   "to": "CD(RSn)",
   "type": "status-update",
   "date": "2026-05-11T00:56:42Z",
   "subject": "test-draft",
   "status": "draft",
   "body": "Testing draft wire creation and send workflow.",
-  "filename": "20260511-0056Z-to-CD(RSn)-from-TM(wildwest-vscode).Cld--test-draft.json",
+  "filename": "20260511-0056Z-to-CD(RSn)-from-TM(wildwest-vscode)--test-draft.json",
   "status_transitions": [
     {
       "status": "draft",
@@ -142,7 +146,8 @@ cat "$flatfile"
 ## File Naming Convention
 
 ### Flat Directory Storage
-- **Location:** `~/wildwest/telegraph/flat/`
+- **Location:** `~/wildwest/telegraph/flat/` ← **TERRITORY level** (global SSOT)
+- **NOT:** `.wildwest/telegraph/flat/` ← town-local; Telegraph panel does NOT read this
 - **Filename:** `${wwuid}.json` (e.g., `wire-test-draft-20260511-0056Z.json`)
 - **Reason:** Flat/ is the territory SSOT; files are indexed by wwuid for fast lookup
 
@@ -156,13 +161,15 @@ cat "$flatfile"
 ## Address Formats
 
 ### `from` Field (Sender)
-- `TM(wildwest-vscode)` — Town marshal of wildwest-vscode
-- `TM(wildwest-vscode).Cld` — Town marshal of wildwest-vscode on Claude channel
-- `CD(RSn)` — Chief deputy dyad RSn (multi-town county)
+- **MUST use `Role(alias)` format** — the panel matches `from` against the workspace alias
+- `TM(wildwest-vscode)` ✅ — Town marshal of wildwest-vscode (CORRECT)
+- `TM(wildwest-vscode).Cld` ✅ — with channel suffix (also works)
+- `TM` ❌ — bare role; will NOT appear in Outbox (addressMatchesSelf cannot match it)
+- `CD(RSn)` — Chief deputy dyad RSn
 - `CD(RSn).Cld` — Chief deputy dyad RSn on Claude channel
 
 ### `to` Field (Recipient)
-- `TM` — Any town marshal (ambiguous; use `TM(alias)` to be specific)
+- `TM` — Any town marshal (works for `to`; only `from` requires alias format)
 - `TM(wildwest-vscode)` — Specific town (wildwest-vscode)
 - `TM(*vscode)` — Town matching pattern `*vscode` (glob)
 - `CD(RSn)` — Specific county dyad
@@ -202,12 +209,33 @@ cat "$flatfile"
 **Cause:** Wire filename in flat/ directory does not match `${wwuid}.json`  
 **Fix:** Ensure the JSON file is named exactly `${wwuid}.json`, not the telegraph filename or any other variant.
 
-### Issue: Draft wire not appearing in Telegraph panel
-**Cause:** Wire is not in `~/wildwest/telegraph/flat/` or JSON is malformed  
-**Fix:**
-1. Verify file location: `ls -la ~/wildwest/telegraph/flat/${wwuid}.json`
-2. Verify JSON syntax: `jq . ~/wildwest/telegraph/flat/${wwuid}.json`
-3. Refresh Telegraph panel: Click ↻ button in panel
+### Issue: Draft wire not appearing in Telegraph panel (Outbox > Draft)
+
+**Cause 1: Wrong directory** — wrote to `.wildwest/telegraph/flat/` instead of `~/wildwest/telegraph/flat/`  
+**Fix:** Move wire to territory flat/:
+```bash
+mv .wildwest/telegraph/flat/${wwuid}.json ~/wildwest/telegraph/flat/${wwuid}.json
+```
+
+**Cause 2: Wrong `from` format** — used bare role `"TM"` instead of `"TM(alias)"`  
+`addressMatchesSelf()` only matches:
+- exact identity string (e.g., `TM(RSn)` from `wildwest.identity` setting)
+- alias in parens (e.g., `TM(wildwest-vscode)` matching registry alias `wildwest-vscode`)
+- glob in parens (e.g., `TM(*vscode)`)
+- bare alias as whole field  
+
+Bare `"TM"` matches NONE of these. **Always use `Role(alias)` format for `from`.**
+
+**Fix:** Update the wire JSON `from` field:
+```json
+"from": "TM(wildwest-vscode)"
+```
+
+**Cause 3: JSON malformed**  
+**Fix:** Validate syntax: `jq . ~/wildwest/telegraph/flat/${wwuid}.json`
+
+**Cause 4: File renamed incorrectly** — filename must match `wwuid`  
+**Fix:** Rename file to exactly `${wwuid}.json`
 
 ### Issue: Status transitions show wrong timestamps
 **Cause:** Timestamps use milliseconds (`.999Z`) instead of second precision  

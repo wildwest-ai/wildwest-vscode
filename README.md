@@ -8,6 +8,8 @@ Governance framework for AI-assisted development. Tracks dyad activity, exports 
 
 ## What's New
 
+**v0.37.11** — Bug fix: heartbeat now always writes `status: "sent"` at destination scope (previously wrote `status: "pending"` when wire arrived from outbox before sender-side promotion). Recipient inbox now consistently shows "New". Also: draft wire creation guide corrected — territory `~/wildwest/telegraph/flat/` (not town-local), and `from` must be `Role(alias)` format.
+
 **v0.37.10** — Documentation: Release runbook clarified — Step 2 (Update README) explicitly occurs BEFORE Step 3 (Run release script). Removed ambiguity about when to add What's New entries vs. update version number line.
 
 **v0.37.9** — Bug fix: wire status now correctly shows as "New" at recipient scope (not "Delivered"). Heartbeat no longer sets status to "delivered" when syncing to destination flat/. Wires show as "New" in recipient inbox until read/acted upon; "Delivered" only in sender outbox.

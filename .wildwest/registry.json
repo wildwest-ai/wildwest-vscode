@@ -7,5 +7,10 @@
   "remote": "https://github.com/wildwest-ai/wildwest-vscode",
   "mcp": null,
   "active_branches": {},
-  "identities": []
+  "identities": [
+    {
+      "role": "TM",
+      "dyad": "wildwest-vscode"
+    }
+  ]
 }
