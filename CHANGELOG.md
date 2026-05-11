@@ -4,6 +4,10 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.39.6] - 2026-05-11
+
+Fixed wire delivery pipeline writing territory flat files under timestamp filenames instead of `{wwuid}.json`. Root cause: `handleSendDraft` and `handleSend` dropped the outbox file as `wire.filename` (timestamp string), so `HeartbeatMonitor.updateFlatWireDeliveryStatus()` wrote territory SSOT under that same timestamp name — invisible to the panel's UUID filter. Additionally, `updateDestinationFlatWire()` skipped territory write if the file didn't already exist (new wires were never promoted). Fix: outbox files now written as `{wwuid}.json` in both `handleSend` and `handleSendDraft`; `updateFlatWireDeliveryStatus()` simplified to always upsert `{wwuid}.json` in territory; `updateDestinationFlatWire()` now creates territory wire unconditionally.
+
 ## [0.39.5] - 2026-05-11
 
 Fixed Mark Read and Archive buttons being no-ops for wires stored under legacy timestamp filenames in territory flat/. Root cause: handlers looked up `{wwuid}.json` by name but territory wires were named `YYYYMMDD-HHMMz-to-...-from-...--subject.json`. Fix: added `findWireFilePath()` helper that resolves UUID filenames with a directory scan fallback; `handleMarkRead`, `handleArchiveWire`, and `handleBulkStatus` now use it. Retired legacy timestamp filenames across the codebase — `TelegraphCommands.finalizeWire()` and `ackMemo()` now write `{wwuid}.json`; `TelegraphInbox` reply and ack generation write `{wwuid}.json` for flat-wire protocol (`.md` markdown path unchanged). `HeartbeatMonitor.updateFlatWireDeliveryStatus()` legacy fallback scan loop removed. `readAllFlatWires()` and inbox file scanner now filter to UUID-named files only via `UUID_FILE_RE`. Existing legacy-named files in territory flat/ migrated to `{wwuid}.json` via `scripts/migrate-filenames.js`. Added debug logging to `TelegraphPanel` via a dedicated `Wild West Telegraph` Output channel.

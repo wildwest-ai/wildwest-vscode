@@ -1,0 +1,30 @@
+{
+  "schema_version": "2",
+  "wwuid": "01432270-c167-5100-baed-55d0a9ed6ad9",
+  "wwuid_type": "wire",
+  "from": "TM(wildwest-vscode)",
+  "to": "TM(wildwest-vscode)",
+  "type": "status-update",
+  "date": "2026-05-11T12:53:14Z",
+  "subject": "npm-run-wire-test",
+  "status": "archived",
+  "body": "Testing npm run wire works.",
+  "filename": "20260511-1253Z-to-TM(wildwest-vscode)-from-TM(wildwest-vscode)--npm-run-wire-test.json",
+  "status_transitions": [
+    {
+      "status": "draft",
+      "timestamp": "2026-05-11T12:53:14Z",
+      "instances": 1,
+      "repos": [
+        "vscode"
+      ]
+    },
+    {
+      "status": "archived",
+      "timestamp": "2026-05-11T13:02:55Z",
+      "repos": [
+        "vscode"
+      ]
+    }
+  ]
+}

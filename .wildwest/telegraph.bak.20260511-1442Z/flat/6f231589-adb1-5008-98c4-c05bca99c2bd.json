@@ -1,0 +1,30 @@
+{
+  "schema_version": "2",
+  "wwuid": "6f231589-adb1-5008-98c4-c05bca99c2bd",
+  "wwuid_type": "wire",
+  "from": "TM[wildwest-vscode]",
+  "to": "TM[wildwest-vscode]",
+  "type": "status-update",
+  "date": "2026-05-11T14:31:46Z",
+  "subject": "self-test",
+  "status": "pending",
+  "body": "Draft to self — verifying telegraph panel inbox/outbox display after v0.39.5 legacy retirement.",
+  "filename": "20260511-1431Z-to-TM[wildwest-vscode]-from-TM[wildwest-vscode]--self-test.json",
+  "status_transitions": [
+    {
+      "status": "draft",
+      "timestamp": "2026-05-11T14:31:46Z",
+      "instances": 1,
+      "repos": [
+        "vscode"
+      ]
+    },
+    {
+      "status": "pending",
+      "timestamp": "2026-05-11T14:32:13Z",
+      "repos": [
+        "vscode"
+      ]
+    }
+  ]
+}

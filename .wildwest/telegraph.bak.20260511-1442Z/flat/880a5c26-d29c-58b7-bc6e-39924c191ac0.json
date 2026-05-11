@@ -1,0 +1,46 @@
+{
+  "schema_version": "2",
+  "wwuid": "880a5c26-d29c-58b7-bc6e-39924c191ac0",
+  "wwuid_type": "wire",
+  "from": "TM(wildwest-vscode)",
+  "to": "TM(wildwest-vscode)",
+  "type": "status-update",
+  "date": "2026-05-11T12:58:18Z",
+  "subject": "session-close-test",
+  "status": "read",
+  "body": "Testing wildwest.createWire command flow end-to-end. Draft written via npm run wire (aligned with toolDraftWire). Open Telegraph panel → Outbox → Draft to review and send.",
+  "filename": "20260511-1258Z-to-TM(wildwest-vscode)-from-TM(wildwest-vscode)--session-close-test.json",
+  "status_transitions": [
+    {
+      "status": "draft",
+      "timestamp": "2026-05-11T12:58:18Z",
+      "instances": 1,
+      "repos": [
+        "vscode"
+      ]
+    },
+    {
+      "status": "pending",
+      "timestamp": "2026-05-11T13:04:15Z",
+      "repos": [
+        "vscode"
+      ]
+    },
+    {
+      "status": "archived",
+      "timestamp": "2026-05-11T13:17:35Z",
+      "repos": [
+        "vscode"
+      ]
+    },
+    {
+      "status": "read",
+      "timestamp": "2026-05-11T13:54:41Z",
+      "repos": [
+        "vscode"
+      ]
+    }
+  ],
+  "read_at": "2026-05-11T13:54:41Z",
+  "sender_archived_at": "2026-05-11T14:31:09Z"
+}

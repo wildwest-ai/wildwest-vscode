@@ -173,13 +173,12 @@ function updateDestinationFlatWire(
       wire['status_transitions'] = transitions;
     }
 
-    // Write back to territory flat/ (not destination local)
+    // Write back to territory flat/ (not destination local) — create if not yet present
     const territoryFlatDir = path.join(worldRoot, 'telegraph', 'flat');
+    fs.mkdirSync(territoryFlatDir, { recursive: true });
     const territoryWirePath = path.join(territoryFlatDir, `${wwuid}.json`);
-    if (fs.existsSync(territoryWirePath)) {
-      fs.writeFileSync(territoryWirePath, JSON.stringify(wire, null, 2), 'utf8');
-      outputChannel.appendLine(`[HeartbeatMonitor] territory wire → received: ${wwuid}.json`);
-    }
+    fs.writeFileSync(territoryWirePath, JSON.stringify(wire, null, 2), 'utf8');
+    outputChannel.appendLine(`[HeartbeatMonitor] territory wire upserted → received: ${wwuid}.json`);
   } catch (err) {
     outputChannel.appendLine(`[HeartbeatMonitor] failed to update destination flat wire: ${err}`);
   }
@@ -191,42 +190,26 @@ function updateFlatWireDeliveryStatus(worldRoot: string, memoPath: string, memoF
   const flatDir = path.join(worldRoot, 'telegraph', 'flat');
   fs.mkdirSync(flatDir, { recursive: true });
 
-  let wirePath: string | null = null;
-  const targetPath = path.join(flatDir, memoFile);
-  if (fs.existsSync(targetPath)) {
-    wirePath = targetPath;
-  }
-
-  if (!wirePath) {
-    try {
-      const wire = JSON.parse(fs.readFileSync(memoPath, 'utf8')) as Record<string, unknown>;
-      // Operator dispatched wire — territory SSOT status is 'sent'
-      wire['status'] = 'sent';
-      wire['sent_at'] = wire['sent_at'] || new Date().toISOString();
-      const transitions = Array.isArray(wire['status_transitions']) ? wire['status_transitions'] as Array<Record<string, unknown>> : [];
-      transitions.push({ status: 'sent', timestamp: wire['sent_at'], repos: ['vscode'] });
-      wire['status_transitions'] = transitions;
-      fs.writeFileSync(targetPath, JSON.stringify(wire, null, 2), 'utf8');
-      outputChannel.appendLine(`[HeartbeatMonitor] flat wire created: ${memoFile} in territory SSOT (status: sent)`);
-      return;
-    } catch (err) {
-      outputChannel.appendLine(`[HeartbeatMonitor] failed to create flat wire for ${memoFile}: ${err}`);
-      return;
-    }
-  }
-
   try {
-    const wire = JSON.parse(fs.readFileSync(wirePath, 'utf8')) as Record<string, unknown>;
+    const wire = JSON.parse(fs.readFileSync(memoPath, 'utf8')) as Record<string, unknown>;
+    const wwuid = wire['wwuid'] as string | undefined;
+    // Always use {wwuid}.json so the panel's UUID filter can see the file
+    const uuidFilename = wwuid ? `${wwuid}.json` : memoFile;
+    const targetPath = path.join(flatDir, uuidFilename);
+
     // Operator dispatched wire — territory SSOT status is 'sent'
     wire['status'] = 'sent';
     wire['sent_at'] = wire['sent_at'] || new Date().toISOString();
     const transitions = Array.isArray(wire['status_transitions']) ? wire['status_transitions'] as Array<Record<string, unknown>> : [];
-    transitions.push({ status: 'sent', timestamp: wire['sent_at'], repos: ['vscode'] });
-    wire['status_transitions'] = transitions;
-    fs.writeFileSync(wirePath, JSON.stringify(wire, null, 2), 'utf8');
-    outputChannel.appendLine(`[HeartbeatMonitor] flat wire updated: ${path.basename(wirePath)} → sent`);
+    const alreadyHasSent = transitions.some((t) => (t as Record<string, unknown>)['status'] === 'sent');
+    if (!alreadyHasSent) {
+      transitions.push({ status: 'sent', timestamp: wire['sent_at'], repos: ['vscode'] });
+      wire['status_transitions'] = transitions;
+    }
+    fs.writeFileSync(targetPath, JSON.stringify(wire, null, 2), 'utf8');
+    outputChannel.appendLine(`[HeartbeatMonitor] flat wire upserted: ${uuidFilename} in territory SSOT (status: sent)`);
   } catch (err) {
-    outputChannel.appendLine(`[HeartbeatMonitor] failed to update flat wire status for ${memoFile}: ${err}`);
+    outputChannel.appendLine(`[HeartbeatMonitor] failed to upsert flat wire for ${memoFile}: ${err}`);
   }
 }
 

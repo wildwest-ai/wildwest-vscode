@@ -272,9 +272,10 @@ export class TelegraphPanel {
 
     // Compose Send → write as pending to local outbox/ for heartbeat pickup.
     // Heartbeat operator promotes to territory SSOT as 'sent'.
+    // Use {wwuid}.json so territory SSOT gets written with UUID filename (panel UUID filter).
     const outboxDir = path.join(wsPath, '.wildwest', 'telegraph', 'outbox');
     fs.mkdirSync(outboxDir, { recursive: true });
-    fs.writeFileSync(path.join(outboxDir, wire.filename), JSON.stringify(wire, null, 2), 'utf8');
+    fs.writeFileSync(path.join(outboxDir, `${wire.wwuid}.json`), JSON.stringify(wire, null, 2), 'utf8');
 
     // Also save to local flat/ so it shows in Outbox > Pending immediately
     writeDraftWire(wire, wsPath);
@@ -337,9 +338,10 @@ export class TelegraphPanel {
       // Update local flat/ so Outbox shows Pending
       fs.writeFileSync(localFilePath, JSON.stringify(wire, null, 2), 'utf8');
       // Drop in workspace outbox/ for heartbeat pickup
+      // Use {wwuid}.json so territory SSOT gets written with UUID filename (panel UUID filter).
       const outboxDir = path.join(wsPath, '.wildwest', 'telegraph', 'outbox');
       fs.mkdirSync(outboxDir, { recursive: true });
-      fs.writeFileSync(path.join(outboxDir, wire.filename), JSON.stringify(wire, null, 2), 'utf8');
+      fs.writeFileSync(path.join(outboxDir, `${wire.wwuid}.json`), JSON.stringify(wire, null, 2), 'utf8');
       vscode.window.showInformationMessage(`Wild West: wire pending — operator will deliver on next heartbeat.`);
       this.sendWires();
     } catch (err) {
