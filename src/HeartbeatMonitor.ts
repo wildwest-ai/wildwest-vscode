@@ -817,18 +817,11 @@ function deliverPendingOutbox(
           failed++;
           continue;
         } else {
-          // Deliver to destination inbox. The destination may be local for self-addressed mail.
-          const destInboxDir = path.join(destPath, '.wildwest', 'telegraph', 'inbox');
-          if (!fs.existsSync(destInboxDir)) {
-            fs.mkdirSync(destInboxDir, { recursive: true });
-          }
-
-          // Fix 1: resolve wildcard pattern in filename to actual destination alias
+          // Resolve deliveredFilename (wildcard pattern → actual alias)
           let deliveredFilename = memoFile;
           if (pattern) {
             const destAlias = readRegistryAlias(destPath);
             if (destAlias) {
-              // Replace role(*pattern) with role(alias) in the filename
               const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
               deliveredFilename = memoFile.replace(
                 new RegExp(`${role}\\(${escapedPattern}\\)`),
@@ -837,18 +830,13 @@ function deliverPendingOutbox(
             }
           }
 
-          const destMemoPath = path.join(destInboxDir, deliveredFilename);
-
-          // Copy original (without delivered_at) to destination
-          const originalContent = fs.readFileSync(memoPath, 'utf8');
-          fs.writeFileSync(destMemoPath, originalContent, 'utf8');
-
           outputChannel.appendLine(
-            `[HeartbeatMonitor] delivery: ${memoFile} → ${destPath}/.wildwest/telegraph/inbox/${deliveredFilename}`,
+            `[HeartbeatMonitor] delivery: ${memoFile} → territory flat/ (received)`,
           );
 
-          // Update territory SSOT: wire arrived at recipient → status 'received'
-          updateDestinationFlatWire(destPath, destMemoPath, deliveredFilename, outputChannel, worldRoot);
+          // Update territory SSOT: wire arrived at recipient → status 'received'.
+          // Read directly from outbox (no inbox/ copy needed — flat/ is the unified store).
+          updateDestinationFlatWire(destPath, memoPath, deliveredFilename, outputChannel, worldRoot);
         }
 
         // Stamp sent_at in our copy (operator dispatched)
