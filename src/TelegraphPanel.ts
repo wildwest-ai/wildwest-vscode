@@ -55,15 +55,16 @@ export class TelegraphPanel {
   }
 
   /**
-   * Returns the workspace-local flat/ directory, which HeartbeatMonitor writes
-   * delivered wires into with status 'sent' (recipient perspective).
-   * Different from the territory flat/ which holds the sender's 'delivered' view.
+   * Returns the workspace-local flat/ directory.
+   * This is the town's local cache — heartbeat syncs from territory SSOT into here.
+   * Panel reads from this directory only; never directly from territory SSOT.
    */
   private getWorkspaceFlatDir(): string | null {
     const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
     if (!wsPath) return null;
     const dir = path.join(wsPath, '.wildwest', 'telegraph', 'flat');
-    return fs.existsSync(dir) ? dir : null;
+    // Return path even if it doesn't exist yet — createFlatWire will create it
+    return dir;
   }
 
   private getActorAlias(): string {
@@ -126,55 +127,28 @@ export class TelegraphPanel {
   }
 
   private readAllFlatWires(): FlatWire[] {
-    const territoryDir = this.getFlatDir();
+    // Panel reads local cache only (.wildwest/telegraph/flat/).
+    // Heartbeat syncs territory SSOT → local cache on every beat and after delivery.
+    // Draft/pending wires also live in local cache until promoted.
     const wsDir = this.getWorkspaceFlatDir();
+    if (!wsDir) return [];
 
     const byWwuid = new Map<string, FlatWire>();
+    let entries: string[];
+    try { entries = fs.readdirSync(wsDir); } catch { return []; }
 
-    // 1. Load territory first (authoritative for sent and beyond)
-    if (territoryDir) {
-      let entries: string[];
-      try { entries = fs.readdirSync(territoryDir); } catch { entries = []; }
-      for (const f of entries) {
-        if (!f.endsWith('.json') || f.startsWith('.') || !UUID_FILE_RE.test(f)) continue;
-        try {
-          const wire = JSON.parse(fs.readFileSync(path.join(territoryDir, f), 'utf8')) as FlatWire;
-          if (!wire.from || !wire.to) {
-            const parsed = parseFilenameActors(wire.filename);
-            if (!wire.from && parsed.from) wire.from = parsed.from;
-            if (!wire.to && parsed.to) wire.to = parsed.to;
-          }
-          const key = wire.wwuid ?? f.replace('.json', '');
-          byWwuid.set(key, wire);
-        } catch { /* skip corrupt */ }
-      }
-    }
-
-    // 2. Load local draft/pending wires (territory does NOT have these yet)
-    if (wsDir) {
-      let entries: string[];
-      try { entries = fs.readdirSync(wsDir); } catch { entries = []; }
-      for (const f of entries) {
-        if (!f.endsWith('.json') || f.startsWith('.') || !UUID_FILE_RE.test(f)) continue;
-        try {
-          const wire = JSON.parse(fs.readFileSync(path.join(wsDir, f), 'utf8')) as FlatWire;
-          if (!wire.from || !wire.to) {
-            const parsed = parseFilenameActors(wire.filename);
-            if (!wire.from && parsed.from) wire.from = parsed.from;
-            if (!wire.to && parsed.to) wire.to = parsed.to;
-          }
-          const key = wire.wwuid ?? f.replace('.json', '');
-          // Only add local wire if territory does NOT already have it.
-          // Exception: merge overlay fields (archive) from local onto territory wire.
-          if (!byWwuid.has(key)) {
-            byWwuid.set(key, wire);
-          } else {
-            const existing = byWwuid.get(key)!;
-            if (wire.sender_archived_at) existing.sender_archived_at = wire.sender_archived_at;
-            if (wire.recipient_archived_at) existing.recipient_archived_at = wire.recipient_archived_at;
-          }
-        } catch { /* skip corrupt */ }
-      }
+    for (const f of entries) {
+      if (!f.endsWith('.json') || f.startsWith('.') || !UUID_FILE_RE.test(f)) continue;
+      try {
+        const wire = JSON.parse(fs.readFileSync(path.join(wsDir, f), 'utf8')) as FlatWire;
+        if (!wire.from || !wire.to) {
+          const parsed = parseFilenameActors(wire.filename);
+          if (!wire.from && parsed.from) wire.from = parsed.from;
+          if (!wire.to && parsed.to) wire.to = parsed.to;
+        }
+        const key = wire.wwuid ?? f.replace('.json', '');
+        byWwuid.set(key, wire);
+      } catch { /* skip corrupt */ }
     }
 
     return [...byWwuid.values()].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -195,7 +169,7 @@ export class TelegraphPanel {
     const alias = this.getActorAlias();
     const identity = vscode.workspace.getConfiguration('wildwest').get<string>('identity') ?? '';
     const { inbox, outbox } = this.filterWires(all, alias, identity);
-    const flatAvailable = this.getFlatDir() !== null;
+    const flatAvailable = true; // local cache always available (created on first send)
     this.panel.webview.postMessage({ type: 'wires', inbox, outbox, all, alias, flatAvailable });
   }
 

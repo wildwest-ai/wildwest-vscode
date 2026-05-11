@@ -4,6 +4,10 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.39.14] - 2026-05-11
+
+Correct panel/heartbeat architecture to match layered sync model. Panel now reads local cache (`.wildwest/telegraph/flat/`) only — never territory SSOT directly. Heartbeat gains `syncFromTerritory()` pull step: on every beat and after delivery, territory SSOT → local cache. Overlay fields (`sender_archived_at`, `recipient_archived_at`) preserved during sync. Prepares for future remote SSOT without panel changes.
+
 ## [0.39.13] - 2026-05-11
 
 Remove `outbox/history/` from `deliverPendingOutbox` — territory `flat/` SSOT is the record; history folder was a duplicate. After delivery, outbox wire is deleted (not archived). Local flat copy is also deleted after heartbeat delivers to SSOT (territory wins; panel reads SSOT). Dead content-stamping block removed.

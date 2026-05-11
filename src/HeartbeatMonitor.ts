@@ -874,6 +874,58 @@ function deliverPendingOutbox(
   return { delivered, failed };
 }
 
+/**
+ * Sync territory SSOT flat/ → town local flat/ cache.
+ * Territory wins on all fields except per-actor overlay fields (archive timestamps)
+ * which are preserved from the existing local copy.
+ * This is the pull step: town always reads its local cache; heartbeat keeps it current.
+ */
+function syncFromTerritory(
+  townRootPath: string,
+  worldRoot: string,
+  outputChannel: vscode.OutputChannel,
+): boolean {
+  const territoryFlatDir = path.join(worldRoot, 'telegraph', 'flat');
+  if (!fs.existsSync(territoryFlatDir)) return false;
+
+  const localFlatDir = path.join(townRootPath, '.wildwest', 'telegraph', 'flat');
+  fs.mkdirSync(localFlatDir, { recursive: true });
+
+  let synced = 0;
+  let entries: string[];
+  try { entries = fs.readdirSync(territoryFlatDir); } catch { return false; }
+
+  for (const f of entries) {
+    if (!f.endsWith('.json') || f.startsWith('.')) continue;
+    try {
+      const territoryWire = JSON.parse(
+        fs.readFileSync(path.join(territoryFlatDir, f), 'utf8'),
+      ) as Record<string, unknown>;
+
+      const localPath = path.join(localFlatDir, f);
+      if (fs.existsSync(localPath)) {
+        const localWire = JSON.parse(fs.readFileSync(localPath, 'utf8')) as Record<string, unknown>;
+        // Territory wins on all fields; preserve per-actor overlay fields from local
+        const merged: Record<string, unknown> = { ...territoryWire };
+        if (localWire['sender_archived_at'])    merged['sender_archived_at']    = localWire['sender_archived_at'];
+        if (localWire['recipient_archived_at']) merged['recipient_archived_at'] = localWire['recipient_archived_at'];
+        // Skip write if nothing changed
+        if (JSON.stringify(merged) === JSON.stringify(localWire)) continue;
+        fs.writeFileSync(localPath, JSON.stringify(merged, null, 2), 'utf8');
+      } else {
+        // New wire from territory — write to local cache
+        fs.writeFileSync(localPath, JSON.stringify(territoryWire, null, 2), 'utf8');
+      }
+      synced++;
+    } catch { /* skip corrupt */ }
+  }
+
+  if (synced > 0) {
+    outputChannel.appendLine(`[HeartbeatMonitor] syncFromTerritory: ${synced} wire(s) synced to local cache`);
+  }
+  return synced > 0;
+}
+
 function isActionableWireFile(filename: string): boolean {
   return (
     (filename.endsWith('.md') || filename.endsWith('.json')) &&
@@ -939,6 +991,10 @@ function beatTown(
       const countyDelivery = deliverPendingOutbox(countyRoot, 'county', outputChannel, worldRoot, countiesDir);
       refreshNeeded = refreshNeeded || countyDelivery.delivered > 0;
     }
+
+    // Pull: sync territory SSOT → local cache so panel reads local only
+    const syncNeeded = syncFromTerritory(rootPath, worldRoot, outputChannel);
+    refreshNeeded = refreshNeeded || syncNeeded;
 
     if (refreshNeeded) {
       void Promise.resolve(vscode.commands.executeCommand('wildwest.refreshTelegraphPanel')).catch(() => undefined);
@@ -1179,6 +1235,9 @@ export class HeartbeatMonitor {
         const countyDelivery = deliverPendingOutbox(countyRoot, 'county', this.outputChannel, this.worldRoot, this.countiesDir);
         refreshNeeded = refreshNeeded || countyDelivery.delivered > 0;
       }
+      // Pull: sync territory SSOT → local cache after delivery
+      const syncNeeded = syncFromTerritory(town.rootPath, this.worldRoot, this.outputChannel);
+      refreshNeeded = refreshNeeded || syncNeeded;
       if (refreshNeeded) {
         void Promise.resolve(vscode.commands.executeCommand('wildwest.refreshTelegraphPanel')).catch(() => undefined);
       }
