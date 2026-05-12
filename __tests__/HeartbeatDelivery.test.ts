@@ -27,23 +27,26 @@ describe('HeartbeatMonitor delivery', () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('delivers same-scope town mail into the local inbox and archives the sent copy', () => {
+  it('delivers same-scope town mail into the local flat cache and archives the sent copy', () => {
     const townPath = path.join(tempDir, 'counties', 'wildwest-ai', 'wildwest-vscode');
     const telegraphDir = path.join(townPath, '.wildwest', 'telegraph');
     const outboxDir = path.join(telegraphDir, 'outbox');
-    const inboxDir = path.join(telegraphDir, 'inbox');
+    const flatDir = path.join(tempDir, 'telegraph', 'flat');
     fs.mkdirSync(outboxDir, { recursive: true });
 
-    const filename = '20260507-2351Z-to-TM(wildwest-vscode)-from-TM(wildwest-vscode)--self-check.md';
-    const memo = `---
-to: TM
-from: TM(wildwest-vscode)
-subject: self-check
----
-
-Self-addressed mail should arrive in the local inbox.
-`;
-    fs.writeFileSync(path.join(outboxDir, filename), memo, 'utf8');
+    const filename = 'self-check-wire.json';
+    const memo = {
+      schema_version: '2',
+      wwuid: 'self-check-wire',
+      wwuid_type: 'wire',
+      from: 'TM(wildwest-vscode)',
+      to: 'TM',
+      subject: 'self-check',
+      body: 'Self-addressed mail should arrive in the local flat cache.',
+      status: 'pending',
+      filename,
+    };
+    fs.writeFileSync(path.join(outboxDir, filename), JSON.stringify(memo, null, 2), 'utf8');
 
     const logs: string[] = [];
     const outputChannel = {
@@ -59,10 +62,10 @@ Self-addressed mail should arrive in the local inbox.
     );
 
     expect(result).toEqual({ delivered: 1, failed: 0 });
-    expect(fs.existsSync(path.join(inboxDir, filename))).toBe(true);
+    expect(fs.existsSync(path.join(flatDir, 'self-check-wire.json'))).toBe(true);
     expect(fs.existsSync(path.join(outboxDir, 'history', filename))).toBe(true);
     expect(fs.existsSync(path.join(outboxDir, filename))).toBe(false);
-    expect(logs.some((line) => line.includes('/.wildwest/telegraph/inbox/'))).toBe(true);
+    expect(logs.some((line) => line.includes('territory wire upserted'))).toBe(true);
   });
 
   it('marks the flat/ SSOT JSON wire delivered when the outbox file is processed', () => {
@@ -100,16 +103,16 @@ Self-addressed mail should arrive in the local inbox.
     );
 
     expect(result).toEqual({ delivered: 1, failed: 0 });
-    expect(fs.existsSync(path.join(inboxDir, filename))).toBe(true);
     expect(fs.existsSync(path.join(outboxDir, 'history', filename))).toBe(true);
     expect(fs.existsSync(path.join(outboxDir, filename))).toBe(false);
+    expect(fs.existsSync(path.join(flatDir, filename))).toBe(true);
 
     const flatWire = JSON.parse(fs.readFileSync(path.join(flatDir, filename), 'utf8')) as Record<string, unknown>;
-    expect(flatWire.status).toBe('delivered');
-    expect(typeof flatWire.delivered_at).toBe('string');
+    expect(flatWire.status).toBe('sent');
+    expect(typeof flatWire.sent_at).toBe('string');
     expect(Array.isArray(flatWire.status_transitions)).toBe(true);
-    expect((flatWire.status_transitions as Array<Record<string, unknown>>).some((t) => t.status === 'delivered')).toBe(true);
-    expect(logs.some((line) => line.includes('flat wire updated'))).toBe(true);
+    expect((flatWire.status_transitions as Array<Record<string, unknown>>).some((t) => t.status === 'sent')).toBe(true);
+    expect(logs.some((line) => line.includes('flat wire upserted'))).toBe(true);
   });
 
   it('creates a territory flat wire entry when the wire is absent from SSOT', () => {
@@ -151,16 +154,16 @@ Self-addressed mail should arrive in the local inbox.
     );
 
     expect(result).toEqual({ delivered: 1, failed: 0 });
-    expect(fs.existsSync(path.join(countyInboxDir, filename))).toBe(true);
+    expect(fs.existsSync(path.join(flatDir, 'wire-release-v0.37.6-20260511-0030Z.json'))).toBe(true);
     expect(fs.existsSync(path.join(outboxDir, 'history', filename))).toBe(true);
-    expect(fs.existsSync(path.join(flatDir, filename))).toBe(true);
+    expect(fs.existsSync(path.join(flatDir, 'wire-release-v0.37.6-20260511-0030Z.json'))).toBe(true);
 
-    const flatWire = JSON.parse(fs.readFileSync(path.join(flatDir, filename), 'utf8')) as Record<string, unknown>;
-    expect(flatWire.status).toBe('delivered');
-    expect(typeof flatWire.delivered_at).toBe('string');
+    const flatWire = JSON.parse(fs.readFileSync(path.join(flatDir, 'wire-release-v0.37.6-20260511-0030Z.json'), 'utf8')) as Record<string, unknown>;
+    expect(flatWire.status).toBe('sent');
+    expect(typeof flatWire.sent_at).toBe('string');
     expect(Array.isArray(flatWire.status_transitions)).toBe(true);
-    expect((flatWire.status_transitions as Array<Record<string, unknown>>).some((t) => t.status === 'delivered')).toBe(true);
-    expect(logs.some((line) => line.includes('flat wire created'))).toBe(true);
+    expect((flatWire.status_transitions as Array<Record<string, unknown>>).some((t) => t.status === 'sent')).toBe(true);
+    expect(logs.some((line) => line.includes('flat wire upserted'))).toBe(true);
   });
 
   it('beats TM(wildwest-vscode).Cld → CD(RSn) and delivers it to the parent county inbox', () => {
@@ -208,7 +211,7 @@ Self-addressed mail should arrive in the local inbox.
     const state = HeartbeatMonitorTest.beatTown(townPath, outputChannel, worldRoot, 'counties');
 
     expect(state).toBe('alive');
-    expect(fs.existsSync(path.join(countyInboxDir, filename))).toBe(true);
+    expect(fs.existsSync(path.join(countyPath, '.wildwest', 'telegraph', 'flat', 'ba474482-7c6b-57d2-8476-314dcf4a523e.json'))).toBe(true);
     expect(fs.existsSync(path.join(outboxDir, 'history', filename))).toBe(true);
     expect(logs.some((line) => line.includes('normalized'))).toBe(true);
     expect(logs.some((line) => line.includes(`delivery: ${filename}`))).toBe(true);
@@ -220,7 +223,7 @@ Self-addressed mail should arrive in the local inbox.
     const townAPath = path.join(countyPath, 'wildwest-vscode');
     const townBPath = path.join(countyPath, 'other-town');
     const outboxDir = path.join(countyPath, '.wildwest', 'telegraph', 'outbox');
-    const townAInboxDir = path.join(townAPath, '.wildwest', 'telegraph', 'inbox');
+    const townAFlatDir = path.join(townAPath, '.wildwest', 'telegraph', 'flat');
 
     fs.mkdirSync(outboxDir, { recursive: true });
     fs.mkdirSync(path.join(townAPath, '.wildwest'), { recursive: true });
@@ -266,7 +269,7 @@ Self-addressed mail should arrive in the local inbox.
     const result = HeartbeatMonitorTest.deliverPendingOutbox(countyPath, 'county', outputChannel, worldRoot, 'counties');
 
     expect(result).toEqual({ delivered: 1, failed: 0 });
-    expect(fs.existsSync(path.join(townAInboxDir, filename))).toBe(true);
+    expect(fs.existsSync(path.join(worldRoot, 'telegraph', 'flat', 'route-check.json'))).toBe(true);
     expect(fs.existsSync(path.join(outboxDir, 'history', filename))).toBe(true);
     expect(logs.some((line) => line.includes('role=TM'))).toBe(true);
     expect(logs.some((line) => line.includes('pattern=wildwest-vscode'))).toBe(true);
@@ -317,7 +320,7 @@ Self-addressed mail should arrive in the local inbox.
     const state = HeartbeatMonitorTest.beatTown(townPath, outputChannel, worldRoot, 'counties');
 
     expect(state).toBe('alive');
-    expect(fs.existsSync(path.join(countyInboxDir, filename))).toBe(true);
+    expect(fs.existsSync(path.join(countyPath, '.wildwest', 'telegraph', 'flat', 'bug-wire.json'))).toBe(true);
     expect(fs.existsSync(path.join(outboxDir, 'history', filename))).toBe(true);
     expect(logs.some((line) => line.includes(`town beat countyRoot=${countyPath}`))).toBe(true);
     expect(logs.some((line) => line.includes(`delivery: ${filename}`))).toBe(true);

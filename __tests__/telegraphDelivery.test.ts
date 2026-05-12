@@ -83,11 +83,9 @@ describe('Telegraph Delivery — production deliverPendingOutbox', () => {
     expect(result.failed).toBe(0);
     expect(logs.some((l) => l.includes('delivery:'))).toBe(true);
 
-    expect(fs.existsSync(path.join(countyPath, '.wildwest', 'telegraph', 'inbox', filename))).toBe(true);
+    expect(fs.existsSync(path.join(worldRoot, 'telegraph', 'flat', 'test-wire.json'))).toBe(true);
     const historyPath = path.join(townPath, '.wildwest', 'telegraph', 'outbox', 'history', filename);
     expect(fs.existsSync(historyPath)).toBe(true);
-    const archivedJson = JSON.parse(fs.readFileSync(historyPath, 'utf8')) as Record<string, unknown>;
-    expect(archivedJson.delivered_at).toBeTruthy();
   });
 
   test('JSON wire — memo delivered to county inbox', () => {
@@ -121,10 +119,9 @@ describe('Telegraph Delivery — production deliverPendingOutbox', () => {
     expect(result.delivered).toBe(1);
     expect(result.failed).toBe(0);
     expect(logs.some((l) => l.includes('delivery:'))).toBe(true);
-    expect(fs.existsSync(path.join(countyPath, '.wildwest', 'telegraph', 'inbox', filename))).toBe(true);
+    expect(fs.existsSync(path.join(worldRoot, 'telegraph', 'flat', 'test-wire.json'))).toBe(true);
     const historyPath = path.join(townPath, '.wildwest', 'telegraph', 'outbox', 'history', filename);
     expect(fs.existsSync(historyPath)).toBe(true);
-    expect(JSON.parse(fs.readFileSync(historyPath, 'utf8')).delivered_at).toBeTruthy();
   });
 
   test('Unknown role — memo marked failed, not delivered', () => {
@@ -156,8 +153,18 @@ describe('Telegraph Delivery — production deliverPendingOutbox', () => {
     expect(result.failed).toBe(1);
     expect(logs.some((l) => l.includes('unknown role'))).toBe(true);
     // Production renames to !<filename> on failure
-    expect(fs.existsSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox', `!${filename}`))).toBe(true);
+    const failedPath = path.join(townPath, '.wildwest', 'telegraph', 'outbox', `!${filename}`);
+    expect(fs.existsSync(failedPath)).toBe(true);
     expect(fs.existsSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox', filename))).toBe(false);
+    const failedWire = JSON.parse(fs.readFileSync(failedPath, 'utf8')) as Record<string, unknown>;
+    expect(failedWire.status).toBe('failed');
+    expect(failedWire.failed_at).toBeTruthy();
+    expect(failedWire.failure).toMatchObject({
+      by: 'heartbeat',
+      reason: 'unknown_role',
+      field: 'to',
+    });
+    expect(failedWire.to).toBe('BOGUS(!)');
   });
 
   test('Empty outbox — no-op', () => {
@@ -171,7 +178,7 @@ describe('Telegraph Delivery — production deliverPendingOutbox', () => {
     expect(result.failed).toBe(0);
   });
 
-  test('Local (same-scope) destination — delivered to local inbox', () => {
+  test('Local (same-scope) destination — delivered to local flat cache', () => {
     const worldRoot = tempDir;
     const townPath = path.join(worldRoot, 'counties', 'myc', 'mytown');
     fs.mkdirSync(path.join(townPath, '.wildwest', 'telegraph', 'outbox'), { recursive: true });
@@ -198,8 +205,8 @@ describe('Telegraph Delivery — production deliverPendingOutbox', () => {
     const { result, logs } = deliver(townPath, worldRoot);
 
     expect(result.delivered).toBe(1);
-    expect(logs.some((l) => l.includes('inbox'))).toBe(true);
-    expect(fs.existsSync(path.join(townPath, '.wildwest', 'telegraph', 'inbox', filename))).toBe(true);
+    expect(logs.some((l) => l.includes('flat'))).toBe(true);
+    expect(fs.existsSync(path.join(worldRoot, 'telegraph', 'flat', 'local-wire.json'))).toBe(true);
   });
 
   test('Missing to: field — memo marked failed', () => {
