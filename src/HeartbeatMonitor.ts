@@ -678,16 +678,42 @@ function markMemoFailed(
   memoPath: string,
   reason: string,
   outputChannel: vscode.OutputChannel,
+  field?: string,
 ): void {
   try {
     let content = fs.readFileSync(memoPath, 'utf8');
+    const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
     if (memoFile.endsWith('.json')) {
       try {
         const json = JSON.parse(content) as Record<string, unknown>;
-        if (typeof json['to'] === 'string') {
-          json['to'] = `${json['to']}(!)`;
+        const failedField = field ?? 'to';
+        if (typeof json[failedField] === 'string' && !(json[failedField] as string).endsWith('(!)')) {
+          json[failedField] = `${json[failedField]}(!)`;
         }
+        json['status'] = 'failed';
+        json['failed_at'] = isoNow;
+        json['failure'] = {
+          by: 'heartbeat',
+          reason: reasonCode(reason),
+          message: reason,
+          field: failedField,
+        };
+        const transitions = Array.isArray(json['status_transitions'])
+          ? json['status_transitions'] as Array<Record<string, unknown>>
+          : [];
+        if (!transitions.some((t) => t['status'] === 'failed' && t['message'] === reason)) {
+          transitions.push({
+            status: 'failed',
+            timestamp: isoNow,
+            by: 'heartbeat',
+            tool: 'vscode',
+            source: 'heartbeat.operator-failed',
+            message: reason,
+            field: failedField,
+          });
+        }
+        json['status_transitions'] = transitions;
         content = JSON.stringify(json, null, 2);
       } catch {
         // Fall back to raw content if JSON is invalid.
@@ -708,6 +734,15 @@ function markMemoFailed(
   } catch (err) {
     outputChannel.appendLine(`[HeartbeatMonitor] markMemoFailed error for ${memoFile}: ${err}`);
   }
+}
+
+function reasonCode(reason: string): string {
+  if (reason.includes('invalid addressing format')) return 'invalid_addressing_format';
+  if (reason.includes('missing')) return 'missing_field';
+  if (reason.includes('unknown role')) return 'unknown_role';
+  if (reason.includes('ambiguous recipient')) return 'ambiguous_recipient';
+  if (reason.includes('unresolvable recipient')) return 'unresolvable_recipient';
+  return 'delivery_failed';
 }
 
 /**
@@ -775,7 +810,7 @@ function deliverPendingOutbox(
         }
 
         if (!toField) {
-          markMemoFailed(outboxDir, memoFile, memoPath, `missing 'to:' field`, outputChannel);
+          markMemoFailed(outboxDir, memoFile, memoPath, `missing 'to:' field`, outputChannel, 'to');
           failed++;
           continue;
         }
@@ -791,7 +826,7 @@ function deliverPendingOutbox(
         // Extract role and optional pattern
         const rolePattern = extractRolePattern(normalizedToField);
         if (!rolePattern) {
-          markMemoFailed(outboxDir, memoFile, memoPath, `invalid addressing format: '${normalizedToField}'`, outputChannel);
+          markMemoFailed(outboxDir, memoFile, memoPath, `invalid addressing format: '${normalizedToField}'`, outputChannel, 'to');
           failed++;
           continue;
         }
@@ -803,7 +838,7 @@ function deliverPendingOutbox(
 
         const destScope = resolveRoleToScope(role);
         if (!destScope) {
-          markMemoFailed(outboxDir, memoFile, memoPath, `unknown role: '${role}'`, outputChannel);
+          markMemoFailed(outboxDir, memoFile, memoPath, `unknown role: '${role}'`, outputChannel, 'to');
           failed++;
           continue;
         }
@@ -817,13 +852,13 @@ function deliverPendingOutbox(
           const hint = destScope === 'town'
             ? `Use ${role}(*<town-pattern>) to specify a town`
             : `Use ${role}(<county-name>) to specify a county`;
-          markMemoFailed(outboxDir, memoFile, memoPath, `ambiguous recipient — ${hint}`, outputChannel);
+          markMemoFailed(outboxDir, memoFile, memoPath, `ambiguous recipient — ${hint}`, outputChannel, 'to');
           failed++;
           continue;
         }
 
         if (!destPath) {
-          markMemoFailed(outboxDir, memoFile, memoPath, `unresolvable recipient: '${normalizedToField}'`, outputChannel);
+          markMemoFailed(outboxDir, memoFile, memoPath, `unresolvable recipient: '${normalizedToField}'`, outputChannel, 'to');
           failed++;
           continue;
         } else {
@@ -852,8 +887,12 @@ function deliverPendingOutbox(
         // Update territory SSOT: sender's copy → status 'sent'.
         updateFlatWireDeliveryStatus(worldRoot, memoPath, memoFile, outputChannel);
 
-        // Remove outbox wire — territory SSOT is now authoritative.
-        fs.unlinkSync(memoPath);
+        // Archive the original outbox wire to outbox/history/.
+        const historyDir = path.join(outboxDir, 'history');
+        if (!fs.existsSync(historyDir)) {
+          fs.mkdirSync(historyDir, { recursive: true });
+        }
+        fs.renameSync(memoPath, path.join(historyDir, memoFile));
 
         // Remove local flat copy if present — territory wins; panel reads SSOT.
         const localFlatFile = path.join(rootPath, '.wildwest', 'telegraph', 'flat', memoFile);
@@ -957,12 +996,6 @@ function hasActionableTelegraphFiles(telegraphDir: string): boolean {
       isActionableWireFile(e)
     );
     if (hasLegacyRootWire) return true;
-
-    const inboxDir = path.join(telegraphDir, 'inbox');
-    if (fs.existsSync(inboxDir)) {
-      const hasInboxWire = fs.readdirSync(inboxDir).some((e) => isActionableWireFile(e));
-      if (hasInboxWire) return true;
-    }
 
     const outboxDir = path.join(telegraphDir, 'outbox');
     if (fs.existsSync(outboxDir)) {

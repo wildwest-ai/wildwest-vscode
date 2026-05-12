@@ -34,9 +34,14 @@ export function telegraphISOTimestamp(d: Date = new Date()): string {
 // Path helpers
 // ---------------------------------------------------------------------------
 
-/** Canonical inbox directory for a telegraph bus root. */
+/** Canonical local flat cache directory for a telegraph bus root. */
+export function flatPath(telegraphDir: string): string {
+  return path.join(telegraphDir, 'flat');
+}
+
+/** Legacy alias: old inbox path is replaced by flat cache. */
 export function inboxPath(telegraphDir: string): string {
-  return path.join(telegraphDir, 'inbox');
+  return flatPath(telegraphDir);
 }
 
 /** Canonical outbox directory for a telegraph bus root. */

@@ -163,20 +163,20 @@ function checkConsent(context: vscode.ExtensionContext): CheckResult {
 }
 
 function checkInbox(wwDir: string): CheckResult {
-  const inboxDir = path.join(wwDir, 'telegraph', 'inbox');
-  if (!fs.existsSync(inboxDir)) {
-    return { label: 'Inbox', status: 'info', detail: 'inbox/ does not exist' };
+  const flatDir = path.join(wwDir, 'telegraph', 'flat');
+  if (!fs.existsSync(flatDir)) {
+    return { label: 'Wire cache', status: 'info', detail: 'flat/ does not exist' };
   }
-  const wires = fs.readdirSync(inboxDir).filter(
-    (f) => f.endsWith('.md') && !f.startsWith('.') && f !== '.gitkeep',
+  const wires = fs.readdirSync(flatDir).filter(
+    (f) => (f.endsWith('.json') || f.endsWith('.md')) && !f.startsWith('.') && !f.startsWith('!'),
   );
   if (wires.length === 0) {
-    return { label: 'Inbox', status: 'ok', detail: 'empty' };
+    return { label: 'Wire cache', status: 'ok', detail: 'empty' };
   }
   return {
-    label: 'Inbox',
+    label: 'Wire cache',
     status: 'warn',
-    detail: `${wires.length} unresolved wire${wires.length > 1 ? 's' : ''}`,
+    detail: `${wires.length} wire${wires.length > 1 ? 's' : ''} in flat/`,
   };
 }
 

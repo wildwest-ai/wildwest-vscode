@@ -69,8 +69,8 @@ function findAckStatus(
   subject: string,
 ): 'acknowledged' | 'blocked' | null {
   const searchDirs = [
-    path.join(telegraphDir, 'inbox'),
-    path.join(telegraphDir, 'inbox', 'history'),
+    path.join(telegraphDir, 'flat'),
+    path.join(telegraphDir, 'flat', 'history'),
   ];
   for (const dir of searchDirs) {
     try {

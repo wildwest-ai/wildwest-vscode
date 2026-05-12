@@ -156,10 +156,10 @@ export function registerChatParticipant(
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
 async function handleInbox(wwRoot: string, stream: vscode.ChatResponseStream): Promise<void> {
-  const townInboxDir = path.join(wwRoot, 'telegraph', 'inbox');
+  const townFlatDir = path.join(wwRoot, 'telegraph', 'flat');
 
-  // Scope enforcement: town workspace reads only its own inbox.
-  // Cross-scope (county) inbox reads are blocked for town identity (Rule 14).
+  // Scope enforcement: town workspace reads only its own wire cache.
+  // Cross-scope (county) wire reads are blocked for town identity (Rule 14).
   const registryPath = path.join(wwRoot, 'registry.json');
   let workspaceScope: string | null = null;
   try {
@@ -167,40 +167,40 @@ async function handleInbox(wwRoot: string, stream: vscode.ChatResponseStream): P
     workspaceScope = (reg['scope'] as string) ?? null;
   } catch { /* registry unreadable — default to town-only */ }
 
-  const townWires = listWires(townInboxDir);
+  const townWires = listWires(townFlatDir);
 
   if (workspaceScope !== 'town') {
-    // Non-town workspace: also sweep county inbox
+    // Non-town workspace: also sweep county wire cache
     const countyRoot = findCountyRootFromWwDir(wwRoot);
-    const countyInboxDir = countyRoot ? path.join(countyRoot, '.wildwest', 'telegraph', 'inbox') : null;
-    const countyWires = countyInboxDir ? listWires(countyInboxDir) : [];
+    const countyFlatDir = countyRoot ? path.join(countyRoot, '.wildwest', 'telegraph', 'flat') : null;
+    const countyWires = countyFlatDir ? listWires(countyFlatDir) : [];
 
     const total = townWires.length + countyWires.length;
     if (total === 0) {
-      stream.markdown('**All inboxes empty.** Nothing to process.');
+      stream.markdown('**All wires processed.** Nothing to process.');
       return;
     }
 
     if (countyWires.length > 0) {
-      stream.markdown(`**County inbox** — ${countyWires.length} wire(s):\n\n`);
+      stream.markdown(`**County wire cache** — ${countyWires.length} wire(s):\n\n`);
       for (const wire of countyWires) {
-        const subject = extractSubject(path.join(countyInboxDir!, wire), wire);
+        const subject = extractSubject(path.join(countyFlatDir!, wire), wire);
         stream.markdown(`- \`${wire}\`  \n  ${subject}\n`);
-        stream.button({ command: CMD_ARCHIVE_WIRE, title: 'Archive', arguments: [{ inboxDir: countyInboxDir!, filename: wire }] });
+        stream.button({ command: CMD_ARCHIVE_WIRE, title: 'Archive', arguments: [{ inboxDir: countyFlatDir!, filename: wire }] });
         stream.markdown('\n');
       }
     }
   } else if (townWires.length === 0) {
-    stream.markdown('**Inbox empty.** Nothing to process.');
+    stream.markdown('**Wire cache empty.** Nothing to process.');
     return;
   }
 
   if (townWires.length > 0) {
-    stream.markdown(`**Town inbox** — ${townWires.length} wire(s):\n\n`);
+    stream.markdown(`**Town wire cache** — ${townWires.length} wire(s):\n\n`);
     for (const wire of townWires) {
-      const subject = extractSubject(path.join(townInboxDir, wire), wire);
+      const subject = extractSubject(path.join(townFlatDir, wire), wire);
       stream.markdown(`- \`${wire}\`  \n  ${subject}\n`);
-      stream.button({ command: CMD_ARCHIVE_WIRE, title: 'Archive', arguments: [{ inboxDir: townInboxDir, filename: wire }] });
+      stream.button({ command: CMD_ARCHIVE_WIRE, title: 'Archive', arguments: [{ inboxDir: townFlatDir, filename: wire }] });
       stream.markdown('\n');
     }
   }
@@ -241,17 +241,18 @@ async function handleAck(wwRoot: string, timestampArg: string, stream: vscode.Ch
     return;
   }
 
-  // Find wire matching the timestamp in town inbox
-  const inboxDir = path.join(wwRoot, 'telegraph', 'inbox');
-  const wires = listWires(inboxDir);
+  // Find wire matching the timestamp in local flat cache
+  const flatDir = path.join(wwRoot, 'telegraph', 'flat');
+  const wires = listWires(flatDir);
   const matched = wires.find((f) => f.includes(timestampArg));
 
   if (!matched) {
-    stream.markdown(`No wire found matching \`${timestampArg}\` in inbox.`);
+    stream.markdown(`No wire found matching \`${timestampArg}\` in local wire cache.`);
     return;
   }
 
-  const frontmatter = parseFrontmatter(path.join(inboxDir, matched));
+  const matchedPath = path.join(flatDir, matched);
+  const frontmatter = parseFrontmatter(matchedPath);
   const originalFrom = (frontmatter['from'] as string) ?? 'unknown';
   const originalSubject = (frontmatter['subject'] as string) ?? matched;
 
@@ -264,7 +265,7 @@ async function handleAck(wwRoot: string, timestampArg: string, stream: vscode.Ch
   const outboxDir = path.join(wwRoot, 'telegraph', 'outbox');
   const ackSubject = `ack-${timestampArg}-${originalSubject}`.slice(0, 60).replace(/\s+/g, '-');
   const ackBody = `Ack — your ${timestampArg} wire (${originalSubject}) received and processed.\n\n${senderAlias}`;
-  const flatDir = resolveFlatDir();
+  const localFlatDir = resolveFlatDir();
 
   const wire = createFlatWire({
     from: senderAlias,
@@ -279,21 +280,22 @@ async function handleAck(wwRoot: string, timestampArg: string, stream: vscode.Ch
 
   stream.markdown(`**Ack wire** — \`${matched}\`:\n\n`);
   stream.markdown('```json\n' + JSON.stringify(wire, null, 2) + '\n```\n\n');
-  stream.button({ command: CMD_CONFIRM_ACK, title: 'Send Ack', arguments: [{ wire, flatDir, outboxDir }] });
+  stream.button({ command: CMD_CONFIRM_ACK, title: 'Send Ack', arguments: [{ wire, flatDir: localFlatDir, outboxDir }] });
 }
 
 async function handleArchive(wwRoot: string, filenameArg: string, stream: vscode.ChatResponseStream): Promise<void> {
-  const inboxDir = path.join(wwRoot, 'telegraph', 'inbox');
-  const wires = listWires(inboxDir);
+  const flatDir = path.join(wwRoot, 'telegraph', 'flat');
+  const wires = listWires(flatDir);
   const matched = wires.find((f) => f === filenameArg || f.includes(filenameArg));
 
   if (!matched) {
-    stream.markdown(`No wire found matching \`${filenameArg}\` in inbox.\n\nUsage: \`@wildwest archive <filename-or-partial>\``);
+    stream.markdown(`No wire found matching \`${filenameArg}\` in local wire cache.\n\nUsage: \`@wildwest archive <filename-or-partial>\``);
     return;
   }
 
+  const archiveDir = path.join(wwRoot, 'telegraph', 'flat');
   stream.markdown(`Archive \`${matched}\`?\n\n`);
-  stream.button({ command: CMD_ARCHIVE_WIRE, title: 'Archive', arguments: [{ inboxDir, filename: matched }] });
+  stream.button({ command: CMD_ARCHIVE_WIRE, title: 'Archive', arguments: [{ inboxDir: archiveDir, filename: matched }] });
 }
 
 async function handleTelegraphCheck(wwRoot: string, stream: vscode.ChatResponseStream): Promise<void> {
@@ -305,14 +307,14 @@ async function handleTelegraphCheck(wwRoot: string, stream: vscode.ChatResponseS
     try { return fs.readdirSync(dir).filter(pred).length; } catch { return 0; }
   };
 
-  const inboxDir   = path.join(telegraphDir, 'inbox');
+  const flatDir   = path.join(telegraphDir, 'flat');
   const outboxDir  = path.join(telegraphDir, 'outbox');
-  const historyDir = path.join(telegraphDir, 'history');
+  const historyDir = path.join(outboxDir, 'history');
 
-  const inbox      = count(inboxDir,   (f) => isMd(f) && !f.startsWith('!'));
-  const outbox     = count(outboxDir,  (f) => isMd(f) && !f.startsWith('!'));
-  const history    = count(historyDir, isMd);
-  const deadLetter = count(inboxDir,   (f) => f.startsWith('!')) + count(outboxDir, (f) => f.startsWith('!'));
+  const inbox      = count(flatDir,   (f) => (f.endsWith('.json') || f.endsWith('.md')) && !f.startsWith('!'));
+  const outbox     = count(outboxDir,  (f) => (f.endsWith('.json') || f.endsWith('.md')) && !f.startsWith('!'));
+  const history    = count(historyDir, (f) => (f.endsWith('.json') || f.endsWith('.md')) && !f.startsWith('.'));
+  const deadLetter = count(outboxDir, (f) => f.startsWith('!'));
 
   stream.markdown('**Telegraph check**\n\n');
   stream.markdown(`| Dir | Count |\n|---|---|\n`);
@@ -357,7 +359,7 @@ async function handleStatus(wwRoot: string, stream: vscode.ChatResponseStream): 
     const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
     const beatPath = path.join(wwRoot, 'telegraph', '.last-beat');
     const lastBeat = fs.existsSync(beatPath) ? fs.readFileSync(beatPath, 'utf8').trim() : 'unknown';
-    const inboxCount = listWires(path.join(wwRoot, 'telegraph', 'inbox')).length;
+    const inboxCount = listWires(path.join(wwRoot, 'telegraph', 'flat')).length;
     const boardDir = path.join(wwRoot, 'board', 'branches');
     const boardCount = fs.existsSync(boardDir)
       ? fs.readdirSync(boardDir).filter((f) => f.endsWith('.json')).length : 0;

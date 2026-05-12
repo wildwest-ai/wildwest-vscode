@@ -29,29 +29,6 @@ export class TelegraphWatcher {
     const worktrees = this.worktreeManager.list();
     for (const wt of worktrees) {
       const telegraphDir = path.join(wt.path, '.wildwest', 'telegraph');
-      const inboxDir = path.join(telegraphDir, 'inbox');
-      
-      // Ensure inbox/ exists (may not exist on first run after upgrade)
-      if (!fs.existsSync(inboxDir)) {
-        try {
-          fs.mkdirSync(inboxDir, { recursive: true });
-        } catch (err) {
-          this.outputChannel.appendLine(`[TelegraphWatcher] failed to create inbox: ${err}`);
-        }
-      }
-      
-      // Primary watcher: inbox/ directory (new outbox/inbox model)
-      const inboxWatcher = chokidar.watch(inboxDir, {
-        ignoreInitial: false,
-        depth: 0,
-        persistent: true,
-      });
-      inboxWatcher.on('add', (filePath) => this.onInboxFile(filePath));
-      inboxWatcher.on('error', (err) => {
-        this.outputChannel.appendLine(`[TelegraphWatcher] error watching ${inboxDir}: ${err}`);
-      });
-      this.watchers.push(inboxWatcher);
-      this.outputChannel.appendLine(`[TelegraphWatcher] watching inbox: ${inboxDir}`);
 
       // Outbox watcher: trigger immediate delivery when a new memo is added
       const outboxDir = path.join(telegraphDir, 'outbox');
@@ -115,29 +92,6 @@ export class TelegraphWatcher {
     }
     this.outputChannel.appendLine(`[TelegraphWatcher] new outbox memo: ${basename} — triggering immediate delivery`);
     this.heartbeatMonitor.deliverOutboxNow();
-  }
-
-  private onInboxFile(filePath: string): void {
-    const basename = path.basename(filePath);
-    
-    // Ignore sentinel, heartbeat logs, and meta files
-    if (
-      basename === '.last-beat' ||
-      basename === '.gitkeep' ||
-      basename.includes('-heartbeat--')
-    ) {
-      return;
-    }
-
-    // New memo in inbox = alert identity to process
-    this.heartbeatMonitor.setFlagged(true);
-    const msg = `Wild West: 📬 new memo in inbox — ${basename}`;
-    this.outputChannel.appendLine(`[TelegraphWatcher] new inbox memo: ${basename}`);
-    vscode.window.showWarningMessage(msg, 'Process Inbox', 'Dismiss').then((choice) => {
-      if (choice === 'Process Inbox') {
-        vscode.commands.executeCommand('wildwest.processInbox');
-      }
-    });
   }
 
   private onLegacyFile(filePath: string, telegraphDir: string): void {
