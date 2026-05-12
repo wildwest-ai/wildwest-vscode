@@ -113,9 +113,9 @@ export class TelegraphPanel {
 
   /**
    * Read all wires for panel display.
-   * - Territory flat/ (~/wildwest/telegraph/flat/) is the SSOT for sent/received/read/archived.
-   * - Local .wildwest/telegraph/flat/ holds draft/pending wires (sender's local PO) only.
-   *   These are merged in for Outbox view; territory wins on any wwuid conflict.
+   * - Territory flat/ (~/wildwest/telegraph/flat/) is the SSOT.
+   * - Local .wildwest/telegraph/flat/ is this scope's cache.
+   * - Heartbeat syncs territory → local cache; the panel reads local cache only.
    */
   /**
    * Find the actual file path for a wire by wwuid in a given directory.

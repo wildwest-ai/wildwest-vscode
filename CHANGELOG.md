@@ -4,6 +4,10 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.39.15] - 2026-05-12
+
+Extend `syncFromTerritory` to county scope: `beatCounty`, `beatTown` (county root branch), and `deliverOutboxNow` (county path) all now sync territory → county local cache after outbox delivery. Comment updates in `TelegraphPanel` to reflect panel reads local cache only.
+
 ## [0.39.14] - 2026-05-11
 
 Correct panel/heartbeat architecture to match layered sync model. Panel now reads local cache (`.wildwest/telegraph/flat/`) only — never territory SSOT directly. Heartbeat gains `syncFromTerritory()` pull step: on every beat and after delivery, territory SSOT → local cache. Overlay fields (`sender_archived_at`, `recipient_archived_at`) preserved during sync. Prepares for future remote SSOT without panel changes.

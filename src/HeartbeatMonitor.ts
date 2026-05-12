@@ -984,12 +984,14 @@ function beatTown(
     const townDelivery = deliverPendingOutbox(rootPath, scope, outputChannel, worldRoot, countiesDir);
     let refreshNeeded = townDelivery.delivered > 0;
 
-    // Also deliver county outbox if we can find the county root
+    // Also deliver and sync county scope if we can find the county root.
     const countyRoot = findCountyRoot(rootPath);
     outputChannel.appendLine(`[HeartbeatMonitor] town beat countyRoot=${countyRoot ?? '<none>'}`);
     if (countyRoot) {
       const countyDelivery = deliverPendingOutbox(countyRoot, 'county', outputChannel, worldRoot, countiesDir);
       refreshNeeded = refreshNeeded || countyDelivery.delivered > 0;
+      const countySyncNeeded = syncFromTerritory(countyRoot, worldRoot, outputChannel);
+      refreshNeeded = refreshNeeded || countySyncNeeded;
     }
 
     // Pull: sync territory SSOT → local cache so panel reads local only
@@ -1095,6 +1097,9 @@ function beatCounty(
     const townDelivery = deliverPendingOutbox(townInfo.path, 'town', outputChannel, worldRoot, countiesDir);
     refreshNeeded = refreshNeeded || townDelivery.delivered > 0;
   }
+
+  const countySyncNeeded = syncFromTerritory(rootPath, worldRoot, outputChannel);
+  refreshNeeded = refreshNeeded || countySyncNeeded;
 
   if (refreshNeeded) {
     void Promise.resolve(vscode.commands.executeCommand('wildwest.refreshTelegraphPanel')).catch(() => undefined);
@@ -1234,6 +1239,8 @@ export class HeartbeatMonitor {
       if (countyRoot) {
         const countyDelivery = deliverPendingOutbox(countyRoot, 'county', this.outputChannel, this.worldRoot, this.countiesDir);
         refreshNeeded = refreshNeeded || countyDelivery.delivered > 0;
+        const countySyncNeeded = syncFromTerritory(countyRoot, this.worldRoot, this.outputChannel);
+        refreshNeeded = refreshNeeded || countySyncNeeded;
       }
       // Pull: sync territory SSOT → local cache after delivery
       const syncNeeded = syncFromTerritory(town.rootPath, this.worldRoot, this.outputChannel);
@@ -1247,10 +1254,17 @@ export class HeartbeatMonitor {
     const county = this.scopes.find((s) => s.scope === 'county');
     if (county) {
       this.outputChannel.appendLine('[HeartbeatMonitor] outbox delivery triggered by new memo in county scope');
-      deliverPendingOutbox(county.rootPath, county.scope, this.outputChannel, this.worldRoot, this.countiesDir);
+      const countyDelivery = deliverPendingOutbox(county.rootPath, county.scope, this.outputChannel, this.worldRoot, this.countiesDir);
+      let refreshNeeded = countyDelivery.delivered > 0;
       const towns = listTownsInCounty(county.rootPath);
       for (const townInfo of towns) {
-        deliverPendingOutbox(townInfo.path, 'town', this.outputChannel, this.worldRoot, this.countiesDir);
+        const townDelivery = deliverPendingOutbox(townInfo.path, 'town', this.outputChannel, this.worldRoot, this.countiesDir);
+        refreshNeeded = refreshNeeded || townDelivery.delivered > 0;
+      }
+      const countySyncNeeded = syncFromTerritory(county.rootPath, this.worldRoot, this.outputChannel);
+      refreshNeeded = refreshNeeded || countySyncNeeded;
+      if (refreshNeeded) {
+        void Promise.resolve(vscode.commands.executeCommand('wildwest.refreshTelegraphPanel')).catch(() => undefined);
       }
     }
   }
