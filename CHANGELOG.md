@@ -4,6 +4,12 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.41.0] - 2026-05-12
+
+- Add `dist/mcp-standalone.js` — standalone stdio MCP server for Claude Code and non-VSCode clients. Spawnable via `node dist/mcp-standalone.js` with `WW_ROOT` and `WW_WORLD_ROOT` env vars; no VSCode extension required. Exposes all 7 tools: `wildwest_status`, `wildwest_inbox`, `wildwest_board`, `wildwest_telegraph_check`, `wildwest_draft_wire`, `wildwest_send_wire`, `wildwest_retry_wire`.
+- Refactor `wwMCPAuth` to use a local `Logger` interface instead of `vscode.OutputChannel` — removes vscode dependency from auth module.
+- Add `build:mcp-standalone` script; update `vscode:prepublish` to build both `extension.js` and `mcp-standalone.js`.
+
 ## [0.40.2] - 2026-05-12
 
 - Fix TelegraphPanel address matching so sent wires to other `TM[...]` aliases do not incorrectly appear in Inbox.
