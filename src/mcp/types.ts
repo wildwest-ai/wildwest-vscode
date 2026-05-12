@@ -8,6 +8,7 @@ export const TOOL_BOARD = 'wildwest_board';
 export const TOOL_TELEGRAPH_CHECK = 'wildwest_telegraph_check';
 export const TOOL_DRAFT_WIRE = 'wildwest_draft_wire';
 export const TOOL_SEND_WIRE = 'wildwest_send_wire';
+export const TOOL_RETRY_WIRE = 'wildwest_retry_wire';
 
 // ── Scope context ──────────────────────────────────────────────────────────
 
@@ -74,6 +75,10 @@ export interface SendWireInput {
   body: string;
   type?: string;
   re?: string;
+}
+
+export interface RetryWireInput {
+  wwuid: string;
 }
 
 export interface WireWriteOutput {

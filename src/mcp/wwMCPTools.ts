@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {
+  applyStatusUpdate,
   createFlatWire,
   createWireStatusUpdatePacket,
   writeDraftWire,
@@ -18,6 +19,7 @@ import {
   InboxInput,
   InboxOutput,
   MCPScopeContext,
+  RetryWireInput,
   SendWireInput,
   TelegraphCheckOutput,
   WireSummary,
@@ -55,20 +57,20 @@ export function toolStatus(ctx: MCPScopeContext): StatusOutput {
 
 export function toolInbox(ctx: MCPScopeContext, input: InboxInput): InboxOutput {
   const limit = input.limit ?? 20;
-  const inboxDir = path.join(ctx.rootPath, '.wildwest', 'telegraph', 'inbox');
+  const flatDir = path.join(ctx.rootPath, '.wildwest', 'telegraph', 'flat');
 
-  if (!fs.existsSync(inboxDir)) {
+  if (!fs.existsSync(flatDir)) {
     return { wires: [], total: 0 };
   }
 
   const files = fs
-    .readdirSync(inboxDir)
-    .filter((f) => (f.endsWith('.json') || f.endsWith('.md')) && !f.startsWith('.') && !f.startsWith('!') && f !== 'history')
+    .readdirSync(flatDir)
+    .filter((f) => (f.endsWith('.json') || f.endsWith('.md')) && !f.startsWith('.') && !f.startsWith('!'))
     .sort()
     .slice(0, limit);
 
   const wires: WireSummary[] = files.map((filename) => {
-    const filePath = path.join(inboxDir, filename);
+    const filePath = path.join(flatDir, filename);
     return parseWireSummary(filePath, filename);
   });
 
@@ -116,17 +118,16 @@ export function toolTelegraphCheck(ctx: MCPScopeContext): TelegraphCheckOutput {
     } catch { return 0; }
   };
 
-  const inboxDir = path.join(telegraphDir, 'inbox');
+  const flatDir = path.join(telegraphDir, 'flat');
   const outboxDir = path.join(telegraphDir, 'outbox');
-  const historyDir = path.join(telegraphDir, 'history');
+  const historyDir = path.join(outboxDir, 'history');
   const isWire = (f: string) => (f.endsWith('.json') || f.endsWith('.md')) && !f.startsWith('.');
 
   return {
-    inbox: count(inboxDir, (f) => isWire(f) && !f.startsWith('!')),
+    inbox: count(flatDir, (f) => isWire(f) && !f.startsWith('!')),
     outbox: count(outboxDir, (f) => isWire(f) && !f.startsWith('!')),
     history: count(historyDir, isWire),
-    deadLetter: count(inboxDir, (f) => f.startsWith('!')) +
-                count(outboxDir, (f) => f.startsWith('!')),
+    deadLetter: count(outboxDir, (f) => f.startsWith('!')),
   };
 }
 
@@ -197,7 +198,7 @@ export function toolSendWire(ctx: MCPScopeContext, input: SendWireInput): WireWr
 
   const localOutboxDir = path.join(ctx.rootPath, '.wildwest', 'telegraph', 'outbox');
   fs.mkdirSync(localOutboxDir, { recursive: true });
-  fs.writeFileSync(path.join(localOutboxDir, `${wire.wwuid}.json`), JSON.stringify(wire, null, 2), 'utf8');
+  fs.writeFileSync(path.join(localOutboxDir, wire.filename), JSON.stringify(wire, null, 2), 'utf8');
 
   return {
     wwuid: wire.wwuid,
@@ -206,6 +207,50 @@ export function toolSendWire(ctx: MCPScopeContext, input: SendWireInput): WireWr
     date: wire.date,
     path: path.join(territoryFlatDir, `${wire.wwuid}.json`),
   };
+}
+
+export function toolRetryWire(ctx: MCPScopeContext, input: RetryWireInput): WireWriteOutput {
+  const wwuid = input.wwuid?.trim();
+  if (!wwuid) {
+    throw new Error('wwuid is required');
+  }
+
+  for (const rootPath of recoveryRoots(ctx.rootPath)) {
+    const outboxDir = path.join(rootPath, '.wildwest', 'telegraph', 'outbox');
+    const failedPath = path.join(outboxDir, `!${wwuid}.json`);
+    const restoredPath = path.join(outboxDir, `${wwuid}.json`);
+    if (!fs.existsSync(failedPath)) continue;
+
+    const wire = JSON.parse(fs.readFileSync(failedPath, 'utf8')) as Record<string, unknown>;
+    for (const key of ['to', 'from', 'subject', 'type']) {
+      if (typeof wire[key] === 'string') {
+        wire[key] = (wire[key] as string).replace(/\(!\)$/u, '');
+      }
+    }
+    wire['status'] = 'pending';
+    delete wire['failure'];
+    delete wire['failed_at'];
+    const alias = readRegistryAlias(path.join(rootPath, '.wildwest')) ?? '';
+    applyStatusUpdate(
+      wire as unknown as Parameters<typeof applyStatusUpdate>[0],
+      'pending',
+      { status: 'pending' },
+      transitionContext({ ...ctx, rootPath }, alias, 'wwmcp.retry-wire'),
+    );
+
+    fs.writeFileSync(restoredPath, JSON.stringify(wire, null, 2), 'utf8');
+    fs.unlinkSync(failedPath);
+
+    return {
+      wwuid,
+      filename: (wire['filename'] as string | undefined) ?? `${wwuid}.json`,
+      status: 'pending',
+      date: (wire['date'] as string | undefined) ?? new Date().toISOString(),
+      path: restoredPath,
+    };
+  }
+
+  throw new Error(`Failed wire not found: ${wwuid}`);
 }
 
 function senderAddress(ctx: MCPScopeContext, alias: string): string {
@@ -227,6 +272,29 @@ function transitionContext(ctx: MCPScopeContext, alias: string, source: string) 
     tool: 'wwmcp',
     source,
   };
+}
+
+function recoveryRoots(rootPath: string): string[] {
+  const roots = new Set<string>();
+  roots.add(rootPath);
+  const countyRoot = findAncestorScopeRoot(rootPath, 'county');
+  if (countyRoot) roots.add(countyRoot);
+  return [...roots];
+}
+
+function findAncestorScopeRoot(startPath: string, scope: string): string | null {
+  let current = startPath;
+  const fsRoot = path.parse(current).root;
+  while (current && current !== fsRoot) {
+    try {
+      const reg = JSON.parse(
+        fs.readFileSync(path.join(current, '.wildwest', 'registry.json'), 'utf8'),
+      ) as Record<string, unknown>;
+      if (reg['scope'] === scope) return current;
+    } catch { /* keep walking */ }
+    current = path.dirname(current);
+  }
+  return null;
 }
 
 function normalizeWireSubject(subject: string): string {

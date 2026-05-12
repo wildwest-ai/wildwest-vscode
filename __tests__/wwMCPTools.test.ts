@@ -59,7 +59,7 @@ describe('wwMCP wire write tools', () => {
     expect(fs.existsSync(draftPath)).toBe(true);
 
     const wire = JSON.parse(fs.readFileSync(draftPath, 'utf8'));
-    expect(wire.from).toBe('TM(wildwest-vscode)');
+    expect(wire.from).toBe('TM[wildwest-vscode]');
     expect(wire.to).toBe('CD(RSn)');
     expect(wire.status).toBe('draft');
     expect(wire.re).toBe('original-wire-wwuid');

@@ -11,6 +11,7 @@ import {
   toolBoard,
   toolDraftWire,
   toolInbox,
+  toolRetryWire,
   toolSendWire,
   toolStatus,
   toolTelegraphCheck,
@@ -20,10 +21,12 @@ import {
   DraftWireInput,
   InboxInput,
   MCPScopeContext,
+  RetryWireInput,
   SendWireInput,
   TOOL_BOARD,
   TOOL_DRAFT_WIRE,
   TOOL_INBOX,
+  TOOL_RETRY_WIRE,
   TOOL_SEND_WIRE,
   TOOL_STATUS,
   TOOL_TELEGRAPH_CHECK,
@@ -132,6 +135,17 @@ export class wwMCPServer {
             required: ['to', 'subject', 'body'],
           },
         },
+        {
+          name: TOOL_RETRY_WIRE,
+          description: 'Restore a failed !{wwuid}.json wire to pending and trigger immediate delivery.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              wwuid: { type: 'string', description: 'Failed wire wwuid to retry' },
+            },
+            required: ['wwuid'],
+          },
+        },
       ],
     }));
 
@@ -173,6 +187,11 @@ export class wwMCPServer {
           }
           case TOOL_SEND_WIRE: {
             const result = toolSendWire(ctx, args as unknown as SendWireInput);
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+          }
+          case TOOL_RETRY_WIRE: {
+            const result = toolRetryWire(ctx, args as unknown as RetryWireInput);
+            this.heartbeatMonitor.deliverOutboxNow();
             return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
           }
           default:
