@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as vscode from 'vscode';
+
+interface Logger { appendLine(msg: string): void; }
 
 /**
  * Checks whether the connecting identity is registered in the identity registry.
@@ -10,7 +11,7 @@ import * as vscode from 'vscode';
  */
 export function checkActorAccess(
   rootPath: string,
-  outputChannel: vscode.OutputChannel,
+  outputChannel: Logger,
 ): { allowed: boolean; reason?: string } {
   const regPath = path.join(rootPath, '.wildwest', 'registry.json');
 
