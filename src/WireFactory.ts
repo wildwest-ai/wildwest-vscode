@@ -8,7 +8,13 @@ import { telegraphTimestamp, telegraphISOTimestamp } from './TelegraphService';
 export interface StatusTransition {
   status: string;
   timestamp: string;
+  by?: string;
+  scope?: string;
+  alias?: string;
+  tool?: string;
+  source?: string;
   instances?: number;
+  /** @deprecated use tool/source plus by/scope/alias */
   repos?: string[];
 }
 
@@ -53,6 +59,31 @@ export interface CreateWireParams {
   status?: string;
   re?: string;
   original_wire?: string;
+  transitionContext?: WireTransitionContext;
+}
+
+export interface WireTransitionContext {
+  by?: string;
+  scope?: string;
+  alias?: string;
+  tool?: string;
+  source?: string;
+}
+
+export interface WireUpdatePacket {
+  schema_version: '1';
+  wwuid: string;
+  wwuid_type: 'packet';
+  wire_wwuid: string;
+  op: 'wire.status';
+  created_at: string;
+  by?: string;
+  scope?: string;
+  alias?: string;
+  tool?: string;
+  source?: string;
+  patch: Record<string, unknown>;
+  transition: StatusTransition;
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────
@@ -82,12 +113,13 @@ export function createFlatWire(params: CreateWireParams): FlatWire {
     body: params.body,
     filename,
     status_transitions: [
-      {
-        status,
-        timestamp: isoNow,
-        instances: 1,
-        repos: ['vscode'],
-      },
+      createStatusTransition(status, isoNow, {
+        by: params.transitionContext?.by ?? params.from,
+        scope: params.transitionContext?.scope,
+        alias: params.transitionContext?.alias,
+        tool: params.transitionContext?.tool ?? 'vscode',
+        source: params.transitionContext?.source ?? 'wire-factory',
+      }, 1),
     ],
   };
 
@@ -95,6 +127,82 @@ export function createFlatWire(params: CreateWireParams): FlatWire {
   if (params.original_wire) wire.original_wire = params.original_wire;
 
   return wire;
+}
+
+export function createStatusTransition(
+  status: string,
+  timestamp: string,
+  context: WireTransitionContext = {},
+  instances?: number,
+): StatusTransition {
+  const transition: StatusTransition = {
+    status,
+    timestamp,
+    tool: context.tool ?? 'vscode',
+    source: context.source,
+  };
+  if (context.by) transition.by = context.by;
+  if (context.scope) transition.scope = context.scope;
+  if (context.alias) transition.alias = context.alias;
+  if (instances !== undefined) transition.instances = instances;
+  return transition;
+}
+
+export function applyStatusUpdate(
+  wire: FlatWire,
+  status: string,
+  patch: Record<string, unknown>,
+  context: WireTransitionContext = {},
+  timestamp: string = telegraphISOTimestamp(),
+  options: { dedupeStatus?: boolean } = {},
+): StatusTransition {
+  wire.status = status;
+  Object.assign(wire, patch);
+  const transitions = wire.status_transitions ?? [];
+  const existing = transitions.find((t) => t.status === status);
+  if (options.dedupeStatus && existing) {
+    wire.status_transitions = transitions;
+    return existing;
+  }
+  const transition = createStatusTransition(status, timestamp, context);
+  transitions.push(transition);
+  wire.status_transitions = transitions;
+  return transition;
+}
+
+export function createWireStatusUpdatePacket(
+  wire: FlatWire,
+  patch: Record<string, unknown>,
+  transition: StatusTransition,
+  context: WireTransitionContext = {},
+): WireUpdatePacket {
+  const createdAt = transition.timestamp;
+  return {
+    schema_version: '1',
+    wwuid: generateWwuid('packet', wire.wwuid, transition.status, createdAt),
+    wwuid_type: 'packet',
+    wire_wwuid: wire.wwuid,
+    op: 'wire.status',
+    created_at: createdAt,
+    by: context.by ?? transition.by,
+    scope: context.scope ?? transition.scope,
+    alias: context.alias ?? transition.alias,
+    tool: context.tool ?? transition.tool ?? 'vscode',
+    source: context.source ?? transition.source,
+    patch,
+    transition,
+  };
+}
+
+export function writeWireUpdatePacket(packet: WireUpdatePacket, flatDir: string): void {
+  const telegraphDir = path.dirname(flatDir);
+  const packetsDir = path.join(telegraphDir, 'packets');
+  fs.mkdirSync(packetsDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(packetsDir, `${packet.wwuid}.json`),
+    JSON.stringify(packet, null, 2),
+    'utf8',
+  );
 }
 
 // ── I/O helpers ───────────────────────────────────────────────────────────────

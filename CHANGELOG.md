@@ -4,6 +4,10 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.39.16] - 2026-05-12
+
+Packetized wire status transitions. `WireFactory` gains `WireTransitionContext`, `WireUpdatePacket`, `createStatusTransition()`, `applyStatusUpdate()`, `createWireStatusUpdatePacket()`, and `writeWireUpdatePacket()` helpers. Status mutations now append-only `wire.status` packets under `telegraph/packets/`. `StatusTransition` fields expanded: `by`, `scope`, `alias`, `tool`, `source` (deprecates `repos`). `TelegraphPanel` compose emits bracket-routing addresses (`Role[alias]`); mark-read writes immediately to territory and local cache and emits a packet. `HeartbeatMonitor` sent/received transitions use shared helpers and packet writes; `transitionContextForRoot()` reads registry for scope/alias context.
+
 ## [0.39.15] - 2026-05-12
 
 Extend `syncFromTerritory` to county scope: `beatCounty`, `beatTown` (county root branch), and `deliverOutboxNow` (county path) all now sync territory → county local cache after outbox delivery. Comment updates in `TelegraphPanel` to reflect panel reads local cache only.

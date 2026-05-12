@@ -1,7 +1,16 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { FlatWire, createFlatWire, writeFlatWire, writeDraftWire, parseFilenameActors } from './WireFactory';
+import {
+  FlatWire,
+  WireTransitionContext,
+  applyStatusUpdate,
+  createFlatWire,
+  createWireStatusUpdatePacket,
+  writeDraftWire,
+  writeWireUpdatePacket,
+  parseFilenameActors,
+} from './WireFactory';
 import { readRegistryAlias } from './TelegraphService';
 import { PromptIndexService } from './PromptIndexService';
 import type { HeartbeatMonitor } from './HeartbeatMonitor';
@@ -70,6 +79,25 @@ export class TelegraphPanel {
   private getActorAlias(): string {
     const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
     return readRegistryAlias(path.join(wsPath, '.wildwest')) ?? '';
+  }
+
+  private getWireTransitionContext(source: string): WireTransitionContext {
+    const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+    const identity = vscode.workspace.getConfiguration('wildwest').get<string>('identity') ?? '';
+    try {
+      const reg = JSON.parse(
+        fs.readFileSync(path.join(wsPath, '.wildwest', 'registry.json'), 'utf8'),
+      ) as Record<string, unknown>;
+      return {
+        by: identity || undefined,
+        scope: (reg['scope'] as string | undefined) ?? undefined,
+        alias: (reg['alias'] as string | undefined) ?? undefined,
+        tool: 'vscode',
+        source,
+      };
+    } catch {
+      return { by: identity || undefined, tool: 'vscode', source };
+    }
   }
 
   /**
@@ -243,9 +271,10 @@ export class TelegraphPanel {
     const identity = vscode.workspace.getConfiguration('wildwest').get<string>('identity') ?? '';
     const roleMatch = identity.match(/^([A-Za-z]+)/);
     const role = roleMatch?.[1] ?? 'TM';
-    const fromActor = alias ? `${role}(${alias})` : (identity || 'TM');
+    const fromActor = alias ? `${role}[${alias}]` : (identity || 'TM');
 
-    const wire = createFlatWire({ from: fromActor, to, type, subject, body, status: 'pending' });
+    const transitionContext = this.getWireTransitionContext('telegraph-panel.compose');
+    const wire = createFlatWire({ from: fromActor, to, type, subject, body, status: 'pending', transitionContext });
 
     // Write to local outbox for heartbeat pickup → heartbeat promotes to SSOT.
     // Call deliverOutboxNow() immediately so there's no waiting for the next tick.
@@ -276,6 +305,7 @@ export class TelegraphPanel {
       return; // sendWires called inside handleMarkRead
     }
     const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+    const transitionContext = this.getWireTransitionContext('telegraph-panel.bulk-status');
     for (const wwuid of wwuids) {
       // Prefer territory for sent/received/read; fall back to local for draft/pending
       const dirs = flatDir ? [flatDir] : [];
@@ -285,12 +315,10 @@ export class TelegraphPanel {
         if (!filePath) continue;
         try {
           const wire = JSON.parse(fs.readFileSync(filePath, 'utf8')) as FlatWire;
-          wire.status = status;
-          wire.status_transitions = [
-            ...(wire.status_transitions ?? []),
-            { status, timestamp: isoNow, repos: ['vscode'] },
-          ];
+          const patch = { status };
+          const transition = applyStatusUpdate(wire, status, patch, transitionContext, isoNow);
           fs.writeFileSync(filePath, JSON.stringify(wire, null, 2), 'utf8');
+          writeWireUpdatePacket(createWireStatusUpdatePacket(wire, patch, transition, transitionContext), dir);
         } catch { /* skip */ }
         break; // only write to first dir that has the file
       }
@@ -308,13 +336,12 @@ export class TelegraphPanel {
     try {
       const wire = JSON.parse(fs.readFileSync(localFilePath, 'utf8')) as FlatWire;
       const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
-      wire.status = 'pending';
-      wire.status_transitions = [
-        ...(wire.status_transitions ?? []),
-        { status: 'pending', timestamp: isoNow, repos: ['vscode'] },
-      ];
+      const transitionContext = this.getWireTransitionContext('telegraph-panel.send-draft');
+      const patch = { status: 'pending' };
+      const transition = applyStatusUpdate(wire, 'pending', patch, transitionContext, isoNow);
       // Update local flat/ so Outbox shows Pending while delivery runs
       fs.writeFileSync(localFilePath, JSON.stringify(wire, null, 2), 'utf8');
+      writeWireUpdatePacket(createWireStatusUpdatePacket(wire, patch, transition, transitionContext), localFlatDir);
       // Drop in workspace outbox/ for heartbeat pickup
       const outboxDir = path.join(wsPath, '.wildwest', 'telegraph', 'outbox');
       fs.mkdirSync(outboxDir, { recursive: true });
@@ -331,31 +358,53 @@ export class TelegraphPanel {
     const wsDir = this.getWorkspaceFlatDir();
     this.log(`handleMarkRead: wwuid=${wwuid} flatDir=${flatDir} wsDir=${wsDir}`);
     if (!wwuid) { this.log('handleMarkRead: early exit — no wwuid'); return; }
-    // Try territory first (authoritative), fall back to workspace local
-    const dirs: string[] = [];
-    if (flatDir) dirs.push(flatDir);
-    if (wsDir) dirs.push(wsDir);
-    const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
-    for (const dir of dirs) {
-      const filePath = this.findWireFilePath(wwuid, dir);
-      this.log(`handleMarkRead: checking ${dir} → ${filePath ?? 'not found'}`);
-      if (!filePath) continue;
-      try {
-        const wire = JSON.parse(fs.readFileSync(filePath, 'utf8')) as FlatWire;
-        if (wire.status === 'read') { this.log('handleMarkRead: already read, skip'); return; }
-        wire.status = 'read';
-        wire.read_at = isoNow;
-        wire.status_transitions = [
-          ...(wire.status_transitions ?? []),
-          { status: 'read', timestamp: isoNow, repos: ['vscode'] },
-        ];
-        fs.writeFileSync(filePath, JSON.stringify(wire, null, 2), 'utf8');
-        this.log(`handleMarkRead: wrote read status to ${filePath}`);
-        this.sendWires();
-      } catch (err) { this.log(`handleMarkRead: error ${err}`); }
+
+    const territoryPath = flatDir ? this.findWireFilePath(wwuid, flatDir) : null;
+    const localPath = wsDir ? path.join(wsDir, `${wwuid}.json`) : null;
+    const sourcePath = territoryPath ?? (wsDir ? this.findWireFilePath(wwuid, wsDir) : null);
+    this.log(`handleMarkRead: territoryPath=${territoryPath ?? 'not found'} localPath=${localPath ?? 'none'} sourcePath=${sourcePath ?? 'not found'}`);
+    if (!sourcePath) {
+      this.log(`handleMarkRead: no file found for wwuid=${wwuid}`);
       return;
     }
-    this.log(`handleMarkRead: no file found in dirs=${JSON.stringify(dirs)}`);
+
+    const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+    try {
+      const wire = JSON.parse(fs.readFileSync(sourcePath, 'utf8')) as FlatWire;
+      const transitionContext = this.getWireTransitionContext('telegraph-panel.mark-read');
+      const patch: Record<string, unknown> = { status: 'read', read_at: isoNow };
+      let transition = wire.status_transitions?.find((t) => t.status === 'read');
+      if (wire.status !== 'read') {
+        transition = applyStatusUpdate(wire, 'read', patch, transitionContext, isoNow);
+      }
+
+      if (territoryPath) {
+        fs.writeFileSync(territoryPath, JSON.stringify(wire, null, 2), 'utf8');
+        if (transition) {
+          writeWireUpdatePacket(createWireStatusUpdatePacket(wire, patch, transition, transitionContext), flatDir!);
+        }
+        this.log(`handleMarkRead: wrote read status to territory ${territoryPath}`);
+      }
+
+      if (localPath) {
+        fs.mkdirSync(path.dirname(localPath), { recursive: true });
+        const localWire = fs.existsSync(localPath)
+          ? { ...wire, ...JSON.parse(fs.readFileSync(localPath, 'utf8')) as Record<string, unknown> }
+          : wire;
+        localWire['status'] = wire.status;
+        localWire['read_at'] = wire.read_at;
+        localWire['status_transitions'] = wire.status_transitions;
+        fs.writeFileSync(localPath, JSON.stringify(localWire, null, 2), 'utf8');
+        if (transition) {
+          writeWireUpdatePacket(createWireStatusUpdatePacket(wire, patch, transition, transitionContext), path.dirname(localPath));
+        }
+        this.log(`handleMarkRead: wrote read status to local cache ${localPath}`);
+      }
+
+      this.sendWires();
+    } catch (err) {
+      this.log(`handleMarkRead: error ${err}`);
+    }
   }
 
   private handleArchiveWire(wwuid: string, perspective: 'recipient' | 'sender' = 'recipient'): void {
@@ -411,15 +460,16 @@ export class TelegraphPanel {
       const territoryFilePath = flatDir ? this.findWireFilePath(wwuid, flatDir) : null;
       if (bothArchived && territoryFilePath) {
         try {
-          const tw = JSON.parse(fs.readFileSync(territoryFilePath, 'utf8')) as Record<string, unknown>;
-          tw['status'] = 'archived';
-          tw['sender_archived_at'] = localWire['sender_archived_at'];
-          tw['recipient_archived_at'] = localWire['recipient_archived_at'];
-          tw['status_transitions'] = [
-            ...((tw['status_transitions'] as unknown[]) ?? []),
-            { status: 'archived', timestamp: isoNow, repos: ['vscode'] },
-          ];
+          const tw = JSON.parse(fs.readFileSync(territoryFilePath, 'utf8')) as FlatWire;
+          const transitionContext = this.getWireTransitionContext('telegraph-panel.archive');
+          const patch = {
+            status: 'archived',
+            sender_archived_at: localWire['sender_archived_at'],
+            recipient_archived_at: localWire['recipient_archived_at'],
+          };
+          const transition = applyStatusUpdate(tw, 'archived', patch, transitionContext, isoNow);
           fs.writeFileSync(territoryFilePath, JSON.stringify(tw, null, 2), 'utf8');
+          writeWireUpdatePacket(createWireStatusUpdatePacket(tw, patch, transition, transitionContext), flatDir!);
           this.log(`handleArchiveWire: promoted archive to territory ${territoryFilePath}`);
         } catch (err) { console.error('Wild West: territory promotion failed', err); }
       }
@@ -996,9 +1046,12 @@ export class TelegraphPanel {
     if (w.status_transitions && w.status_transitions.length > 0) {
       html += '<div><div class="section-label" style="margin-bottom:6px">Timeline</div><div class="timeline">';
       for (const t of w.status_transitions) {
+        const actor = [t.by, t.scope, t.alias].filter(Boolean).join(' · ');
+        const source = [t.tool, t.source].filter(Boolean).join(' / ') || (t.repos && t.repos.length ? t.repos.join(', ') : '');
         html += '<div class="timeline-item"><div class="timeline-dot"></div><div>'
           + '<strong>' + esc(t.status) + '</strong> — ' + esc(fmtDate(t.timestamp))
-          + (t.repos && t.repos.length ? ' <span style="opacity:0.7">(' + esc(t.repos.join(', ')) + ')</span>' : '')
+          + (actor ? ' <span style="opacity:0.7">by ' + esc(actor) + '</span>' : '')
+          + (source ? ' <span style="opacity:0.55">(' + esc(source) + ')</span>' : '')
           + '</div></div>';
       }
       html += '</div></div>';

@@ -14,7 +14,7 @@ import * as os from 'os';
 export const WW_NAMESPACE = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
 
 /** Valid entity types for wwuid generation */
-export type WwuidType = 'session' | 'device' | 'wire' | 'town' | 'county' | 'territory';
+export type WwuidType = 'session' | 'device' | 'wire' | 'packet' | 'town' | 'county' | 'territory';
 
 /**
  * Generate a deterministic wwuid (Wild West Universal ID)

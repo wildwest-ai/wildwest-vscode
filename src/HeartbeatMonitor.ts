@@ -6,6 +6,13 @@ import {
   scopeRoleMap,
   resolveRoleToScope as resolveRoleToScopeFromRegistry,
 } from './roles/roleRegistry';
+import {
+  FlatWire,
+  WireTransitionContext,
+  applyStatusUpdate,
+  createWireStatusUpdatePacket,
+  writeWireUpdatePacket,
+} from './WireFactory';
 
 export type { WildWestScope };
 
@@ -143,41 +150,34 @@ function updateDestinationFlatWire(
   if (!memoFile.endsWith('.json')) return;
 
   try {
-    let wire: Record<string, unknown>;
+    let wire: FlatWire;
     try {
-      wire = JSON.parse(fs.readFileSync(memoPath, 'utf8')) as Record<string, unknown>;
+      wire = JSON.parse(fs.readFileSync(memoPath, 'utf8')) as FlatWire;
     } catch {
       outputChannel.appendLine(`[HeartbeatMonitor] failed to read wire from ${memoFile}`);
       return;
     }
 
     // Extract wwuid or derive from filename
-    let wwuid = wire['wwuid'] as string | undefined;
+    let wwuid = wire.wwuid;
     if (!wwuid) {
       wwuid = memoFile.replace('.json', '');
-      wire['wwuid'] = wwuid;
+      wire.wwuid = wwuid;
     }
 
     // Update territory SSOT: wire has arrived at recipient — status -> 'received'.
     // received_at records the delivery moment.
-    const receivedAt = wire['received_at'] as string | undefined || new Date().toISOString();
-    wire['received_at'] = receivedAt;
-    wire['status'] = 'received';
-
-    const transitions = Array.isArray(wire['status_transitions'])
-      ? wire['status_transitions'] as Array<Record<string, unknown>>
-      : [];
-    const alreadyHasReceived = transitions.some((t) => t['status'] === 'received');
-    if (!alreadyHasReceived) {
-      transitions.push({ status: 'received', timestamp: receivedAt, repos: ['vscode'] });
-      wire['status_transitions'] = transitions;
-    }
+    const receivedAt = wire.received_at || new Date().toISOString();
+    const context = transitionContextForRoot(destPath, 'heartbeat.destination-received');
+    const patch = { status: 'received', received_at: receivedAt };
+    const transition = applyStatusUpdate(wire, 'received', patch, context, receivedAt, { dedupeStatus: true });
 
     // Write back to territory flat/ (not destination local) — create if not yet present
     const territoryFlatDir = path.join(worldRoot, 'telegraph', 'flat');
     fs.mkdirSync(territoryFlatDir, { recursive: true });
     const territoryWirePath = path.join(territoryFlatDir, `${wwuid}.json`);
     fs.writeFileSync(territoryWirePath, JSON.stringify(wire, null, 2), 'utf8');
+    writeWireUpdatePacket(createWireStatusUpdatePacket(wire, patch, transition, context), territoryFlatDir);
     outputChannel.appendLine(`[HeartbeatMonitor] territory wire upserted → received: ${wwuid}.json`);
   } catch (err) {
     outputChannel.appendLine(`[HeartbeatMonitor] failed to update destination flat wire: ${err}`);
@@ -191,22 +191,19 @@ function updateFlatWireDeliveryStatus(worldRoot: string, memoPath: string, memoF
   fs.mkdirSync(flatDir, { recursive: true });
 
   try {
-    const wire = JSON.parse(fs.readFileSync(memoPath, 'utf8')) as Record<string, unknown>;
-    const wwuid = wire['wwuid'] as string | undefined;
+    const wire = JSON.parse(fs.readFileSync(memoPath, 'utf8')) as FlatWire;
+    const wwuid = wire.wwuid;
     // Always use {wwuid}.json so the panel's UUID filter can see the file
     const uuidFilename = wwuid ? `${wwuid}.json` : memoFile;
     const targetPath = path.join(flatDir, uuidFilename);
 
     // Operator dispatched wire — territory SSOT status is 'sent'
-    wire['status'] = 'sent';
-    wire['sent_at'] = wire['sent_at'] || new Date().toISOString();
-    const transitions = Array.isArray(wire['status_transitions']) ? wire['status_transitions'] as Array<Record<string, unknown>> : [];
-    const alreadyHasSent = transitions.some((t) => (t as Record<string, unknown>)['status'] === 'sent');
-    if (!alreadyHasSent) {
-      transitions.push({ status: 'sent', timestamp: wire['sent_at'], repos: ['vscode'] });
-      wire['status_transitions'] = transitions;
-    }
+    const sentAt = wire.sent_at || new Date().toISOString();
+    const context = transitionContextForRoot(path.dirname(path.dirname(path.dirname(path.dirname(memoPath)))), 'heartbeat.operator-sent');
+    const patch = { status: 'sent', sent_at: sentAt };
+    const transition = applyStatusUpdate(wire, 'sent', patch, context, sentAt, { dedupeStatus: true });
     fs.writeFileSync(targetPath, JSON.stringify(wire, null, 2), 'utf8');
+    writeWireUpdatePacket(createWireStatusUpdatePacket(wire, patch, transition, context), flatDir);
     outputChannel.appendLine(`[HeartbeatMonitor] flat wire upserted: ${uuidFilename} in territory SSOT (status: sent)`);
   } catch (err) {
     outputChannel.appendLine(`[HeartbeatMonitor] failed to upsert flat wire for ${memoFile}: ${err}`);
@@ -235,6 +232,19 @@ function readRegistryAlias(rootPath: string): string | null {
   } catch {
     return null;
   }
+}
+
+function transitionContextForRoot(rootPath: string, source: string): WireTransitionContext {
+  const reg = readMigratedRegistry(rootPath);
+  const scope = reg?.['scope'] as string | undefined;
+  const alias = reg?.['alias'] as string | undefined;
+  return {
+    by: alias && scope ? `${scope}[${alias}]` : alias,
+    scope,
+    alias,
+    tool: 'vscode',
+    source,
+  };
 }
 
 /**
