@@ -4,6 +4,10 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.40.2] - 2026-05-12
+
+- Fix TelegraphPanel address matching so sent wires to other `TM[...]` aliases do not incorrectly appear in Inbox.
+
 ## [0.40.1] - 2026-05-12
 
 - Show heartbeat interval in SidePanel heartbeat status.
