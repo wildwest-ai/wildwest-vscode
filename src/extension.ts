@@ -279,6 +279,11 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('wildwest.refreshTelegraphPanel', () => {
       TelegraphPanel.refresh();
     }),
+    vscode.commands.registerCommand('wildwest.forceHeartbeat', () => {
+      heartbeatMonitor.deliverOutboxNow();
+      outputChannel.appendLine('[wildwest] heartbeat forced by user');
+      void Promise.resolve(vscode.commands.executeCommand('wildwest.refreshTelegraphPanel')).catch(() => undefined);
+    }),
     vscode.commands.registerCommand('wildwest.createWire', async () => {
       const folders = vscode.workspace.workspaceFolders;
       const wsPath = folders?.[0]?.uri.fsPath ?? '';

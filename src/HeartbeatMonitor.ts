@@ -1342,6 +1342,19 @@ export class HeartbeatMonitor {
     return null;
   }
 
+  getHeartbeatIntervalMs(): number | null {
+    const scope = this.detectScope();
+    if (!scope) return null;
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) return null;
+
+    const primaryFolder = folders[0].uri.fsPath;
+    const rootPath = scopeOf(primaryFolder) === scope ? primaryFolder : walkUpForScope(primaryFolder, scope);
+    if (!rootPath) return null;
+
+    return effectiveIntervalMs(rootPath, scope);
+  }
+
   /**
    * Validate that the declared identity role is valid for the given scope.
    * Extracts role from identity setting (e.g. "TM" from "TM(RHk)").

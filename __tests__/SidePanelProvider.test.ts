@@ -67,6 +67,7 @@ describe('SidePanelProvider', () => {
     mockMonitor = {
       checkLiveness: jest.fn().mockReturnValue('alive'),
       detectScope: jest.fn().mockReturnValue('town'),
+      getHeartbeatIntervalMs: jest.fn().mockReturnValue(300000),
     } as unknown as HeartbeatMonitor;
   });
 
@@ -220,14 +221,17 @@ describe('SidePanelProvider', () => {
     provider.dispose();
   });
 
-  it('heartbeat root item shows state and last beat timestamp', () => {
+  it('heartbeat root item shows state, interval, and force heartbeat action', () => {
     const provider = new SidePanelProvider(mockMonitor);
     // hbItem is second-last; watcher state is the final root item.
     const roots = provider.getChildren();
     const hbItem = roots[roots.length - 2] as SidePanelItem;
     expect(hbItem.sectionId).toBeUndefined();
     expect(hbItem.label).toContain('alive');
-    expect(hbItem.tooltip).toContain('2026-05-08T12:00:00.000Z');
+    expect(hbItem.label).toContain('(5m)');
+    expect(hbItem.command).toEqual({ command: 'wildwest.forceHeartbeat', title: 'Force heartbeat / sync SSOT' });
+    expect(hbItem.tooltip).toContain('Heartbeat: alive');
+    expect(hbItem.tooltip).toContain('Click to force heartbeat / sync SSOT');
     provider.dispose();
   });
 

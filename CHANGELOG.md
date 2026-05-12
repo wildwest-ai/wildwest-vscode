@@ -4,6 +4,14 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.40.1] - 2026-05-12
+
+- Show heartbeat interval in SidePanel heartbeat status.
+- Add `wildwest.forceHeartbeat` command to force outbox delivery and SSOT sync from the SidePanel heartbeat item.
+- Implement heartbeat interval lookup from effective scope config.
+- Update SidePanel heartbeat tooltip and icon to indicate refresh / force-sync.
+- Add SidePanelProvider test coverage for heartbeat interval and force action.
+
 ## [0.40.0] - 2026-05-12
 
 - Migrate heartbeat telegraph delivery from legacy `.wildwest/telegraph/inbox/` to territory SSOT at `worldRoot/telegraph/flat/`.

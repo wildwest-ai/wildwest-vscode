@@ -124,8 +124,14 @@ export class SidePanelProvider
     const hbIcon = hbState === 'alive' ? '●' : hbState === 'flagged' ? '⚑' : '○';
     const lastBeat = this.readSentinelTimestamp();
     const lastBeatAgo = this.timeAgo(lastBeat);
-    const hbItem = new SidePanelItem(`${hbIcon} ${hbState}  ${lastBeatAgo}`, vscode.TreeItemCollapsibleState.None);
-    hbItem.iconPath = new vscode.ThemeIcon(hbState === 'alive' ? 'pulse' : 'warning');
+    const intervalMs = this.heartbeatMonitor.getHeartbeatIntervalMs();
+    const intervalLabel = intervalMs ? `(${this.formatInterval(intervalMs)})` : '';
+    const hbItem = new SidePanelItem(
+      `${hbIcon} ${hbState}  ${lastBeatAgo} ${intervalLabel}`.trim(),
+      vscode.TreeItemCollapsibleState.None,
+    );
+    hbItem.iconPath = new vscode.ThemeIcon('refresh');
+    hbItem.command = { command: 'wildwest.forceHeartbeat', title: 'Force heartbeat / sync SSOT' };
 
     if (hbState === 'flagged') {
       const wwRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -145,9 +151,10 @@ export class SidePanelProvider
         }
         if (wires.length > 5) tip.appendMarkdown(`- …and ${wires.length - 5} more\n`);
       }
+      tip.appendMarkdown('\n\nClick to force heartbeat / sync SSOT.');
       hbItem.tooltip = tip;
     } else {
-      hbItem.tooltip = `Heartbeat: ${hbState}\nLast beat: ${lastBeat}`;
+      hbItem.tooltip = `Heartbeat: ${hbState}\nLast beat: ${lastBeat}${intervalMs ? `\nInterval: ${this.formatInterval(intervalMs)}` : ''}\nClick to force heartbeat / sync SSOT`;
     }
 
     // ── Scope inline ────────────────────────────────────────────────────────
@@ -832,6 +839,19 @@ export class SidePanelProvider
       const day = Math.floor(hr / 24);
       return `${day}d ago`;
     } catch { return ts; }
+  }
+
+  private formatInterval(ms: number | null): string {
+    if (ms === null || ms === undefined) return '—';
+    if (ms < 1000) return `${ms}ms`;
+    const seconds = Math.floor(ms / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.floor(hours / 24);
+    return `${days}d`;
   }
 
   private readSentinelTimestamp(): string {
