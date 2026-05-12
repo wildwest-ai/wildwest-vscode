@@ -147,6 +147,30 @@ The generated wire has:
 - `status_transitions`: seeded with the initial status + timestamp
 - `filename`: `YYYYMMDD-HHMMz-to-<to>-from-<from>--<subject>.json`
 
+### Option D — MCP tool `toolDraftWire` (recommended for AI models and automation)
+
+If you are using MCP or an AI model integration, prefer `toolDraftWire` instead of hand-writing JSON or using a file-based shortcut.
+
+- `toolDraftWire(ctx, input)` creates a proper `schema_version: "2"` wire with `status: "draft"`
+- It writes the draft into the local workspace `~/.wildwest/telegraph/flat/`
+- It also emits a `wire.status` packet for MCP traceability
+
+Example payload for a model or tool integration:
+
+```ts
+const result = toolDraftWire(ctx, {
+  to: 'CD(RSn)',
+  subject: 'draft-wire-review',
+  body: 'This is a local draft wire to CD(RSn) created via MCP draft tool.',
+});
+
+// result.path points to the generated draft file, e.g.:
+// ~/.wildwest/telegraph/flat/<wwuid>.json
+```
+
+> **Do not create draft wires with raw JSON in another model prompt unless you can confirm the exact MCP draft path.**
+> Use `toolDraftWire` when available.
+
 ---
 
 ## File Naming Convention
