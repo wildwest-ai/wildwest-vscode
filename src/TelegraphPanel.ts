@@ -18,6 +18,33 @@ import type { HeartbeatMonitor } from './HeartbeatMonitor';
 /** New protocol: wire files are always {wwuid}.json */
 const UUID_FILE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.json$/;
 
+export function addressMatchesActor(field: string, alias: string, identity: string): boolean {
+  if (!field) return false;
+  const f = field.toLowerCase();
+  const a = alias.toLowerCase();
+  const id = identity.toLowerCase();
+
+  // Exact identity or with .Channel suffix: "CD(RSn)" or "CD(RSn).Cld"
+  if (id && (f === id || f.startsWith(id + '.'))) return true;
+
+  if (a) {
+    // Alias in parens: TM(wildwest-vscode) [legacy]
+    if (f.includes('(' + a + ')')) return true;
+    // Alias in brackets: TM[wildwest-vscode] or TM(RHk)[wildwest-vscode]
+    if (f.includes('[' + a + ']')) return true;
+    // Glob in parens: TM(*vscode) — alias ends with suffix
+    const glob = f.match(/\(\*([^)]+)\)/);
+    if (glob && a.endsWith(glob[1])) return true;
+    // Glob in brackets: TM[*vscode]
+    const globB = f.match(/\[\*([^\]]+)\]/);
+    if (globB && a.endsWith(globB[1])) return true;
+    // Bare alias as whole field
+    if (f === a) return true;
+  }
+
+  return false;
+}
+
 export class TelegraphPanel {
   static readonly viewType = 'wildwest.telegraphPanel';
   private static instance: TelegraphPanel | undefined;
@@ -138,42 +165,9 @@ export class TelegraphPanel {
 
   /**
    * True if a `to`/`from` address field belongs to this actor.
-   *
-   * Canonical formats only (legacy normalized by migration script):
-   *   TM(wildwest-vscode)   — role(alias)
-   *   CD(RSn)               — role(dyad)
-   *   CD(RSn).Cld           — role(dyad).channel
-   *   TM(*vscode)           — glob: alias ends with suffix
-   *   wildwest-vscode       — bare alias
    */
   private addressMatchesSelf(field: string, alias: string, identity: string): boolean {
-    if (!field) return false;
-    const f = field.toLowerCase();
-    const a = alias.toLowerCase();
-    const id = identity.toLowerCase();
-
-    // Exact identity or with .Channel suffix: "CD(RSn)" or "CD(RSn).Cld"
-    if (id && (f === id || f.startsWith(id + '.'))) return true;
-    const identityRole = (id.match(/^([a-z]+)/) || [])[1];
-    const fieldRole = (f.match(/^([a-z]+)/) || [])[1];
-    if (identityRole && fieldRole && identityRole === fieldRole) return true;
-
-    if (a) {
-      // Alias in parens: TM(wildwest-vscode) [legacy]
-      if (f.includes('(' + a + ')')) return true;
-      // Alias in brackets: TM[wildwest-vscode] or TM(RHk)[wildwest-vscode]
-      if (f.includes('[' + a + ']')) return true;
-      // Glob in parens: TM(*vscode) — alias ends with suffix
-      const glob = f.match(/\(\*([^)]+)\)/);
-      if (glob && a.endsWith(glob[1])) return true;
-      // Glob in brackets: TM[*vscode]
-      const globB = f.match(/\[\*([^\]]+)\]/);
-      if (globB && a.endsWith(globB[1])) return true;
-      // Bare alias as whole field
-      if (f === a) return true;
-    }
-
-    return false;
+    return addressMatchesActor(field, alias, identity);
   }
 
   // ── Read flat/ wires ──────────────────────────────────────────────────────
