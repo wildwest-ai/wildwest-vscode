@@ -4,6 +4,15 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.40.0] - 2026-05-12
+
+- Migrate heartbeat telegraph delivery from legacy `.wildwest/telegraph/inbox/` to territory SSOT at `worldRoot/telegraph/flat/`.
+- Archive processed outbox wires to `outbox/history/` and retain panel history semantics.
+- Align `SidePanelProvider`, `TelegraphPanel`, and telegraph command flows with flat-store behavior.
+- Update MCP server/tools to use territory flat cache health checks and outbox write paths.
+- Refresh heartbeat/delivery tests for flat-only telegraph delivery and side panel behavior.
+- Document the new flat telegraph delivery architecture in `docs/telegraph-delivery.md` and record progress in `TODO.md`.
+
 ## [0.39.18] - 2026-05-12
 
 MCP wire tools now emit richer packetized status transitions. `wwMCPTools` writes append-only `wire.status` packets for drafted and sent wires, resolves sender addresses via registry-aware bracket routing, and preserves `transitionContext` metadata (`by`, `scope`, `alias`, `tool`, `source`). `wwMCPServer` now passes workspace identity into MCP scope context. `package.json` drops the legacy `wire` npm script.
