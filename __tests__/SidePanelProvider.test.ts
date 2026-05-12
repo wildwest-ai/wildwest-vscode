@@ -39,7 +39,7 @@ describe('SidePanelProvider', () => {
   let tempDir: string;
   let townRoot: string;
   let telegraphDir: string;
-  let inboxDir: string;
+  let flatDir: string;
   let outboxDir: string;
   let historyDir: string;
   let boardDir: string;
@@ -49,11 +49,11 @@ describe('SidePanelProvider', () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wildwest-sidepanel-'));
     townRoot = path.join(tempDir, 'town');
     telegraphDir = path.join(townRoot, '.wildwest', 'telegraph');
-    inboxDir = path.join(telegraphDir, 'inbox');
+    flatDir = path.join(telegraphDir, 'flat');
     outboxDir = path.join(telegraphDir, 'outbox');
-    historyDir = path.join(inboxDir, 'history');
+    historyDir = path.join(outboxDir, 'history');
     boardDir = path.join(townRoot, '.wildwest', 'board', 'branches');
-    fs.mkdirSync(inboxDir, { recursive: true });
+    fs.mkdirSync(flatDir, { recursive: true });
     fs.mkdirSync(outboxDir, { recursive: true });
     fs.mkdirSync(historyDir, { recursive: true });
     fs.mkdirSync(boardDir, { recursive: true });
@@ -130,8 +130,8 @@ describe('SidePanelProvider', () => {
   });
 
   it('inbox section label shows count and children list memo files', () => {
-    fs.writeFileSync(path.join(inboxDir, '20260508-1200Z-to-TM-from-CD--task.md'), 'body');
-    fs.writeFileSync(path.join(inboxDir, '.gitkeep'), '');
+    fs.writeFileSync(path.join(flatDir, '20260508-1200Z-to-TM-from-CD--task.json'), '{}');
+    fs.writeFileSync(path.join(flatDir, '.gitkeep'), '');
 
     const provider = new SidePanelProvider(mockMonitor);
     const inboxSection = provider.getChildren().find((r) => r.sectionId === 'inbox')!;
@@ -139,7 +139,7 @@ describe('SidePanelProvider', () => {
 
     const children = provider.getChildren(inboxSection);
     expect(children).toHaveLength(1);
-    expect((children[0] as SidePanelItem).label).toBe('20260508-1200Z-to-TM-from-CD--task.md');
+    expect((children[0] as SidePanelItem).label).toBe('20260508-1200Z-to-TM-from-CD--task.json');
     provider.dispose();
   });
 
@@ -165,14 +165,14 @@ describe('SidePanelProvider', () => {
     provider.dispose();
   });
 
-  it('history section lists archived files from inbox/history/', () => {
-    fs.writeFileSync(path.join(historyDir, '20260507-0900Z-to-TM-from-CD--old.md'), 'body');
+  it('history section lists archived files from outbox/history/', () => {
+    fs.writeFileSync(path.join(historyDir, '20260507-0900Z-to-TM-from-CD--old.json'), '{}');
 
     const provider = new SidePanelProvider(mockMonitor);
     const histSection = provider.getChildren().find((r) => r.sectionId === 'history')!;
     const children = provider.getChildren(histSection);
     expect(children).toHaveLength(1);
-    expect((children[0] as SidePanelItem).label).toBe('20260507-0900Z-to-TM-from-CD--old.md');
+    expect((children[0] as SidePanelItem).label).toBe('20260507-0900Z-to-TM-from-CD--old.json');
     provider.dispose();
   });
 

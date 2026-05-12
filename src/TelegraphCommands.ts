@@ -100,16 +100,16 @@ export class TelegraphCommands {
     const telegraphDir = await this.getTelegraphDir();
     if (!telegraphDir) return;
 
-    // Scan inbox/ for unacked inbound memos
-    const inboxDir = path.join(telegraphDir, 'inbox');
-    if (!fs.existsSync(inboxDir)) {
-      vscode.window.showInformationMessage('No inbox directory found');
+    // Scan flat/ for unacked inbound wires
+    const flatDir = path.join(telegraphDir, 'flat');
+    if (!fs.existsSync(flatDir)) {
+      vscode.window.showInformationMessage('No wire cache found');
       return;
     }
 
-    const files = fs.readdirSync(inboxDir);
+    const files = fs.readdirSync(flatDir);
     const inboundWires = files.filter((f) => {
-      if (f.startsWith('.') || f.includes('ack-')) return false;
+      if (f.startsWith('.') || f.startsWith('!') || f.includes('ack-')) return false;
       return f.includes('-to-') && (f.endsWith('.json') || f.endsWith('.md'));
     });
 
@@ -130,7 +130,7 @@ export class TelegraphCommands {
     if (!selection) return;
 
     const originalFileName = selection.label;
-    const originalPath = path.join(inboxDir, originalFileName);
+    const originalPath = path.join(flatDir, originalFileName);
 
     // Parse wire — JSON or legacy MD frontmatter
     let fromActor: string;
@@ -224,7 +224,7 @@ export class TelegraphCommands {
 
     // Archive original to inbox/history/
     const today = new Date().toISOString().split('T')[0];
-    const historyDir = path.join(inboxDir, 'history', today);
+    const historyDir = path.join(flatDir, 'history', today);
     archiveMemo(originalPath, historyDir);
 
     this.outputChannel.appendLine(`[TelegraphCommands] Ack queued in outbox: ${ackFileName}`);

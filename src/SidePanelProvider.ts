@@ -129,21 +129,21 @@ export class SidePanelProvider
 
     if (hbState === 'flagged') {
       const wwRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      const inboxDir = wwRoot ? path.join(wwRoot, '.wildwest', 'telegraph', 'inbox') : null;
-      let memos: string[] = [];
+      const flatDir = wwRoot ? path.join(wwRoot, '.wildwest', 'telegraph', 'flat') : null;
+      let wires: string[] = [];
       try {
-        if (inboxDir && fs.existsSync(inboxDir)) {
-          memos = fs.readdirSync(inboxDir).filter(f => f.endsWith('.md') && !f.startsWith('.') && f !== '.gitkeep');
+        if (flatDir && fs.existsSync(flatDir)) {
+          wires = fs.readdirSync(flatDir).filter(f => (f.endsWith('.json') || f.endsWith('.md')) && !f.startsWith('.') && !f.startsWith('!'));
         }
       } catch { /* ignore */ }
       const tip = new vscode.MarkdownString(`**⚑ Flagged** — Last beat: ${lastBeat}\n\n`);
-      if (memos.length > 0) {
-        tip.appendMarkdown(`**Unprocessed inbox (${memos.length}):**\n\n`);
-        for (const memo of memos.slice(0, 5)) {
-          const subject = memo.replace(/^\d{8}-\d{4}Z?-/, '').replace(/\.md$/, '');
+      if (wires.length > 0) {
+        tip.appendMarkdown(`**Unprocessed wires (${wires.length}):**\n\n`);
+        for (const wire of wires.slice(0, 5)) {
+          const subject = wire.replace(/\.json$/, '').replace(/\.md$/, '');
           tip.appendMarkdown(`- ${subject}\n`);
         }
-        if (memos.length > 5) tip.appendMarkdown(`- …and ${memos.length - 5} more\n`);
+        if (wires.length > 5) tip.appendMarkdown(`- …and ${wires.length - 5} more\n`);
       }
       hbItem.tooltip = tip;
     } else {
@@ -726,9 +726,11 @@ export class SidePanelProvider
     const results: Array<{ dir: string; file: string }> = [];
     for (const telegraphDir of getTelegraphDirs()) {
       const targetDir =
-        section === 'history'
-          ? path.join(telegraphDir, 'inbox', 'history')
-          : path.join(telegraphDir, section);
+        section === 'inbox'
+          ? path.join(telegraphDir, 'flat')
+          : section === 'history'
+            ? path.join(telegraphDir, 'outbox', 'history')
+            : path.join(telegraphDir, section);
       for (const file of this.listMdFiles(targetDir)) {
         results.push({ dir: targetDir, file });
       }

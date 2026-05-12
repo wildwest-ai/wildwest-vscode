@@ -76,6 +76,42 @@ export class TelegraphPanel {
     return dir;
   }
 
+  private readRegistryScope(rootPath: string): string | null {
+    try {
+      const reg = JSON.parse(
+        fs.readFileSync(path.join(rootPath, '.wildwest', 'registry.json'), 'utf8'),
+      ) as Record<string, unknown>;
+      const scope = reg['scope'];
+      return typeof scope === 'string' ? scope : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private findAncestorScopeRoot(startPath: string, scope: string): string | null {
+    let current = startPath;
+    const fsRoot = path.parse(current).root;
+    while (current && current !== fsRoot) {
+      if (this.readRegistryScope(current) === scope) return current;
+      current = path.dirname(current);
+    }
+    return null;
+  }
+
+  private getScopeRootsForOutboxRecovery(): string[] {
+    const roots = new Set<string>();
+    const folders = vscode.workspace.workspaceFolders ?? [];
+    for (const folder of folders) {
+      const wsPath = folder.uri.fsPath;
+      if (fs.existsSync(path.join(wsPath, '.wildwest', 'registry.json'))) {
+        roots.add(wsPath);
+      }
+      const countyRoot = this.findAncestorScopeRoot(wsPath, 'county');
+      if (countyRoot) roots.add(countyRoot);
+    }
+    return [...roots];
+  }
+
   private getActorAlias(): string {
     const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
     return readRegistryAlias(path.join(wsPath, '.wildwest')) ?? '';
@@ -118,6 +154,9 @@ export class TelegraphPanel {
 
     // Exact identity or with .Channel suffix: "CD(RSn)" or "CD(RSn).Cld"
     if (id && (f === id || f.startsWith(id + '.'))) return true;
+    const identityRole = (id.match(/^([a-z]+)/) || [])[1];
+    const fieldRole = (f.match(/^([a-z]+)/) || [])[1];
+    if (identityRole && fieldRole && identityRole === fieldRole) return true;
 
     if (a) {
       // Alias in parens: TM(wildwest-vscode) [legacy]
@@ -182,6 +221,28 @@ export class TelegraphPanel {
     return [...byWwuid.values()].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }
 
+  private readFailedOutboxWires(): FlatWire[] {
+    const byWwuid = new Map<string, FlatWire>();
+    for (const rootPath of this.getScopeRootsForOutboxRecovery()) {
+      const outboxDir = path.join(rootPath, '.wildwest', 'telegraph', 'outbox');
+      let entries: string[];
+      try { entries = fs.readdirSync(outboxDir); } catch { continue; }
+      for (const f of entries) {
+        if (!f.startsWith('!') || !UUID_FILE_RE.test(f.slice(1))) continue;
+        try {
+          const filePath = path.join(outboxDir, f);
+          const wire = JSON.parse(fs.readFileSync(filePath, 'utf8')) as FlatWire & Record<string, unknown>;
+          wire.status = 'failed';
+          wire['_failedFile'] = filePath;
+          wire['_outboxRoot'] = rootPath;
+          const key = wire.wwuid ?? f.slice(1).replace('.json', '');
+          byWwuid.set(key, wire);
+        } catch { /* skip corrupt */ }
+      }
+    }
+    return [...byWwuid.values()].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }
+
   private filterWires(all: FlatWire[], alias: string, identity: string): { inbox: FlatWire[]; outbox: FlatWire[] } {
     if (!alias && !identity) return { inbox: [], outbox: [] };
     return {
@@ -193,7 +254,7 @@ export class TelegraphPanel {
   // ── Outbound to webview ───────────────────────────────────────────────────
 
   private sendWires(): void {
-    const all = this.readAllFlatWires();
+    const all = [...this.readAllFlatWires(), ...this.readFailedOutboxWires()];
     const alias = this.getActorAlias();
     const identity = vscode.workspace.getConfiguration('wildwest').get<string>('identity') ?? '';
     const { inbox, outbox } = this.filterWires(all, alias, identity);
@@ -234,6 +295,9 @@ export class TelegraphPanel {
         break;
       case 'sendDraft':
         this.handleSendDraft(msg['wwuid'] as string);
+        break;
+      case 'retryWire':
+        this.handleRetryWire(msg['wwuid'] as string);
         break;
       case 'bulkStatus': {
         const wwuids = msg['wwuids'] as string[];
@@ -351,6 +415,44 @@ export class TelegraphPanel {
     } catch (err) {
       vscode.window.showErrorMessage(`Wild West: send draft failed — ${err}`);
     }
+  }
+
+  private handleRetryWire(wwuid: string): void {
+    if (!wwuid) return;
+    for (const rootPath of this.getScopeRootsForOutboxRecovery()) {
+      const outboxDir = path.join(rootPath, '.wildwest', 'telegraph', 'outbox');
+      const failedPath = path.join(outboxDir, `!${wwuid}.json`);
+      const restoredPath = path.join(outboxDir, `${wwuid}.json`);
+      if (!fs.existsSync(failedPath)) continue;
+      try {
+        const wire = JSON.parse(fs.readFileSync(failedPath, 'utf8')) as FlatWire & Record<string, unknown>;
+        for (const key of ['to', 'from', 'subject', 'type']) {
+          if (typeof wire[key] === 'string') {
+            wire[key] = (wire[key] as string).replace(/\(!\)$/u, '');
+          }
+        }
+        wire.status = 'pending';
+        delete wire['failure'];
+        delete wire['failed_at'];
+        const transitionContext = this.getWireTransitionContext('telegraph-panel.retry-wire');
+        const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+        applyStatusUpdate(wire, 'pending', { status: 'pending' }, transitionContext, isoNow);
+        fs.writeFileSync(restoredPath, JSON.stringify(wire, null, 2), 'utf8');
+        fs.unlinkSync(failedPath);
+
+        const localFlatDir = path.join(rootPath, '.wildwest', 'telegraph', 'flat');
+        fs.mkdirSync(localFlatDir, { recursive: true });
+        fs.writeFileSync(path.join(localFlatDir, `${wwuid}.json`), JSON.stringify(wire, null, 2), 'utf8');
+
+        this.heartbeat?.deliverOutboxNow();
+        this.sendWires();
+        return;
+      } catch (err) {
+        vscode.window.showErrorMessage(`Wild West: retry failed — ${err}`);
+        return;
+      }
+    }
+    vscode.window.showWarningMessage(`Wild West: failed wire not found — ${wwuid}`);
   }
 
   private handleMarkRead(wwuid: string): void {
@@ -574,6 +676,7 @@ export class TelegraphPanel {
   .badge-received { background: #6b6b00; color: #ffff80; }
   .badge-read { background: #1a4a1a; color: #80ff80; }
   .badge-delivered { background: #003d6b; color: #80cfff; }
+  .badge-failed { background: #5a1d1d; color: #ffb3b3; }
   .badge-archived { background: #333; color: #aaa; }
 
   /* ── Wire detail ── */
@@ -721,6 +824,7 @@ export class TelegraphPanel {
     outbox: [
       { status: 'draft',     label: 'Draft'     },
       { status: 'pending',   label: 'Pending'   },
+      { status: 'failed',    label: 'Failed'    },
       { status: 'sent',      label: 'Sent'      },
       { status: 'received',  label: 'Delivered' },
       { status: 'read',      label: 'Read'      },
@@ -847,6 +951,8 @@ export class TelegraphPanel {
     if (markReadBtn) { vscode.postMessage({ type: 'markRead', wwuid: markReadBtn.dataset.markRead }); return; }
     const archiveBtn = e.target.closest('[data-archive]');
     if (archiveBtn) { vscode.postMessage({ type: 'archive', wwuid: archiveBtn.dataset.archive, perspective: activeTab === 'inbox' ? 'recipient' : 'sender' }); return; }
+    const retryBtn = e.target.closest('[data-retry-wire]');
+    if (retryBtn) { vscode.postMessage({ type: 'retryWire', wwuid: retryBtn.dataset.retryWire }); return; }
     const replyBtn = e.target.closest('[data-reply]');
     if (replyBtn) {
       const ww = [...inboxWires, ...outboxWires, ...allWires].find(x => x.wwuid === replyBtn.dataset.reply);
@@ -1033,9 +1139,18 @@ export class TelegraphPanel {
                         html += metaRow('Subject', w.subject);
                         html += metaRow('Type', w.type);
     if (w.delivered_at) html += metaRow('Delivered', fmtDate(w.delivered_at));
+    if (w.failed_at)    html += metaRow('Failed', fmtDate(w.failed_at));
     if (w.re)           html += metaRow('Re', w.re);
     if (w.original_wire) html += metaRow('Re wire', w.original_wire);
     html += '</table>';
+
+    if (w.failure) {
+      html += '<div class="wire-body" style="border-color:var(--vscode-inputValidation-errorBorder,#be1100)">'
+        + '<div class="section-label" style="margin-bottom:6px">Failure</div>'
+        + esc(w.failure.message || w.failure.reason || 'Delivery failed')
+        + (w.failure.field ? '<div style="margin-top:4px;opacity:0.65">Field: ' + esc(w.failure.field) + '</div>' : '')
+        + '</div>';
+    }
 
     // Body
     const bodyText = (w.body || '').trim();
@@ -1069,6 +1184,7 @@ export class TelegraphPanel {
       + '<button class="btn btn-secondary" data-push="claude">→ Claude</button>'
       + '<button class="btn btn-secondary" data-push="codex">→ Codex</button>'
       + (status === 'draft' ? '<button class="btn" data-send-draft="' + esc(w.wwuid) + '">Send</button>' : '')
+      + (status === 'failed' ? '<button class="btn" data-retry-wire="' + esc(w.wwuid) + '">Retry Now</button>' : '')
       + (isInboxWire && !isArchivedActor && (status === 'sent' || status === 'received' || status === 'delivered') ? '<button class="btn" data-mark-read="' + esc(w.wwuid) + '">Mark Read</button>' : '')
       + (isInboxWire && !isArchivedActor && status !== 'draft' ? '<button class="btn" data-reply="' + esc(w.wwuid) + '">↻ Reply</button>' : '')
       + (!isArchivedActor ? '<button class="btn btn-secondary" data-archive="' + esc(w.wwuid) + '">Archive</button>' : '')
