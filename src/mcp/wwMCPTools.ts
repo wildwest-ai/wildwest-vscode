@@ -2,8 +2,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {
   createFlatWire,
+  createWireStatusUpdatePacket,
   writeDraftWire,
   writeFlatWire,
+  writeWireUpdatePacket,
 } from '../WireFactory';
 import {
   readRegistryAlias,
@@ -133,18 +135,28 @@ export function toolDraftWire(ctx: MCPScopeContext, input: DraftWireInput): Wire
   if (!fromAlias) {
     throw new Error('Missing registry alias in .wildwest/registry.json');
   }
+  const from = senderAddress(ctx, fromAlias);
 
   const wire = createFlatWire({
-    from: `TM[${fromAlias}]`,
+    from,
     to: input.to,
     type: input.type ?? 'status-update',
     subject: normalizeWireSubject(input.subject),
     body: input.body,
     status: 'draft',
     re: input.re,
+    transitionContext: transitionContext(ctx, fromAlias, 'wwmcp.draft-wire'),
   });
 
   writeDraftWire(wire, ctx.rootPath);
+  const localFlatDir = path.join(ctx.rootPath, '.wildwest', 'telegraph', 'flat');
+  const transition = wire.status_transitions?.[wire.status_transitions.length - 1];
+  if (transition) {
+    writeWireUpdatePacket(
+      createWireStatusUpdatePacket(wire, { status: wire.status }, transition, transitionContext(ctx, fromAlias, 'wwmcp.draft-wire')),
+      localFlatDir,
+    );
+  }
 
   return {
     wwuid: wire.wwuid,
@@ -160,23 +172,32 @@ export function toolSendWire(ctx: MCPScopeContext, input: SendWireInput): WireWr
   if (!fromAlias) {
     throw new Error('Missing registry alias in .wildwest/registry.json');
   }
+  const from = senderAddress(ctx, fromAlias);
 
   const wire = createFlatWire({
-    from: `TM[${fromAlias}]`,
+    from,
     to: input.to,
     type: input.type ?? 'status-update',
     subject: normalizeWireSubject(input.subject),
     body: input.body,
     status: 'sent',
     re: input.re,
+    transitionContext: transitionContext(ctx, fromAlias, 'wwmcp.send-wire'),
   });
 
   const territoryFlatDir = path.join(ctx.worldRoot, 'telegraph', 'flat');
   writeFlatWire(wire, territoryFlatDir);
+  const transition = wire.status_transitions?.[wire.status_transitions.length - 1];
+  if (transition) {
+    writeWireUpdatePacket(
+      createWireStatusUpdatePacket(wire, { status: wire.status }, transition, transitionContext(ctx, fromAlias, 'wwmcp.send-wire')),
+      territoryFlatDir,
+    );
+  }
 
   const localOutboxDir = path.join(ctx.rootPath, '.wildwest', 'telegraph', 'outbox');
   fs.mkdirSync(localOutboxDir, { recursive: true });
-  fs.writeFileSync(path.join(localOutboxDir, wire.filename), JSON.stringify(wire, null, 2), 'utf8');
+  fs.writeFileSync(path.join(localOutboxDir, `${wire.wwuid}.json`), JSON.stringify(wire, null, 2), 'utf8');
 
   return {
     wwuid: wire.wwuid,
@@ -184,6 +205,27 @@ export function toolSendWire(ctx: MCPScopeContext, input: SendWireInput): WireWr
     status: wire.status,
     date: wire.date,
     path: path.join(territoryFlatDir, `${wire.wwuid}.json`),
+  };
+}
+
+function senderAddress(ctx: MCPScopeContext, alias: string): string {
+  const role = ctx.identity?.match(/^([A-Za-z]+)/)?.[1] ?? defaultRoleForScope(ctx.scope);
+  return `${role}[${alias}]`;
+}
+
+function defaultRoleForScope(scope: MCPScopeContext['scope']): string {
+  if (scope === 'county') return 'CD';
+  if (scope === 'territory') return 'RA';
+  return 'TM';
+}
+
+function transitionContext(ctx: MCPScopeContext, alias: string, source: string) {
+  return {
+    by: ctx.identity || senderAddress(ctx, alias),
+    scope: ctx.scope,
+    alias,
+    tool: 'wwmcp',
+    source,
   };
 }
 

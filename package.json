@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
   },
-  "version": "0.39.16",
+  "version": "0.39.17",
   "publisher": "wildwest-ai",
   "engines": {
     "vscode": "^1.90.0"
@@ -339,8 +339,7 @@
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
     "test": "jest",
-    "release": "scripts/release.sh",
-    "wire": "node scripts/create-wire.js"
+    "release": "scripts/release.sh"
   },
   "devDependencies": {
     "@types/jest": "^29.5.0",

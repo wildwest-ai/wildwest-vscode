@@ -17,6 +17,7 @@ export interface MCPScopeContext {
   scope: WildWestScope;
   worldRoot: string;
   countiesDir: string;
+  identity?: string;
 }
 
 // ── Tool input/output shapes ───────────────────────────────────────────────

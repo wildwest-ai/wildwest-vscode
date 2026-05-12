@@ -4,6 +4,10 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.39.17] - 2026-05-12
+
+MCP wire tools now emit richer packetized status transitions. `wwMCPTools` writes append-only `wire.status` packets for drafted and sent wires, resolves sender addresses via registry-aware bracket routing, and preserves `transitionContext` metadata (`by`, `scope`, `alias`, `tool`, `source`). `wwMCPServer` now passes workspace identity into MCP scope context. `package.json` drops the legacy `wire` npm script.
+
 ## [0.39.16] - 2026-05-12
 
 Packetized wire status transitions. `WireFactory` gains `WireTransitionContext`, `WireUpdatePacket`, `createStatusTransition()`, `applyStatusUpdate()`, `createWireStatusUpdatePacket()`, and `writeWireUpdatePacket()` helpers. Status mutations now append-only `wire.status` packets under `telegraph/packets/`. `StatusTransition` fields expanded: `by`, `scope`, `alias`, `tool`, `source` (deprecates `repos`). `TelegraphPanel` compose emits bracket-routing addresses (`Role[alias]`); mark-read writes immediately to territory and local cache and emits a packet. `HeartbeatMonitor` sent/received transitions use shared helpers and packet writes; `transitionContextForRoot()` reads registry for scope/alias context.
