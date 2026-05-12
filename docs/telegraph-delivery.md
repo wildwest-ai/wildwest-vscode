@@ -44,6 +44,43 @@ The operator runs as part of each heartbeat tick — no separate polling loop, n
 
 ---
 
+## Failed Wire Recovery
+
+Operator delivery failures are quarantines, not dead ends.
+
+When the operator cannot deliver a JSON wire, it must:
+
+1. Stamp the wire as `status: "failed"`.
+2. Add `failed_at`.
+3. Add a structured `failure` object:
+
+```json
+{
+  "by": "heartbeat",
+  "reason": "invalid_addressing_format",
+  "message": "invalid addressing format: 'TM[wildwest-vscode]'",
+  "field": "to"
+}
+```
+
+4. Append a `failed` entry to `status_transitions`.
+5. Preserve the visible quarantine marker by renaming the file to `!{wwuid}.json`.
+6. Add `(!)` to the field that caused failure where possible, so the raw file is self-documenting.
+
+The Telegraph Panel must treat `outbox/!*.json` as first-class failed wires. Failed wires appear in Outbox under a `Failed` filter, show the structured reason, and expose `Retry Now`.
+
+`Retry Now` must:
+
+1. Remove field-level `(!)` markers.
+2. Clear `failure` and `failed_at`.
+3. Restore `status: "pending"`.
+4. Rename `!{wwuid}.json` back to `{wwuid}.json`.
+5. Trigger `HeartbeatMonitor.deliverOutboxNow()` immediately, without waiting for the next heartbeat tick.
+
+AI tools should use the same recovery path through wwMCP rather than rewriting operator behavior independently.
+
+---
+
 ## TelegraphWatcher — Inbox Watch
 
 After migration, `TelegraphWatcher` watches `inbox/` instead of the telegraph root.

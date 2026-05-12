@@ -19,6 +19,7 @@
 - [ ] **Identity block shape decision** — S(R) call needed (affects registry schema)
 - [ ] **`scope: "town"` field** — Add to `.wildwest/registry.json` for all scopes
 - [ ] **TownInit.ts fix** — Write `scope` field on registry creation
+- [ ] **Legacy telegraph inbox cleanup** — remove remaining `.wildwest/telegraph/inbox` references and ensure runtime no longer creates or consumes legacy inbox paths
 - [ ] **SoloModeController.hasBranchDoc()** — Check correct path (stale reference)
 
 ## P2 — Nice-to-Have
@@ -37,6 +38,8 @@
 - [ ] **Session attribution — UI editorial layer** — Side panel Sessions tab shows three sub-lists: **Active** (passing filter), **Excluded** (have `exclude_scope_refs` in session-map), **Candidates** (reference this town but don't pass primary filter). Each session row has **Include** / **Exclude** inline actions that write to `.wildwest/session-map.json` and trigger Rebuild. An **Overrides** view lists all current inject/exclude entries with notes and an Undo action.
 - [ ] **[v4 delivery bug] County outbox/history must not log received memos** — Received memos are appearing in the sender's outbox history. County outbox/history should only contain memos sent *from* that scope, not memos received by it. Filed per ruling `20260509-2240Z` Q3. (Authorized by S(R) via CD(RSn))
 - [ ] **Universal wire drafting across AI tools** — No standard cross-tool way to draft a wire today: `@wildwest send` is Copilot-only; `wildwest_draft_wire` (MCP) works in any AI tool but requires per-workspace setup; `Cmd+Shift+P → Create Wire` is human-only. Goal: make wwMCP auto-available in all configured workspaces so any AI tool (Claude Code, Cursor, Copilot) uses the same `wildwest_draft_wire` interface without manual per-workspace registration.
+- [ ] **Identity source of truth** — `wildwest.identity` currently lives in VS Code settings, but active authority should come from `.wildwest/registry.json`. Registry should declare multiple valid identities per scope; runtime/session state should select the active identity for a dyad/tool. VS Code settings may keep only a local last-selected override, not governance authority. Status transitions should record both identity (`CD(RSn)`) and routing anchor (`CD[wildwest-ai]`).
+- [ ] **wwMCP failed-wire recovery tools** — Mirror Telegraph Panel recovery with `wildwest_validate_wire`, `wildwest_repair_wire`, and `wildwest_retry_wire` so AI tools can inspect failed `!*.json` wires, fix fields, and trigger immediate delivery through the operator.
 
 ## P3 — Telegraph JSON Migration (2026-05-10)
 
