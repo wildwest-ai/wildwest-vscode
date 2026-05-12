@@ -4,6 +4,10 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.39.18] - 2026-05-12
+
+MCP wire tools now emit richer packetized status transitions. `wwMCPTools` writes append-only `wire.status` packets for drafted and sent wires, resolves sender addresses via registry-aware bracket routing, and preserves `transitionContext` metadata (`by`, `scope`, `alias`, `tool`, `source`). `wwMCPServer` now passes workspace identity into MCP scope context. `package.json` drops the legacy `wire` npm script.
+
 ## [0.39.17] - 2026-05-12
 
 MCP wire tools now emit richer packetized status transitions. `wwMCPTools` writes append-only `wire.status` packets for drafted and sent wires, resolves sender addresses via registry-aware bracket routing, and preserves `transitionContext` metadata (`by`, `scope`, `alias`, `tool`, `source`). `wwMCPServer` now passes workspace identity into MCP scope context. `package.json` drops the legacy `wire` npm script.
