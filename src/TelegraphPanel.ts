@@ -714,8 +714,9 @@ export class TelegraphPanel {
   /* active state should not use the global selection color; use subtle inset and badge emphasis */
   .sf-btn.active { background: rgba(0,0,0,0.06); border-color: rgba(0,0,0,0.12); }
   .chip-checkbox { width:16px; height:16px; accent-color: var(--vscode-button-foreground); }
+  .chip-checkbox { width:12px; height:12px; accent-color: var(--vscode-button-foreground); }
   .chip-label { font-size:11px; }
-  .chip-count { display: inline-block; font-size: 10px; padding: 0 6px; margin-left: 6px; border-radius: 10px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
+  .chip-count { display: inline-block; font-size: 10px; padding: 0 4px; margin-left: 6px; border-radius: 10px; background: transparent; color: var(--vscode-descriptionForeground); }
 
   /* ── Scope section headers ── */
   .scope-header { font-size: 10px; font-weight: 700; color: var(--vscode-descriptionForeground); text-transform: uppercase; letter-spacing: 0.07em; padding: 8px 10px 3px; opacity: 0.6; }
@@ -872,16 +873,21 @@ export class TelegraphPanel {
   function renderChips(tab) {
     const bar = document.getElementById('statusFilter');
     const chips = CHIP_CONFIG[tab] || [];
-    // compute counts based on base list
+    // compute counts based on base list — archived counts are exclusive
     const base = tab === 'inbox' ? inboxWires : outboxWires;
     const counts = {};
     for (const c of chips) counts[c.status] = 0;
     for (const w of base) {
-      const st = w.status || (tab === 'inbox' ? 'sent' : 'sent');
+      const archived = w.recipient_archived_at || w.sender_archived_at || false;
+      if (archived) {
+        if (counts['archived'] !== undefined) counts['archived']++;
+        continue;
+      }
+      const st = (w.status || (tab === 'inbox' ? 'sent' : 'sent'));
       if (counts[st] !== undefined) counts[st]++;
-      // archived overlay
-      if (w.recipient_archived_at || w.sender_archived_at) counts['archived'] = (counts['archived']||0) + 1;
+      // If 'all' bucket exists, we'll set it after counting
     }
+    if (counts['all'] !== undefined) counts['all'] = base.length;
 
     bar.innerHTML = chips.map(c => {
       const active = statusFilterSet && statusFilterSet.has(c.status) ? ' active' : '';
@@ -934,7 +940,7 @@ export class TelegraphPanel {
       tab.classList.add('active');
       activeTab = tab.dataset.tab;
       // Restore or initialize statusFilter for the tab
-      statusFilter = initStatusFilter(activeTab);
+      statusFilterSet = initStatusFilterSet(activeTab);
       document.getElementById('searchBar').classList.toggle('visible', activeTab === 'all');
       clearSelection();
       renderChips(activeTab);
@@ -1120,9 +1126,9 @@ export class TelegraphPanel {
       );
     }
     const base = activeTab === 'inbox' ? inboxWires : outboxWires;
-    // if no filters selected, return full base
+    // if no filters selected, return empty list (user-cleared selection => show none)
     const set = tabStatusFilters[activeTab] || new Set();
-    if (set.size === 0) return base;
+    if (set.size === 0) return [];
     // if 'all' present, return base
     if (set.has('all')) return base;
     // include archived if selected
@@ -1142,10 +1148,17 @@ export class TelegraphPanel {
     if (list.length === 0) {
       const msg = !flatAvailable
         ? 'telegraph/flat/ not found'
-        : activeTab === 'inbox'  ? (statusFilter !== 'all' ? 'No ' + statusFilter + ' wires' : 'Inbox empty')
-        : activeTab === 'outbox' ? (statusFilter !== 'all' ? 'No ' + statusFilter + ' wires' : 'No sent wires')
-        : searchQuery            ? 'No matches'
-        : 'No wires';
+        : (function(){
+            if (activeTab === 'all') return searchQuery ? 'No matches' : 'No wires';
+            const set = tabStatusFilters[activeTab] || new Set();
+            if (set.size === 0) return activeTab === 'inbox' ? 'No New wires' : 'No Draft wires';
+            if (set.has('all')) return activeTab === 'inbox' ? 'Inbox empty' : 'No sent wires';
+            // show first selected label if possible
+            const first = Array.from(set)[0];
+            const cfg = CHIP_CONFIG[activeTab] || [];
+            const found = cfg.find(c => c.status === first);
+            return 'No ' + (found ? found.label : first) + ' wires';
+          })();
       pane.innerHTML = '<div class="empty-list">' + esc(msg) + '</div>';
       return;
     }
