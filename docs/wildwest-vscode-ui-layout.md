@@ -159,9 +159,17 @@ Implemented in `src/TelegraphPanel.ts`.
 
 ### Search and filters
 
-- status filter area `#statusFilter`
-  - renders filter buttons with class `.sf-btn`
-  - button labels are based on `CHIP_CONFIG`
+- Status Filter Bar `#statusFilter` (Tab Subheader / Contextual Toolbar):
+  - a contextual toolbar directly below the tab bar that scopes filtering to the active tab.
+  - selector: `#statusFilter` — the container; filter chips use `.sf-btn`.
+  - purpose: narrow the visible wire list by status (e.g., `New`, `Read`, `Draft`, `Sent`) without changing the selected tab.
+  - semantic patterns:
+    - If chips are mutually exclusive, implement as a `radiogroup`: container `role="radiogroup"` + each chip `role="radio"` + `aria-checked`.
+    - If multiple chips may be toggled, implement chips as `<button>` elements with `aria-pressed="true|false"` inside a `role="toolbar"` or plain group with `aria-label="Status filters"`.
+  - accessibility: provide `aria-label="Status filters"` on the container, support Left/Right/Home/End navigation, and ensure Space/Enter toggles the chip.
+  - visual: chips should present an active/selected appearance distinct from the active tab (e.g., filled chip vs. tab underline). Chips are secondary controls — do not use vivid alert colors for counts.
+  - renders filter buttons with class `.sf-btn`.
+  - button labels are based on `CHIP_CONFIG`:
     - `inbox` filters: `New`, `Read`, `Archived`, `All`
     - `outbox` filters: `Draft`, `Pending`, `Failed`, `Sent`, `Delivered`, `Read`, `Archived`
   - default active status by tab is set from `initStatusFilter()`
@@ -337,6 +345,9 @@ Provide an authoritative mapping of DOM selectors and element IDs used by the Te
 - `#btnRefresh` — header refresh button.
 - `#btnCompose` — header compose button.
 - `.tab[data-tab="inbox"]`, `.tab[data-tab="outbox"]`, `.tab[data-tab="all"]` — tab elements.
+ - `.tab[data-tab="inbox"]`, `.tab[data-tab="outbox"]`, `.tab[data-tab="all"]` — tab elements.
+ - `#statusFilter` — Status Filter Bar (tab subheader / contextual toolbar).
+ - `.sf-btn` — status filter chip buttons inside `#statusFilter`.
 - `#searchInput` — search input in `all` tab.
 - `#composeDrawer` — compose drawer container; `.compose-form` fields inside.
 - `.wire-row[data-wwuid]` — wire list row selector (data attribute contains `wwuid`).
