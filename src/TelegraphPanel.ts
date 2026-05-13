@@ -60,7 +60,7 @@ export class TelegraphPanel {
     }
     const panel = vscode.window.createWebviewPanel(
       TelegraphPanel.viewType,
-      '📬 Telegraph',
+      'Telegraph',
       vscode.ViewColumn.Beside,
       { enableScripts: true, retainContextWhenHidden: true },
     );
@@ -634,6 +634,8 @@ export class TelegraphPanel {
   /* ── Header ── */
   .header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--vscode-panel-border); flex-shrink: 0; }
   .header h2 { font-size: 13px; font-weight: 600; }
+  .title { display:flex; align-items:center; gap:8px; }
+  .title .icon svg { width:18px; height:18px; fill:currentColor; display:block; }
   .btn { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; padding: 4px 10px; border-radius: 3px; cursor: pointer; font-size: 12px; }
   .btn:hover { background: var(--vscode-button-hoverBackground); }
   .btn-secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
@@ -726,7 +728,14 @@ export class TelegraphPanel {
 <body>
 
 <div class="header">
-  <h2>📬 Telegraph</h2>
+  <div class="title">
+    <span class="icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+        <path d="M3 6.5A2.5 2.5 0 0 1 5.5 4h13A2.5 2.5 0 0 1 21 6.5v11A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5v-11zM5.2 6.4L12 11.2l6.8-4.8" fill="currentColor" />
+      </svg>
+    </span>
+    <h2>Telegraph</h2>
+  </div>
   <div style="display:flex;gap:6px">
     <button class="btn btn-secondary" id="btnRefresh">↻</button>
     <button class="btn" id="btnCompose">✎ Compose</button>
