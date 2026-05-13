@@ -4,6 +4,10 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.42.0] - 2026-05-13
+
+Multi-part Telegraph UI/UX improvements: replace webview header emoji with a theme-aware monochrome `telegraph` icon, implement multi-select status filter chips with counts and ARIA attributes, add Playwright visual snapshots and `axe-core` accessibility checks, and fix compose form label associations. Includes `media/telegraph.svg`, updated `src/TelegraphPanel.ts`, unit tests, and UI documentation in `docs/wildwest-vscode-ui-layout.md`.
+
 ## [0.41.3] - 2026-05-13
 
 - Enforce strict addressing format validation on `wildwest_draft_wire` and `wildwest_send_wire`: county roles (CD, S, RA, aCD, DS) require `Role(dyad)[scope]` or `Role[scope]`; town roles (TM, DM, HG) must use `Role[town]` format without dyad parens; rejects any `from`/`to` that violate the spec.
