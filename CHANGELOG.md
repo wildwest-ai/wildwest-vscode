@@ -4,6 +4,18 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.43.0] - 2026-05-13
+
+- Telegraph UI/UX improvements
+	- Replace header emoji with theme-aware `telegraph` icon and update webview header.
+	- Multi-select status chips with accessible ARIA attributes, accurate counts, and "hide zero" preference for Pending/Failed chips.
+	- Make status chips appear as tabs (bottom-bar active state) and remove rounded outline.
+	- Add resizable left panel divider with persisted `telegraph.listWidth` preference.
+	- Add settings popover `telegraph.hideZeroStatus` to hide zero-count Pending/Failed chips.
+	- Improve archive display: list badge `Archived`, timeline includes archived entry with actor identity, and move `Wire Id:` above the Timeline.
+	- Outbox list improvements: show `To: <recipient>`, show date+time, and add `Edit` button for Drafts to prefill Compose.
+	- Compose: add a `Save Draft` button and backend draft-saving support (edit existing drafts and create new drafts).
+
 ## [0.42.0] - 2026-05-13
 
 Multi-part Telegraph UI/UX improvements: replace webview header emoji with a theme-aware monochrome `telegraph` icon, implement multi-select status filter chips with counts and ARIA attributes, add Playwright visual snapshots and `axe-core` accessibility checks, and fix compose form label associations. Includes `media/telegraph.svg`, updated `src/TelegraphPanel.ts`, unit tests, and UI documentation in `docs/wildwest-vscode-ui-layout.md`.
