@@ -792,8 +792,8 @@ export class TelegraphPanel {
 
 <div class="compose-drawer" id="composeDrawer">
   <div class="compose-form">
-    <div class="compose-row"><label>To</label><input id="cTo" placeholder="CD(RSn)" /></div>
-    <div class="compose-row"><label>Type</label>
+    <div class="compose-row"><label for="cTo">To</label><input id="cTo" placeholder="CD(RSn)" /></div>
+    <div class="compose-row"><label for="cType">Type</label>
       <select id="cType">
         <option>status-update</option>
         <option>assignment</option>
@@ -804,7 +804,7 @@ export class TelegraphPanel {
         <option>notification</option>
       </select>
     </div>
-    <div class="compose-row"><label>Subject</label><input id="cSubject" placeholder="my-topic-slug" /></div>
+    <div class="compose-row"><label for="cSubject">Subject</label><input id="cSubject" placeholder="my-topic-slug" /></div>
     <div style="position:relative">
       <textarea class="compose-body" id="cBody" placeholder="Wire body… (type 3+ chars to see past prompts)" autocomplete="off"></textarea>
       <div id="promptDropdown" style="display:none;position:absolute;bottom:100%;left:0;right:0;max-height:160px;overflow-y:auto;background:var(--vscode-editorSuggestWidget-background,var(--vscode-input-background));border:1px solid var(--vscode-editorSuggestWidget-border,#555);z-index:100;font-size:11px;"></div>
