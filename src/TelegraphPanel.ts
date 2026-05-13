@@ -621,13 +621,21 @@ export class TelegraphPanel {
   // ── HTML ──────────────────────────────────────────────────────────────────
 
   private buildHtml(): string {
-    // try to inline the theme-aware SVG so it respects currentColor in the webview
-    let inlineIcon = '';
+    // try to reference the repo media via webview.asWebviewUri (preferred)
+    let iconMarkup = '';
     try {
       const mediaRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
       const iconPath = path.join(mediaRoot, 'media', 'telegraph.svg');
-      if (fs.existsSync(iconPath)) inlineIcon = fs.readFileSync(iconPath, 'utf8');
-    } catch { inlineIcon = ''; }
+      if (fs.existsSync(iconPath)) {
+        // external URI for webview
+        const uri = this.panel.webview.asWebviewUri(vscode.Uri.file(iconPath));
+        iconMarkup = `<img src="${uri.toString()}" class="svg-external" aria-hidden="true" />`;
+        // also attempt to inline as a robust fallback for theming if reading succeeds
+        try { iconMarkup = fs.readFileSync(iconPath, 'utf8'); } catch { /* keep external img */ }
+      }
+    } catch {
+      iconMarkup = '';
+    }
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -735,10 +743,10 @@ export class TelegraphPanel {
 </head>
 <body>
 
-<div class="header">
+    <div class="header">
   <div class="title">
     <span class="icon" aria-hidden="true">
-      ${inlineIcon}
+      ${iconMarkup}
     </span>
     <h2>Telegraph</h2>
   </div>
