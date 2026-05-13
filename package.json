@@ -184,6 +184,12 @@
         "icon": "$(mail)"
       },
       {
+        "command": "wildwest.telegraph",
+        "title": "Open Telegraph (telegraph icon)",
+        "category": "Wild West",
+        "icon": "media/telegraph.svg"
+      },
+      {
         "command": "wildwest.createWire",
         "title": "Create Wire",
         "category": "Wild West",
@@ -215,7 +221,7 @@
           "group": "navigation"
         },
         {
-          "command": "wildwest.openTelegraphPanel",
+          "command": "wildwest.telegraph",
           "when": "view == wildwest.sidepanel",
           "group": "navigation"
         }

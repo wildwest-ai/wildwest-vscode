@@ -276,6 +276,10 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('wildwest.openTelegraphPanel', () => {
       TelegraphPanel.open(exporter.getExportPath(), promptIndexService, heartbeatMonitor);
     }),
+    vscode.commands.registerCommand('wildwest.telegraph', () => {
+      // Proxy command to open the Telegraph panel; keeps menu wiring stable
+      TelegraphPanel.open(exporter.getExportPath(), promptIndexService, heartbeatMonitor);
+    }),
     vscode.commands.registerCommand('wildwest.refreshTelegraphPanel', () => {
       TelegraphPanel.refresh();
     }),
