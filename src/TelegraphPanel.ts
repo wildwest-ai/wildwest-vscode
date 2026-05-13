@@ -694,6 +694,7 @@ export class TelegraphPanel {
   .sf-btn { background: none; border: 1px solid var(--vscode-panel-border); color: var(--vscode-descriptionForeground); font-size: 11px; padding: 1px 8px; border-radius: 10px; cursor: pointer; }
   .sf-btn:hover { color: var(--vscode-foreground); }
   .sf-btn.active { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: var(--vscode-button-background); }
+  .chip-count { display: inline-block; font-size: 10px; padding: 0 6px; margin-left: 6px; border-radius: 10px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
 
   /* ── Scope section headers ── */
   .scope-header { font-size: 10px; font-weight: 700; color: var(--vscode-descriptionForeground); text-transform: uppercase; letter-spacing: 0.07em; padding: 8px 10px 3px; opacity: 0.6; }
@@ -801,12 +802,13 @@ export class TelegraphPanel {
   let actorAlias = '';
   let flatAvailable = false;
   let activeTab = 'inbox';
-  let statusFilter = null;   // will be initialized to first chip's status
+  // status filter sets per tab (multi-select chips)
+  let statusFilterSet = null; // Set<string> for currently active tab
   let selectedWwuid = null;
   let pendingFormatted = '';
   let searchQuery = '';
   let selectedWwuids = new Set();
-  let tabStatusFilters = {};   // persist statusFilter per tab
+  let tabStatusFilters = {};   // persist Set<string> per tab
 
   const CHIP_CONFIG = {
     inbox:  [
@@ -828,29 +830,56 @@ export class TelegraphPanel {
   };
 
   // Initialize statusFilter to first chip's status for current tab
-  function initStatusFilter(tab) {
+  function initStatusFilterSet(tab) {
     if (!tabStatusFilters[tab]) {
       const chips = CHIP_CONFIG[tab] || [];
-      tabStatusFilters[tab] = chips.length > 0 ? chips[0].status : 'all';
+      const s = new Set();
+      if (chips.length > 0) s.add(chips[0].status);
+      tabStatusFilters[tab] = s;
     }
     return tabStatusFilters[tab];
   }
-  statusFilter = initStatusFilter('inbox');
+  statusFilterSet = initStatusFilterSet('inbox');
 
   // ── Chip rendering ────────────────────────────────────────────────────────
 
   function renderChips(tab) {
     const bar = document.getElementById('statusFilter');
     const chips = CHIP_CONFIG[tab] || [];
-    bar.innerHTML = chips.map(c =>
-      '<button class="sf-btn' + (c.status === statusFilter ? ' active' : '') + '" data-status="' + c.status + '">' + c.label + '</button>'
-    ).join('');
+    // compute counts based on base list
+    const base = tab === 'inbox' ? inboxWires : outboxWires;
+    const counts = {};
+    for (const c of chips) counts[c.status] = 0;
+    for (const w of base) {
+      const st = w.status || (tab === 'inbox' ? 'sent' : 'sent');
+      if (counts[st] !== undefined) counts[st]++;
+      // archived overlay
+      if (w.recipient_archived_at || w.sender_archived_at) counts['archived'] = (counts['archived']||0) + 1;
+    }
+
+    bar.innerHTML = chips.map(c => {
+      const active = statusFilterSet && statusFilterSet.has(c.status) ? ' active' : '';
+      const count = counts[c.status] || 0;
+      return '<button class="sf-btn' + active + '" data-status="' + c.status + '" aria-pressed="' + (active ? 'true' : 'false') + '" aria-label="' + c.label + ', ' + count + ' items">'
+        + c.label + ' <span class="chip-count">' + count + '</span></button>';
+    }).join('');
+
     bar.querySelectorAll('.sf-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        bar.querySelectorAll('.sf-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        statusFilter = btn.dataset.status;
-        tabStatusFilters[activeTab] = statusFilter;   // persist for this tab
+      btn.addEventListener('click', (e) => {
+        const status = btn.dataset.status;
+        // toggle in set
+        if (!statusFilterSet) statusFilterSet = initStatusFilterSet(tab);
+        if (statusFilterSet.has(status)) {
+          statusFilterSet.delete(status);
+          btn.classList.remove('active');
+          btn.setAttribute('aria-pressed', 'false');
+        } else {
+          statusFilterSet.add(status);
+          btn.classList.add('active');
+          btn.setAttribute('aria-pressed', 'true');
+        }
+        // persist
+        tabStatusFilters[activeTab] = statusFilterSet;
         clearSelection();
         renderList();
       });
@@ -1052,9 +1081,20 @@ export class TelegraphPanel {
       );
     }
     const base = activeTab === 'inbox' ? inboxWires : outboxWires;
-    if (statusFilter === 'all') return base;
-    if (statusFilter === 'archived') return base.filter(w => isArchivedForActor(w));
-    return base.filter(w => !isArchivedForActor(w) && (w.status || 'sent') === statusFilter);
+    // if no filters selected, return full base
+    const set = tabStatusFilters[activeTab] || new Set();
+    if (set.size === 0) return base;
+    // if 'all' present, return base
+    if (set.has('all')) return base;
+    // include archived if selected
+    const wantsArchived = set.has('archived');
+    const wanted = Array.from(set).filter(s => s !== 'archived');
+    return base.filter(w => {
+      if (wantsArchived && isArchivedForActor(w)) return true;
+      if (wanted.length === 0) return !isArchivedForActor(w);
+      const st = (w.status || 'sent');
+      return wanted.includes(st) && !isArchivedForActor(w);
+    });
   }
 
   function renderList() {
