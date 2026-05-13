@@ -4,6 +4,10 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.41.3] - 2026-05-13
+
+- Enforce strict addressing format validation on `wildwest_draft_wire` and `wildwest_send_wire`: county roles (CD, S, RA, aCD, DS) require `Role(dyad)[scope]` or `Role[scope]`; town roles (TM, DM, HG) must use `Role[town]` format without dyad parens; rejects any `from`/`to` that violate the spec.
+
 ## [0.41.2] - 2026-05-13
 
 - `wildwest_draft_wire` now resolves the draft root dynamically from the `from` address — walks the territory registry to find the sender's local town path, so drafts land in the correct town's `.wildwest/telegraph/flat/` instead of the territory SSOT. Falls back to `localRoot` if alias not found.

@@ -132,6 +132,16 @@ export function toolTelegraphCheck(ctx: MCPScopeContext): TelegraphCheckOutput {
 }
 
 export function toolDraftWire(ctx: MCPScopeContext, input: DraftWireInput): WireWriteOutput {
+  // Validate addressing format
+  const fromValidation = validateAddress(input.from);
+  if (!fromValidation.valid) {
+    throw new Error(`Invalid 'from' address: ${fromValidation.error}`);
+  }
+  const toValidation = validateAddress(input.to);
+  if (!toValidation.valid) {
+    throw new Error(`Invalid 'to' address: ${toValidation.error}`);
+  }
+
   const fromAlias = readRegistryAlias(path.join(ctx.rootPath, '.wildwest'));
   if (!fromAlias) {
     throw new Error('Missing registry alias in .wildwest/registry.json');
@@ -169,6 +179,16 @@ export function toolDraftWire(ctx: MCPScopeContext, input: DraftWireInput): Wire
 }
 
 export function toolSendWire(ctx: MCPScopeContext, input: SendWireInput): WireWriteOutput {
+  // Validate addressing format
+  const fromValidation = validateAddress(input.from);
+  if (!fromValidation.valid) {
+    throw new Error(`Invalid 'from' address: ${fromValidation.error}`);
+  }
+  const toValidation = validateAddress(input.to);
+  if (!toValidation.valid) {
+    throw new Error(`Invalid 'to' address: ${toValidation.error}`);
+  }
+
   const fromAlias = readRegistryAlias(path.join(ctx.rootPath, '.wildwest'));
   if (!fromAlias) {
     throw new Error('Missing registry alias in .wildwest/registry.json');
@@ -250,6 +270,53 @@ export function toolRetryWire(ctx: MCPScopeContext, input: RetryWireInput): Wire
   }
 
   throw new Error(`Failed wire not found: ${wwuid}`);
+}
+
+/**
+ * Validate addressing format per wildwest spec:
+ * - County roles (CD, S, RA, aCD, DS): Role(dyad)[scope] or Role[scope]
+ * - Town roles (TM, DM, HG): Role[town] or Role[*pattern] — no dyad parens allowed
+ * - Territory roles (G, RA): Role[territory]
+ * Returns { valid: boolean, error?: string }
+ */
+function validateAddress(address: string): { valid: boolean; error?: string } {
+  const countyRoles = ['CD', 'S', 'RA', 'aCD', 'DS'];
+  const townRoles = ['TM', 'DM', 'HG'];
+  const territoryRoles = ['G', 'RA'];
+
+  // Parse: Role[(dyad)][scope]
+  const match = address.match(/^([A-Za-z]+)(?:\(([^)]+)\))?\[([^\]]+)\]$/);
+  if (!match) {
+    return { valid: false, error: `Invalid address format: '${address}'. Expected Role[(dyad)][scope] or Role[scope]` };
+  }
+
+  const [, role, dyad, scope] = match;
+
+  // Check role + dyad + scope rules
+  if (countyRoles.includes(role)) {
+    // County roles: dyad optional, scope required
+    if (!scope || scope.length === 0) {
+      return { valid: false, error: `County role '${role}' requires scope: '${role}${dyad ? `(${dyad})` : ''}[scope]'` };
+    }
+    return { valid: true };
+  } else if (townRoles.includes(role)) {
+    // Town roles: dyad NOT allowed, scope required
+    if (dyad) {
+      return { valid: false, error: `Town role '${role}' does not use dyad parens: use '${role}[${scope}]' not '${role}(${dyad})[${scope}]'` };
+    }
+    if (!scope || scope.length === 0) {
+      return { valid: false, error: `Town role '${role}' requires scope: '${role}[town]' or '${role}[*pattern]'` };
+    }
+    return { valid: true };
+  } else if (territoryRoles.includes(role)) {
+    // Territory roles: dyad optional, scope required
+    if (!scope || scope.length === 0) {
+      return { valid: false, error: `Territory role '${role}' requires scope: '${role}${dyad ? `(${dyad})` : ''}[territory]'` };
+    }
+    return { valid: true };
+  } else {
+    return { valid: false, error: `Unknown role: '${role}'` };
+  }
 }
 
 /**
