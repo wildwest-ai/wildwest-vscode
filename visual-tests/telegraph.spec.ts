@@ -23,6 +23,18 @@ function extractHtmlFromSource(): string {
 test('header and status filter visual snapshot', async ({ page }) => {
   const html = extractHtmlFromSource();
   await page.setContent(html, { waitUntil: 'networkidle' });
+  // Ensure the status filter has visible sample chips for snapshotting
+  await page.evaluate(() => {
+    const status = document.getElementById('statusFilter');
+    if (!status) return;
+    status.classList.add('visible');
+    status.innerHTML = '' +
+      '<button class="sf-btn active" data-status="sent" aria-pressed="true">New <span class="chip-count">3</span></button>' +
+      '<button class="sf-btn" data-status="read" aria-pressed="false">Read <span class="chip-count">12</span></button>' +
+      '<button class="sf-btn" data-status="archived" aria-pressed="false">Archived <span class="chip-count">4</span></button>' +
+      '<button class="sf-btn" data-status="all" aria-pressed="false">All <span class="chip-count">19</span></button>';
+  });
+
   const header = await page.locator('.header');
   await expect(header).toHaveScreenshot('header.png');
   const status = await page.locator('#statusFilter');
