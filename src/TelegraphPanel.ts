@@ -672,6 +672,10 @@ export class TelegraphPanel {
   /* ── Main layout ── */
   .main { display: flex; flex: 1; overflow: hidden; }
 
+  /* draggable divider between list and detail */
+  .divider { width: 6px; cursor: col-resize; background: transparent; flex-shrink: 0; }
+  .divider:hover { background: rgba(128,128,128,0.06); }
+
   /* ── Wire list ── */
   .list-pane { width: 240px; flex-shrink: 0; border-right: 1px solid var(--vscode-panel-border); overflow-y: auto; display: flex; flex-direction: column; }
   .wire-row { border-left: 3px solid transparent; }
@@ -753,10 +757,17 @@ export class TelegraphPanel {
     </span>
     <h2>Telegraph</h2>
   </div>
-  <div style="display:flex;gap:6px">
-    <button class="btn btn-secondary" id="btnRefresh">↻</button>
-    <button class="btn" id="btnCompose">✎ Compose</button>
-  </div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button class="btn btn-secondary" id="btnRefresh">↻</button>
+      <button class="btn" id="btnCompose">✎ Compose</button>
+      <button class="btn" id="btnSettings" title="Settings">⚙︎</button>
+      <div id="settingsMenu" style="display:none;position:relative">
+        <div id="settingsPopover" role="dialog" aria-label="Telegraph settings" style="position:absolute;right:0;top:28px;background:var(--vscode-editor-background);border:1px solid var(--vscode-panel-border);padding:8px;border-radius:4px;box-shadow:0 6px 18px rgba(0,0,0,0.2);width:260px;z-index:200">
+          <div style="font-size:12px;font-weight:600;margin-bottom:6px">Telegraph Settings</div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px"><input type="checkbox" id="hideZeroStatus"/> Hide Pending/Failed status chips when count is 0</label>
+        </div>
+      </div>
+    </div>
 </div>
 
 <div class="tabs">
@@ -788,9 +799,8 @@ export class TelegraphPanel {
 
 <div class="main">
   <div class="list-pane" id="listPane"></div>
-  <div class="detail-pane empty-detail" id="detailPane">
-    <span>Select a wire to read</span>
-  </div>
+  <div class="divider" id="divider" role="separator" aria-orientation="vertical" tabindex="0"></div>
+  <div class="detail-pane empty-detail" id="detailPane"></div>
 </div>
 
 <div class="compose-drawer" id="composeDrawer">
@@ -835,6 +845,8 @@ export class TelegraphPanel {
   let searchQuery = '';
   let selectedWwuids = new Set();
   let tabStatusFilters = {};   // persist Set<string> per tab
+  // UI prefs
+  let hideZeroStatus = true; // default: hide Pending/Failed when count is 0
 
   const CHIP_CONFIG = {
     inbox:  [
@@ -873,6 +885,7 @@ export class TelegraphPanel {
     const bar = document.getElementById('statusFilter');
     const chips = CHIP_CONFIG[tab] || [];
     // compute counts based on base list — archived counts are exclusive
+    // compute counts based on base list — archived counts are exclusive
     const base = tab === 'inbox' ? inboxWires : outboxWires;
     const counts = {};
     for (const c of chips) counts[c.status] = 0;
@@ -888,7 +901,14 @@ export class TelegraphPanel {
     }
     if (counts['all'] !== undefined) counts['all'] = base.length;
 
-    bar.innerHTML = chips.map(c => {
+    // If user prefers, hide zero-count Pending/Failed chips by default
+    const visibleChips = chips.filter(c => {
+      if (!hideZeroStatus) return true;
+      if ((c.status === 'pending' || c.status === 'failed') && (counts[c.status] || 0) === 0) return false;
+      return true;
+    });
+
+    bar.innerHTML = visibleChips.map(c => {
       const active = statusFilterSet && statusFilterSet.has(c.status) ? ' active' : '';
       const count = counts[c.status] || 0;
       return '<button class="sf-btn' + active + '" data-status="' + c.status + '" aria-label="' + c.label + ', ' + count + ' items' + '">' +
@@ -950,6 +970,63 @@ export class TelegraphPanel {
   // Initial chip render
   renderChips('inbox');
 
+  // ===== Settings init =====
+  try {
+    const storedHide = localStorage.getItem('telegraph.hideZeroStatus');
+    hideZeroStatus = storedHide === null ? true : (storedHide === 'true');
+  } catch (e) { hideZeroStatus = true; }
+  // sync checkbox if present
+  const hideCb = document.getElementById('hideZeroStatus');
+  if (hideCb) hideCb.checked = hideZeroStatus;
+  // settings button
+  const btnSettings = document.getElementById('btnSettings');
+  const settingsMenu = document.getElementById('settingsMenu');
+  if (btnSettings && settingsMenu) {
+    btnSettings.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      settingsMenu.style.display = settingsMenu.style.display === 'block' ? 'none' : 'block';
+      // ensure checkbox reflects state
+      const cb = document.getElementById('hideZeroStatus'); if (cb) cb.checked = hideZeroStatus;
+    });
+    document.addEventListener('click', () => { if (settingsMenu) settingsMenu.style.display = 'none'; });
+    const cbEl = document.getElementById('hideZeroStatus');
+    if (cbEl) cbEl.addEventListener('change', (e) => {
+      hideZeroStatus = e.target.checked;
+      try { localStorage.setItem('telegraph.hideZeroStatus', hideZeroStatus ? 'true' : 'false'); } catch (e) {}
+      renderChips(activeTab);
+    });
+  }
+
+  // ===== Divider (resizable left pane) =====
+  (function(){
+    const listPane = document.getElementById('listPane');
+    const divider = document.getElementById('divider');
+    if (!listPane || !divider) return;
+    // restore width
+    try { const w = localStorage.getItem('telegraph.listWidth'); if (w) listPane.style.width = w; } catch (e) {}
+    let dragging = false;
+    const minW = 160; const maxW = 900;
+    divider.addEventListener('mousedown', (e) => {
+      dragging = true; document.body.style.userSelect = 'none';
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const rect = document.body.getBoundingClientRect();
+      const newW = Math.max(minW, Math.min(maxW, e.clientX - rect.left));
+      listPane.style.width = newW + 'px';
+    });
+    window.addEventListener('mouseup', () => {
+      if (!dragging) return; dragging = false; document.body.style.userSelect = '';
+      try { localStorage.setItem('telegraph.listWidth', listPane.style.width); } catch (e) {}
+    });
+    // keyboard support
+    divider.addEventListener('keydown', (e) => {
+      const cur = parseInt(getComputedStyle(listPane).width, 10) || 240;
+      if (e.key === 'ArrowLeft') { const nw = Math.max(minW, cur - 16); listPane.style.width = nw + 'px'; try{localStorage.setItem('telegraph.listWidth', listPane.style.width);}catch{ } }
+      if (e.key === 'ArrowRight') { const nw = Math.min(maxW, cur + 16); listPane.style.width = nw + 'px'; try{localStorage.setItem('telegraph.listWidth', listPane.style.width);}catch{ } }
+    });
+  })();
+
   document.getElementById('searchInput').addEventListener('input', (e) => {
     searchQuery = e.target.value.toLowerCase();
     renderList();
@@ -961,7 +1038,9 @@ export class TelegraphPanel {
 
   function clearSelection() {
     selectedWwuids.clear();
+    selectedWwuid = null;
     updateBulkBar();
+    renderDetail(null);
   }
 
   function updateBulkBar() {
@@ -1026,6 +1105,12 @@ export class TelegraphPanel {
       if (ww) handleReply(ww);
       return;
     }
+    const editBtn = e.target.closest('[data-edit]');
+    if (editBtn) {
+      const ww = [...inboxWires, ...outboxWires, ...allWires].find(x => x.wwuid === editBtn.dataset.edit);
+      if (ww) handleEdit(ww);
+      return;
+    }
     const sendDraftBtn = e.target.closest('[data-send-draft]');
     if (sendDraftBtn) { vscode.postMessage({ type: 'sendDraft', wwuid: sendDraftBtn.dataset.sendDraft }); }
   });
@@ -1042,7 +1127,9 @@ export class TelegraphPanel {
       document.getElementById('badgeInbox').textContent  = inboxWires.length;
       document.getElementById('badgeOutbox').textContent = outboxWires.length;
       document.getElementById('badgeAll').textContent    = allWires.length;
+      // Update chips counts and list after wires arrive
       clearSelection();
+      renderChips(activeTab);
       renderList();
       if (selectedWwuid) renderDetail(selectedWwuid);
     }
@@ -1134,7 +1221,11 @@ export class TelegraphPanel {
     const wantsArchived = set.has('archived');
     const wanted = Array.from(set).filter(s => s !== 'archived');
     return base.filter(w => {
+      // If only 'archived' is selected, return archived items only
+      if (wantsArchived && wanted.length === 0) return isArchivedForActor(w);
+      // If archived is selected along with other statuses, include archived items as well
       if (wantsArchived && isArchivedForActor(w)) return true;
+      // Otherwise, if no non-archived statuses selected, show non-archived items
       if (wanted.length === 0) return !isArchivedForActor(w);
       const st = (w.status || 'sent');
       return wanted.includes(st) && !isArchivedForActor(w);
@@ -1183,15 +1274,29 @@ export class TelegraphPanel {
   function wireRow(w) {
     const active = w.wwuid === selectedWwuid ? ' active' : '';
     const checked = selectedWwuids.has(w.wwuid) ? ' checked' : '';
-    const dateStr = w.date ? new Date(w.date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
-    const statusLabel = w.status === 'sent' ? 'New' : (w.status || '');
-    const statusBadge = '<span class="badge-status badge-' + esc(w.status || 'sent') + '">' + esc(statusLabel) + '</span>';
+    // If this wire is archived for the current actor, show 'Archived' badge and archived timestamp in meta
+    const archivedForActor = isArchivedForActor(w);
+    // show date + time in list rows
+    let dateStr = w.date ? fmtDate(w.date) : '';
+    let statusLabel = w.status === 'sent' ? 'New' : (w.status || '');
+    let statusBadge = '<span class="badge-status badge-' + esc(w.status || 'sent') + '">' + esc(statusLabel) + '</span>';
+    if (archivedForActor) {
+      statusLabel = 'Archived';
+      statusBadge = '<span class="badge-status badge-archived">' + esc(statusLabel) + '</span>';
+      // prefer actor-specific archived timestamp when present
+      const archivedIso = (activeTab === 'inbox' ? w.recipient_archived_at : (activeTab === 'outbox' ? w.sender_archived_at : (w.recipient_archived_at || w.sender_archived_at || w.archived_at)));
+      if (archivedIso) {
+        try { dateStr = fmtDate(archivedIso); } catch (e) { /* ignore */ }
+      }
+    }
     const shortId = w.wwuid ? w.wwuid.slice(0, 8) : '—';
+    // For outbox rows, show To: <recipient>, for inbox show From: <sender>
+    const addrDisplay = activeTab === 'outbox' ? ('To: ' + esc(w.to || '—')) : ('From: ' + esc(w.from || '—'));
     return '<div class="wire-row' + active + '" data-wwuid="' + esc(w.wwuid) + '">'
       + '<input type="checkbox" class="wire-check"' + checked + ' data-wwuid="' + esc(w.wwuid) + '">'
       + '<div class="wire-content">'
       + '<div class="subject">' + esc(w.subject || w.filename || '—') + '</div>'
-      + '<div class="meta">' + statusBadge + ' <span>' + esc(w.from || w.to || '') + '</span> <span>' + esc(dateStr) + '</span></div>'
+      + '<div class="meta">' + statusBadge + ' <span>' + addrDisplay + '</span> <span>' + esc(dateStr) + '</span></div>'
       + '<div class="meta" style="opacity:0.45;font-family:monospace">' + esc(shortId) + '</div>'
       + '</div>'
       + '</div>';
@@ -1242,9 +1347,12 @@ export class TelegraphPanel {
     html += '<div class="wire-body' + (bodyText ? '' : ' empty') + '">'
       + (bodyText ? esc(bodyText) : '(no body)') + '</div>';
 
-    // Status timeline
+    // Wire Id (show above timeline)
+    html += '<div style="font-family:monospace;font-size:11px;margin-top:12px;margin-bottom:8px;opacity:0.8">Wire Id: ' + esc(w.wwuid || '') + '</div>';
+
+    // Status timeline (include status_transitions and actor-specific archive overlay)
+    html += '<div><div class="section-label" style="margin-bottom:6px">Timeline</div><div class="timeline">';
     if (w.status_transitions && w.status_transitions.length > 0) {
-      html += '<div><div class="section-label" style="margin-bottom:6px">Timeline</div><div class="timeline">';
       for (const t of w.status_transitions) {
         const actor = [t.by, t.scope, t.alias].filter(Boolean).join(' · ');
         const source = [t.tool, t.source].filter(Boolean).join(' / ') || (t.repos && t.repos.length ? t.repos.join(', ') : '');
@@ -1254,11 +1362,17 @@ export class TelegraphPanel {
           + (source ? ' <span style="opacity:0.55">(' + esc(source) + ')</span>' : '')
           + '</div></div>';
       }
-      html += '</div></div>';
     }
-
-    // wwuid
-    html += '<div style="font-family:monospace;font-size:10px;opacity:0.5;word-break:break-all">' + esc(w.wwuid || '') + '</div>';
+    // Add archived overlay as timeline item if present for actor — show actual actor identity
+    const archivedIso = (activeTab === 'inbox' ? w.recipient_archived_at : (activeTab === 'outbox' ? w.sender_archived_at : (w.recipient_archived_at || w.sender_archived_at)));
+    if (archivedIso) {
+      const archivedActor = (activeTab === 'inbox') ? (w.to || 'recipient') : (activeTab === 'outbox') ? (w.from || 'sender') : (w.recipient || w.sender || w.from || w.to || 'actor');
+      html += '<div class="timeline-item"><div class="timeline-dot"></div><div>'
+        + '<strong>archived</strong> — ' + esc(fmtDate(archivedIso))
+        + (archivedActor ? ' <span style="opacity:0.7">by ' + esc(archivedActor) + '</span>' : '')
+        + '</div></div>';
+    }
+    html += '</div></div>';
 
     // Push bar + actions
     const status = w.status || 'received';
@@ -1269,6 +1383,7 @@ export class TelegraphPanel {
       + '<button class="btn btn-secondary" data-push="claude">→ Claude</button>'
       + '<button class="btn btn-secondary" data-push="codex">→ Codex</button>'
       + (status === 'draft' ? '<button class="btn" data-send-draft="' + esc(w.wwuid) + '">Send</button>' : '')
+      + (status === 'draft' && activeTab === 'outbox' ? '<button class="btn" data-edit="' + esc(w.wwuid) + '">Edit</button>' : '')
       + (status === 'failed' ? '<button class="btn" data-retry-wire="' + esc(w.wwuid) + '">Retry Now</button>' : '')
       + (isInboxWire && !isArchivedActor && (status === 'sent' || status === 'received' || status === 'delivered') ? '<button class="btn" data-mark-read="' + esc(w.wwuid) + '">Mark Read</button>' : '')
       + (isInboxWire && !isArchivedActor && status !== 'draft' ? '<button class="btn" data-reply="' + esc(w.wwuid) + '">↻ Reply</button>' : '')
@@ -1346,6 +1461,18 @@ export class TelegraphPanel {
 
     // Store reply metadata for sending
     window.replyToWwuid = wire.wwuid;
+  }
+
+  function handleEdit(wire) {
+    // Prefill compose drawer with draft wire fields for editing
+    document.getElementById('cTo').value = wire.to || '';
+    document.getElementById('cSubject').value = wire.subject || '';
+    document.getElementById('cBody').value = wire.body || '';
+    document.getElementById('cType').value = wire.type || 'status-update';
+    document.getElementById('composeError').textContent = '';
+    toggleCompose(true);
+    document.getElementById('cBody').focus();
+    window.editingWire = wire.wwuid;
   }
 
   refresh();
