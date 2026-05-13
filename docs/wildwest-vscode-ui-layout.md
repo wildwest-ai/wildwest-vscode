@@ -38,14 +38,16 @@ This document describes the actual Wild West extension UI elements implemented i
 Implemented in `src/StatusBarManager.ts`.
 
 - Status bar item: `wildwest-status`
-  - label template: `${eyeIcon} ${heartDot} ${scopeLabel}`
-  - `eyeIcon` is `$(eye)` when watching, `$(eye-closed)` when not watching
-  - `heartDot` values: `●` for alive, `⚑` for flagged, `○` for dead/not running
-  - `scopeLabel` value is derived from `heartbeatMonitor.detectScope()` and normalized to `Town`, `County`, or `Territory`
+  - icon: `$(eye)` when watching, `$(eye-closed)` when not watching
+  - status dot: `●` for alive, `⚑` for flagged, `○` for dead/not running
+  - label: `${scopeLabel}` derived from `heartbeatMonitor.detectScope()` and normalized to `Town`, `County`, or `Territory`
+  - display content: `${eyeIcon} ${heartDot} ${scopeLabel}`
   - command: `wildwest.sidepanel.focus`
 
 - Identity item: `wildwest-identity`
-  - label text: `$(person) ${identitySetting}` if identity exists, otherwise `$(person) Set identity…`
+  - icon: `$(person)`
+  - label: `${identitySetting}` if identity exists, otherwise `Set identity…`
+  - display content: `$(person) ${identitySetting || 'Set identity…'}`
   - `identitySetting` is loaded from `wildwest.identity`
   - command: `wildwest.setIdentity`
 
@@ -136,10 +138,10 @@ Implemented in `src/TelegraphPanel.ts`.
 
 ### Panel shell
 
-- `header`
-  - title label: `📬 Telegraph`
-  - button `#btnRefresh` with text `↻`
-  - button `#btnCompose` with text `✎ Compose`
+- header container `div.header`
+  - heading element `h2` with text content `📬 Telegraph`
+  - button `#btnRefresh` with icon-only display content `↻`
+  - button `#btnCompose` with display content `✎ Compose`
 
 - tab bar `div.tabs` — 3 tabs total
   - tab `div.tab[data-tab="inbox"]` with label `Inbox`
@@ -165,13 +167,13 @@ Implemented in `src/TelegraphPanel.ts`.
 ### Bulk action UI
 
 - bulk action bar `#bulkBar`
-  - checkbox `#selectAll`
+  - checkbox `#selectAll` with label `All`
     - selects all visible wires in the current tab list
   - status label span `#selectedCount` with text `0 selected` when empty
   - dropdown `#bulkStatus`
     - option values: `draft`, `pending`, `sent`, `delivered`, `archived`
-  - button `#bulkApply` with text `Apply`
-  - button `#bulkClear` with text `✕`
+  - button `#bulkApply` with text content `Apply`
+  - button `#bulkClear` with icon-only display content `✕`
   - bar visibility toggles based on `selectedWwuids.size`
 
 ### Main layout
@@ -208,15 +210,15 @@ Each wire row includes:
 
 ### Wire detail action buttons
 
-Buttons in detail view use `data-*` attributes:
-- `button[data-push="copilot"]` — push formatted wire to Copilot chat
-- `button[data-push="claude"]` — push formatted wire to Claude
-- `button[data-push="codex"]` — push formatted wire to Codex
-- `button[data-send-draft="<wwuid>"]` — send draft wire
-- `button[data-retry-wire="<wwuid>"]` — retry failed wire
-- `button[data-mark-read="<wwuid>"]` — mark the selected inbox wire as read
-- `button[data-reply="<wwuid>"]` — open reply compose draft
-- `button[data-archive="<wwuid>"]` — archive the selected wire locally
+Buttons in detail view use `data-*` attributes and these visible labels:
+- `button[data-push="copilot"]` — label `→ Copilot`
+- `button[data-push="claude"]` — label `→ Claude`
+- `button[data-push="codex"]` — label `→ Codex`
+- `button[data-send-draft="<wwuid>"]` — label `Send`
+- `button[data-retry-wire="<wwuid>"]` — label `Retry Now`
+- `button[data-mark-read="<wwuid>"]` — label `Mark Read`
+- `button[data-reply="<wwuid>"]` — label `↻ Reply`
+- `button[data-archive="<wwuid>"]` — label `Archive`
 
 ### Compose drawer elements
 
@@ -224,7 +226,7 @@ Buttons in detail view use `data-*` attributes:
   - class toggled to `open` when visible
 - form container `.compose-form`
 - field rows `.compose-row`
-- label text `To`, `Type`, `Subject`
+- field labels: `To`, `Type`, `Subject`
 - input `#cTo` with placeholder `CD(RSn)`
 - select `#cType`
   - option values: `status-update`, `assignment`, `scope-change`, `question`, `incident-report`, `request`, `notification`
@@ -233,8 +235,8 @@ Buttons in detail view use `data-*` attributes:
 - prompt dropdown `#promptDropdown`
   - hidden by default via `display:none`
 - error banner `#composeError`
-- button `#btnCancel` with text `Cancel`
-- button `#btnSend` with text `Send`
+- button `#btnCancel` with text content `Cancel`
+- button `#btnSend` with text content `Send`
 
 ### Prompt suggestion UI
 
