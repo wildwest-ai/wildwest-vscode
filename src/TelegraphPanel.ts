@@ -709,9 +709,12 @@ export class TelegraphPanel {
   /* ── Status filter bar ── */
   .status-filter { display: none; gap: 6px; padding: 5px 10px; border-bottom: 1px solid var(--vscode-panel-border); flex-shrink: 0; }
   .status-filter.visible { display: flex; }
-  .sf-btn { background: none; border: 1px solid var(--vscode-panel-border); color: var(--vscode-descriptionForeground); font-size: 11px; padding: 1px 8px; border-radius: 10px; cursor: pointer; }
+  .sf-btn { background: transparent; border: 1px solid var(--vscode-panel-border); color: var(--vscode-descriptionForeground); font-size: 11px; padding: 4px 8px; border-radius: 10px; cursor: pointer; display:flex; align-items:center; gap:8px; }
   .sf-btn:hover { color: var(--vscode-foreground); }
-  .sf-btn.active { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: var(--vscode-button-background); }
+  /* active state should not use the global selection color; use subtle inset and badge emphasis */
+  .sf-btn.active { background: rgba(0,0,0,0.06); border-color: rgba(0,0,0,0.12); }
+  .chip-checkbox { width:16px; height:16px; accent-color: var(--vscode-button-foreground); }
+  .chip-label { font-size:11px; }
   .chip-count { display: inline-block; font-size: 10px; padding: 0 6px; margin-left: 6px; border-radius: 10px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
 
   /* ── Scope section headers ── */
@@ -883,28 +886,41 @@ export class TelegraphPanel {
     bar.innerHTML = chips.map(c => {
       const active = statusFilterSet && statusFilterSet.has(c.status) ? ' active' : '';
       const count = counts[c.status] || 0;
-      return '<button class="sf-btn' + active + '" data-status="' + c.status + '" aria-pressed="' + (active ? 'true' : 'false') + '" aria-label="' + c.label + ', ' + count + ' items">'
-        + c.label + ' <span class="chip-count">' + count + '</span></button>';
+      return '<button class="sf-btn' + active + '" data-status="' + c.status + '" aria-label="' + c.label + ', ' + count + ' items' + '">' +
+        '<input type="checkbox" class="chip-checkbox" data-status="' + c.status + '" ' + (active ? 'checked' : '') + ' aria-label="Include ' + c.label + '"/>' +
+        '<span class="chip-label">' + c.label + '</span>' +
+        '<span class="chip-count">' + count + '</span>' +
+        '</button>';
     }).join('');
 
-    bar.querySelectorAll('.sf-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const status = btn.dataset.status;
-        // toggle in set
+    // Checkbox change toggles inclusion (multi-select). Clicking the label text selects exclusively.
+    bar.querySelectorAll('.chip-checkbox').forEach(cb => {
+      cb.addEventListener('change', (e) => {
+        e.stopPropagation();
+        const status = cb.dataset.status;
         if (!statusFilterSet) statusFilterSet = initStatusFilterSet(tab);
-        if (statusFilterSet.has(status)) {
-          statusFilterSet.delete(status);
-          btn.classList.remove('active');
-          btn.setAttribute('aria-pressed', 'false');
-        } else {
-          statusFilterSet.add(status);
-          btn.classList.add('active');
-          btn.setAttribute('aria-pressed', 'true');
-        }
-        // persist
+        if (cb.checked) statusFilterSet.add(status);
+        else statusFilterSet.delete(status);
         tabStatusFilters[activeTab] = statusFilterSet;
         clearSelection();
         renderList();
+        renderChips(tab); // refresh visual state
+      });
+    });
+
+    bar.querySelectorAll('.sf-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        // If click originated from the checkbox, the change handler already ran.
+        if (e.target.classList && e.target.classList.contains('chip-checkbox')) return;
+        const status = btn.dataset.status;
+        // Clicking label/text makes this selection exclusive (only this status)
+        if (!statusFilterSet) statusFilterSet = initStatusFilterSet(tab);
+        statusFilterSet.clear();
+        statusFilterSet.add(status);
+        tabStatusFilters[activeTab] = statusFilterSet;
+        clearSelection();
+        renderList();
+        renderChips(tab);
       });
     });
     bar.classList.toggle('visible', tab === 'inbox' || tab === 'outbox');

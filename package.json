@@ -187,7 +187,10 @@
         "command": "wildwest.telegraph",
         "title": "Open Telegraph (telegraph icon)",
         "category": "Wild West",
-        "icon": "media/telegraph.svg"
+        "icon": {
+          "dark": "media/telegraph-dark.svg",
+          "light": "media/telegraph-light.svg"
+        }
       },
       {
         "command": "wildwest.createWire",
