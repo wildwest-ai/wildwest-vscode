@@ -621,6 +621,14 @@ export class TelegraphPanel {
   // ── HTML ──────────────────────────────────────────────────────────────────
 
   private buildHtml(): string {
+    // try to inline the theme-aware SVG so it respects currentColor in the webview
+    let inlineIcon = '';
+    try {
+      const mediaRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+      const iconPath = path.join(mediaRoot, 'media', 'telegraph.svg');
+      if (fs.existsSync(iconPath)) inlineIcon = fs.readFileSync(iconPath, 'utf8');
+    } catch { inlineIcon = ''; }
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -730,9 +738,7 @@ export class TelegraphPanel {
 <div class="header">
   <div class="title">
     <span class="icon" aria-hidden="true">
-      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
-        <path d="M3 6.5A2.5 2.5 0 0 1 5.5 4h13A2.5 2.5 0 0 1 21 6.5v11A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5v-11zM5.2 6.4L12 11.2l6.8-4.8" fill="currentColor" />
-      </svg>
+      ${inlineIcon}
     </span>
     <h2>Telegraph</h2>
   </div>
