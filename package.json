@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/wildwest-ai/wildwest-vscode.git"
   },
-  "version": "0.41.3",
+  "version": "0.42.8",
   "publisher": "wildwest-ai",
   "engines": {
     "vscode": "^1.90.0"
@@ -184,6 +184,15 @@
         "icon": "$(mail)"
       },
       {
+        "command": "wildwest.telegraph",
+        "title": "Open Telegraph (telegraph icon)",
+        "category": "Wild West",
+        "icon": {
+          "dark": "media/telegraph-dark.svg",
+          "light": "media/telegraph-light.svg"
+        }
+      },
+      {
         "command": "wildwest.createWire",
         "title": "Create Wire",
         "category": "Wild West",
@@ -215,7 +224,7 @@
           "group": "navigation"
         },
         {
-          "command": "wildwest.openTelegraphPanel",
+          "command": "wildwest.telegraph",
           "when": "view == wildwest.sidepanel",
           "group": "navigation"
         }
@@ -340,10 +349,13 @@
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
     "test": "jest",
+    "visual:test": "npx playwright test visual-tests",
     "release": "scripts/release.sh"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/jest": "^29.5.0",
+    "@types/jsdom": "^28.0.3",
     "@types/node": "^18.x",
     "@types/uuid": "^10.0.0",
     "@types/vscode": "^1.84.0",
@@ -353,7 +365,9 @@
     "esbuild": "^0.19.x",
     "eslint": "^8.x",
     "jest": "^29.5.0",
+    "jsdom": "^29.1.1",
     "ts-jest": "^29.1.0",
+    "axe-core": "^4.10.0",
     "typescript": "^5.x"
   },
   "dependencies": {

@@ -60,7 +60,7 @@ export class TelegraphPanel {
     }
     const panel = vscode.window.createWebviewPanel(
       TelegraphPanel.viewType,
-      '📬 Telegraph',
+      'Telegraph',
       vscode.ViewColumn.Beside,
       { enableScripts: true, retainContextWhenHidden: true },
     );
@@ -621,6 +621,22 @@ export class TelegraphPanel {
   // ── HTML ──────────────────────────────────────────────────────────────────
 
   private buildHtml(): string {
+    // try to reference the repo media via webview.asWebviewUri (preferred)
+    let iconMarkup = '';
+    try {
+      const mediaRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+      const iconPath = path.join(mediaRoot, 'media', 'telegraph.svg');
+      if (fs.existsSync(iconPath)) {
+        // external URI for webview
+        const uri = this.panel.webview.asWebviewUri(vscode.Uri.file(iconPath));
+        iconMarkup = `<img src="${uri.toString()}" class="svg-external" aria-hidden="true" />`;
+        // also attempt to inline as a robust fallback for theming if reading succeeds
+        try { iconMarkup = fs.readFileSync(iconPath, 'utf8'); } catch { /* keep external img */ }
+      }
+    } catch {
+      iconMarkup = '';
+    }
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -634,6 +650,8 @@ export class TelegraphPanel {
   /* ── Header ── */
   .header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--vscode-panel-border); flex-shrink: 0; }
   .header h2 { font-size: 13px; font-weight: 600; }
+  .title { display:flex; align-items:center; gap:8px; }
+  .title .icon svg { width:18px; height:18px; fill:currentColor; display:block; }
   .btn { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; padding: 4px 10px; border-radius: 3px; cursor: pointer; font-size: 12px; }
   .btn:hover { background: var(--vscode-button-hoverBackground); }
   .btn-secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
@@ -644,7 +662,7 @@ export class TelegraphPanel {
   .tab { padding: 6px 14px; font-size: 12px; cursor: pointer; border-bottom: 2px solid transparent; color: var(--vscode-descriptionForeground); user-select: none; }
   .tab:hover { color: var(--vscode-foreground); }
   .tab.active { color: var(--vscode-foreground); border-bottom-color: var(--vscode-focusBorder); }
-  .tab .badge { display: inline-block; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); font-size: 10px; border-radius: 8px; padding: 0 5px; margin-left: 4px; }
+  .tab .badge { display: inline-block; background: transparent; color: var(--vscode-descriptionForeground); font-size: 10px; border-radius: 6px; padding: 0 3px; margin-left: 4px; }
 
   /* ── Search (All tab) ── */
   .search-bar { padding: 6px 10px; border-bottom: 1px solid var(--vscode-panel-border); flex-shrink: 0; display: none; }
@@ -653,6 +671,10 @@ export class TelegraphPanel {
 
   /* ── Main layout ── */
   .main { display: flex; flex: 1; overflow: hidden; }
+
+  /* draggable divider between list and detail */
+  .divider { width: 6px; cursor: col-resize; background: transparent; flex-shrink: 0; }
+  .divider:hover { background: rgba(128,128,128,0.06); }
 
   /* ── Wire list ── */
   .list-pane { width: 240px; flex-shrink: 0; border-right: 1px solid var(--vscode-panel-border); overflow-y: auto; display: flex; flex-direction: column; }
@@ -689,11 +711,15 @@ export class TelegraphPanel {
   .section-label { font-size: 11px; font-weight: 600; color: var(--vscode-descriptionForeground); text-transform: uppercase; letter-spacing: 0.05em; }
 
   /* ── Status filter bar ── */
-  .status-filter { display: none; gap: 6px; padding: 5px 10px; border-bottom: 1px solid var(--vscode-panel-border); flex-shrink: 0; }
+  .status-filter { display: none; gap: 0px; padding: 5px 10px; border-bottom: 1px solid var(--vscode-panel-border); flex-shrink: 0; }
   .status-filter.visible { display: flex; }
-  .sf-btn { background: none; border: 1px solid var(--vscode-panel-border); color: var(--vscode-descriptionForeground); font-size: 11px; padding: 1px 8px; border-radius: 10px; cursor: pointer; }
+  /* chips: compact, no rounded outline; active state shows a horizontal bottom bar like tabs */
+  .sf-btn { background: transparent; border: none; color: var(--vscode-descriptionForeground); font-size: 11px; padding: 6px 8px; border-radius: 0; cursor: pointer; display:flex; align-items:center; gap:4px; }
   .sf-btn:hover { color: var(--vscode-foreground); }
-  .sf-btn.active { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: var(--vscode-button-background); }
+  .sf-btn.active { background: transparent; color: var(--vscode-foreground); border-bottom: 2px solid var(--vscode-focusBorder); padding-bottom: 4px; }
+  .chip-checkbox { width:12px; height:12px; accent-color: var(--vscode-button-foreground); }
+  .chip-label { font-size:11px; }
+  .chip-count { display: inline-block; font-size: 10px; padding: 0; margin-left: 4px; border-radius: 6px; background: transparent; color: var(--vscode-descriptionForeground); }
 
   /* ── Scope section headers ── */
   .scope-header { font-size: 10px; font-weight: 700; color: var(--vscode-descriptionForeground); text-transform: uppercase; letter-spacing: 0.07em; padding: 8px 10px 3px; opacity: 0.6; }
@@ -724,12 +750,24 @@ export class TelegraphPanel {
 </head>
 <body>
 
-<div class="header">
-  <h2>📬 Telegraph</h2>
-  <div style="display:flex;gap:6px">
-    <button class="btn btn-secondary" id="btnRefresh">↻</button>
-    <button class="btn" id="btnCompose">✎ Compose</button>
+    <div class="header">
+  <div class="title">
+    <span class="icon" aria-hidden="true">
+      ${iconMarkup}
+    </span>
+    <h2>Telegraph</h2>
   </div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button class="btn btn-secondary" id="btnRefresh">↻</button>
+      <button class="btn" id="btnCompose">✎ Compose</button>
+      <button class="btn" id="btnSettings" title="Settings">⚙︎</button>
+      <div id="settingsMenu" style="display:none;position:relative">
+        <div id="settingsPopover" role="dialog" aria-label="Telegraph settings" style="position:absolute;right:0;top:28px;background:var(--vscode-editor-background);border:1px solid var(--vscode-panel-border);padding:8px;border-radius:4px;box-shadow:0 6px 18px rgba(0,0,0,0.2);width:260px;z-index:200">
+          <div style="font-size:12px;font-weight:600;margin-bottom:6px">Telegraph Settings</div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px"><input type="checkbox" id="hideZeroStatus"/> Hide Pending/Failed status chips when count is 0</label>
+        </div>
+      </div>
+    </div>
 </div>
 
 <div class="tabs">
@@ -761,15 +799,14 @@ export class TelegraphPanel {
 
 <div class="main">
   <div class="list-pane" id="listPane"></div>
-  <div class="detail-pane empty-detail" id="detailPane">
-    <span>Select a wire to read</span>
-  </div>
+  <div class="divider" id="divider" role="separator" aria-orientation="vertical" tabindex="0"></div>
+  <div class="detail-pane empty-detail" id="detailPane"></div>
 </div>
 
 <div class="compose-drawer" id="composeDrawer">
   <div class="compose-form">
-    <div class="compose-row"><label>To</label><input id="cTo" placeholder="CD(RSn)" /></div>
-    <div class="compose-row"><label>Type</label>
+    <div class="compose-row"><label for="cTo">To</label><input id="cTo" placeholder="CD(RSn)" /></div>
+    <div class="compose-row"><label for="cType">Type</label>
       <select id="cType">
         <option>status-update</option>
         <option>assignment</option>
@@ -780,7 +817,7 @@ export class TelegraphPanel {
         <option>notification</option>
       </select>
     </div>
-    <div class="compose-row"><label>Subject</label><input id="cSubject" placeholder="my-topic-slug" /></div>
+    <div class="compose-row"><label for="cSubject">Subject</label><input id="cSubject" placeholder="my-topic-slug" /></div>
     <div style="position:relative">
       <textarea class="compose-body" id="cBody" placeholder="Wire body… (type 3+ chars to see past prompts)" autocomplete="off"></textarea>
       <div id="promptDropdown" style="display:none;position:absolute;bottom:100%;left:0;right:0;max-height:160px;overflow-y:auto;background:var(--vscode-editorSuggestWidget-background,var(--vscode-input-background));border:1px solid var(--vscode-editorSuggestWidget-border,#555);z-index:100;font-size:11px;"></div>
@@ -801,12 +838,15 @@ export class TelegraphPanel {
   let actorAlias = '';
   let flatAvailable = false;
   let activeTab = 'inbox';
-  let statusFilter = null;   // will be initialized to first chip's status
+  // status filter sets per tab (multi-select chips)
+  let statusFilterSet = null; // Set<string> for currently active tab
   let selectedWwuid = null;
   let pendingFormatted = '';
   let searchQuery = '';
   let selectedWwuids = new Set();
-  let tabStatusFilters = {};   // persist statusFilter per tab
+  let tabStatusFilters = {};   // persist Set<string> per tab
+  // UI prefs
+  let hideZeroStatus = true; // default: hide Pending/Failed when count is 0
 
   const CHIP_CONFIG = {
     inbox:  [
@@ -828,31 +868,84 @@ export class TelegraphPanel {
   };
 
   // Initialize statusFilter to first chip's status for current tab
-  function initStatusFilter(tab) {
+  function initStatusFilterSet(tab) {
     if (!tabStatusFilters[tab]) {
       const chips = CHIP_CONFIG[tab] || [];
-      tabStatusFilters[tab] = chips.length > 0 ? chips[0].status : 'all';
+      const s = new Set();
+      if (chips.length > 0) s.add(chips[0].status);
+      tabStatusFilters[tab] = s;
     }
     return tabStatusFilters[tab];
   }
-  statusFilter = initStatusFilter('inbox');
+  statusFilterSet = initStatusFilterSet('inbox');
 
   // ── Chip rendering ────────────────────────────────────────────────────────
 
   function renderChips(tab) {
     const bar = document.getElementById('statusFilter');
     const chips = CHIP_CONFIG[tab] || [];
-    bar.innerHTML = chips.map(c =>
-      '<button class="sf-btn' + (c.status === statusFilter ? ' active' : '') + '" data-status="' + c.status + '">' + c.label + '</button>'
-    ).join('');
-    bar.querySelectorAll('.sf-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        bar.querySelectorAll('.sf-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        statusFilter = btn.dataset.status;
-        tabStatusFilters[activeTab] = statusFilter;   // persist for this tab
+    // compute counts based on base list — archived counts are exclusive
+    // compute counts based on base list — archived counts are exclusive
+    const base = tab === 'inbox' ? inboxWires : outboxWires;
+    const counts = {};
+    for (const c of chips) counts[c.status] = 0;
+    for (const w of base) {
+      const archived = w.recipient_archived_at || w.sender_archived_at || false;
+      if (archived) {
+        if (counts['archived'] !== undefined) counts['archived']++;
+        continue;
+      }
+      const st = (w.status || (tab === 'inbox' ? 'sent' : 'sent'));
+      if (counts[st] !== undefined) counts[st]++;
+      // If 'all' bucket exists, we'll set it after counting
+    }
+    if (counts['all'] !== undefined) counts['all'] = base.length;
+
+    // If user prefers, hide zero-count Pending/Failed chips by default
+    const visibleChips = chips.filter(c => {
+      if (!hideZeroStatus) return true;
+      if ((c.status === 'pending' || c.status === 'failed') && (counts[c.status] || 0) === 0) return false;
+      return true;
+    });
+
+    bar.innerHTML = visibleChips.map(c => {
+      const active = statusFilterSet && statusFilterSet.has(c.status) ? ' active' : '';
+      const count = counts[c.status] || 0;
+      return '<button class="sf-btn' + active + '" data-status="' + c.status + '" aria-label="' + c.label + ', ' + count + ' items' + '">' +
+        '<input type="checkbox" class="chip-checkbox" data-status="' + c.status + '" ' + (active ? 'checked' : '') + ' aria-label="Include ' + c.label + '"/>' +
+        '<span class="chip-label">' + c.label + '</span>' +
+        '<span class="chip-count">' + count + '</span>' +
+        '</button>';
+    }).join('');
+
+    // Checkbox change toggles inclusion (multi-select). Clicking the label text selects exclusively.
+    bar.querySelectorAll('.chip-checkbox').forEach(cb => {
+      cb.addEventListener('change', (e) => {
+        e.stopPropagation();
+        const status = cb.dataset.status;
+        if (!statusFilterSet) statusFilterSet = initStatusFilterSet(tab);
+        if (cb.checked) statusFilterSet.add(status);
+        else statusFilterSet.delete(status);
+        tabStatusFilters[activeTab] = statusFilterSet;
         clearSelection();
         renderList();
+        renderChips(tab); // refresh visual state
+      });
+    });
+
+    bar.querySelectorAll('.sf-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        // If click originated from the checkbox, the change handler already ran.
+        if (e.target.classList && e.target.classList.contains('chip-checkbox')) return;
+        const status = btn.dataset.status;
+        // Clicking label/text makes this selection exclusive (only this status)
+        if (!statusFilterSet) statusFilterSet = initStatusFilterSet(tab);
+        statusFilterSet.clear();
+        statusFilterSet.add(status);
+        tabStatusFilters[activeTab] = statusFilterSet;
+        clearSelection();
+        renderList();
+        renderChips(tab);
       });
     });
     bar.classList.toggle('visible', tab === 'inbox' || tab === 'outbox');
@@ -866,7 +959,7 @@ export class TelegraphPanel {
       tab.classList.add('active');
       activeTab = tab.dataset.tab;
       // Restore or initialize statusFilter for the tab
-      statusFilter = initStatusFilter(activeTab);
+      statusFilterSet = initStatusFilterSet(activeTab);
       document.getElementById('searchBar').classList.toggle('visible', activeTab === 'all');
       clearSelection();
       renderChips(activeTab);
@@ -876,6 +969,63 @@ export class TelegraphPanel {
 
   // Initial chip render
   renderChips('inbox');
+
+  // ===== Settings init =====
+  try {
+    const storedHide = localStorage.getItem('telegraph.hideZeroStatus');
+    hideZeroStatus = storedHide === null ? true : (storedHide === 'true');
+  } catch (e) { hideZeroStatus = true; }
+  // sync checkbox if present
+  const hideCb = document.getElementById('hideZeroStatus');
+  if (hideCb) hideCb.checked = hideZeroStatus;
+  // settings button
+  const btnSettings = document.getElementById('btnSettings');
+  const settingsMenu = document.getElementById('settingsMenu');
+  if (btnSettings && settingsMenu) {
+    btnSettings.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      settingsMenu.style.display = settingsMenu.style.display === 'block' ? 'none' : 'block';
+      // ensure checkbox reflects state
+      const cb = document.getElementById('hideZeroStatus'); if (cb) cb.checked = hideZeroStatus;
+    });
+    document.addEventListener('click', () => { if (settingsMenu) settingsMenu.style.display = 'none'; });
+    const cbEl = document.getElementById('hideZeroStatus');
+    if (cbEl) cbEl.addEventListener('change', (e) => {
+      hideZeroStatus = e.target.checked;
+      try { localStorage.setItem('telegraph.hideZeroStatus', hideZeroStatus ? 'true' : 'false'); } catch (e) {}
+      renderChips(activeTab);
+    });
+  }
+
+  // ===== Divider (resizable left pane) =====
+  (function(){
+    const listPane = document.getElementById('listPane');
+    const divider = document.getElementById('divider');
+    if (!listPane || !divider) return;
+    // restore width
+    try { const w = localStorage.getItem('telegraph.listWidth'); if (w) listPane.style.width = w; } catch (e) {}
+    let dragging = false;
+    const minW = 160; const maxW = 900;
+    divider.addEventListener('mousedown', (e) => {
+      dragging = true; document.body.style.userSelect = 'none';
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const rect = document.body.getBoundingClientRect();
+      const newW = Math.max(minW, Math.min(maxW, e.clientX - rect.left));
+      listPane.style.width = newW + 'px';
+    });
+    window.addEventListener('mouseup', () => {
+      if (!dragging) return; dragging = false; document.body.style.userSelect = '';
+      try { localStorage.setItem('telegraph.listWidth', listPane.style.width); } catch (e) {}
+    });
+    // keyboard support
+    divider.addEventListener('keydown', (e) => {
+      const cur = parseInt(getComputedStyle(listPane).width, 10) || 240;
+      if (e.key === 'ArrowLeft') { const nw = Math.max(minW, cur - 16); listPane.style.width = nw + 'px'; try{localStorage.setItem('telegraph.listWidth', listPane.style.width);}catch{ } }
+      if (e.key === 'ArrowRight') { const nw = Math.min(maxW, cur + 16); listPane.style.width = nw + 'px'; try{localStorage.setItem('telegraph.listWidth', listPane.style.width);}catch{ } }
+    });
+  })();
 
   document.getElementById('searchInput').addEventListener('input', (e) => {
     searchQuery = e.target.value.toLowerCase();
@@ -888,7 +1038,9 @@ export class TelegraphPanel {
 
   function clearSelection() {
     selectedWwuids.clear();
+    selectedWwuid = null;
     updateBulkBar();
+    renderDetail(null);
   }
 
   function updateBulkBar() {
@@ -953,6 +1105,12 @@ export class TelegraphPanel {
       if (ww) handleReply(ww);
       return;
     }
+    const editBtn = e.target.closest('[data-edit]');
+    if (editBtn) {
+      const ww = [...inboxWires, ...outboxWires, ...allWires].find(x => x.wwuid === editBtn.dataset.edit);
+      if (ww) handleEdit(ww);
+      return;
+    }
     const sendDraftBtn = e.target.closest('[data-send-draft]');
     if (sendDraftBtn) { vscode.postMessage({ type: 'sendDraft', wwuid: sendDraftBtn.dataset.sendDraft }); }
   });
@@ -969,7 +1127,9 @@ export class TelegraphPanel {
       document.getElementById('badgeInbox').textContent  = inboxWires.length;
       document.getElementById('badgeOutbox').textContent = outboxWires.length;
       document.getElementById('badgeAll').textContent    = allWires.length;
+      // Update chips counts and list after wires arrive
       clearSelection();
+      renderChips(activeTab);
       renderList();
       if (selectedWwuid) renderDetail(selectedWwuid);
     }
@@ -1052,9 +1212,24 @@ export class TelegraphPanel {
       );
     }
     const base = activeTab === 'inbox' ? inboxWires : outboxWires;
-    if (statusFilter === 'all') return base;
-    if (statusFilter === 'archived') return base.filter(w => isArchivedForActor(w));
-    return base.filter(w => !isArchivedForActor(w) && (w.status || 'sent') === statusFilter);
+    // if no filters selected, return empty list (user-cleared selection => show none)
+    const set = tabStatusFilters[activeTab] || new Set();
+    if (set.size === 0) return [];
+    // if 'all' present, return base
+    if (set.has('all')) return base;
+    // include archived if selected
+    const wantsArchived = set.has('archived');
+    const wanted = Array.from(set).filter(s => s !== 'archived');
+    return base.filter(w => {
+      // If only 'archived' is selected, return archived items only
+      if (wantsArchived && wanted.length === 0) return isArchivedForActor(w);
+      // If archived is selected along with other statuses, include archived items as well
+      if (wantsArchived && isArchivedForActor(w)) return true;
+      // Otherwise, if no non-archived statuses selected, show non-archived items
+      if (wanted.length === 0) return !isArchivedForActor(w);
+      const st = (w.status || 'sent');
+      return wanted.includes(st) && !isArchivedForActor(w);
+    });
   }
 
   function renderList() {
@@ -1063,10 +1238,17 @@ export class TelegraphPanel {
     if (list.length === 0) {
       const msg = !flatAvailable
         ? 'telegraph/flat/ not found'
-        : activeTab === 'inbox'  ? (statusFilter !== 'all' ? 'No ' + statusFilter + ' wires' : 'Inbox empty')
-        : activeTab === 'outbox' ? (statusFilter !== 'all' ? 'No ' + statusFilter + ' wires' : 'No sent wires')
-        : searchQuery            ? 'No matches'
-        : 'No wires';
+        : (function(){
+            if (activeTab === 'all') return searchQuery ? 'No matches' : 'No wires';
+            const set = tabStatusFilters[activeTab] || new Set();
+            if (set.size === 0) return activeTab === 'inbox' ? 'No New wires' : 'No Draft wires';
+            if (set.has('all')) return activeTab === 'inbox' ? 'Inbox empty' : 'No sent wires';
+            // show first selected label if possible
+            const first = Array.from(set)[0];
+            const cfg = CHIP_CONFIG[activeTab] || [];
+            const found = cfg.find(c => c.status === first);
+            return 'No ' + (found ? found.label : first) + ' wires';
+          })();
       pane.innerHTML = '<div class="empty-list">' + esc(msg) + '</div>';
       return;
     }
@@ -1092,15 +1274,29 @@ export class TelegraphPanel {
   function wireRow(w) {
     const active = w.wwuid === selectedWwuid ? ' active' : '';
     const checked = selectedWwuids.has(w.wwuid) ? ' checked' : '';
-    const dateStr = w.date ? new Date(w.date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
-    const statusLabel = w.status === 'sent' ? 'New' : (w.status || '');
-    const statusBadge = '<span class="badge-status badge-' + esc(w.status || 'sent') + '">' + esc(statusLabel) + '</span>';
+    // If this wire is archived for the current actor, show 'Archived' badge and archived timestamp in meta
+    const archivedForActor = isArchivedForActor(w);
+    // show date + time in list rows
+    let dateStr = w.date ? fmtDate(w.date) : '';
+    let statusLabel = w.status === 'sent' ? 'New' : (w.status || '');
+    let statusBadge = '<span class="badge-status badge-' + esc(w.status || 'sent') + '">' + esc(statusLabel) + '</span>';
+    if (archivedForActor) {
+      statusLabel = 'Archived';
+      statusBadge = '<span class="badge-status badge-archived">' + esc(statusLabel) + '</span>';
+      // prefer actor-specific archived timestamp when present
+      const archivedIso = (activeTab === 'inbox' ? w.recipient_archived_at : (activeTab === 'outbox' ? w.sender_archived_at : (w.recipient_archived_at || w.sender_archived_at || w.archived_at)));
+      if (archivedIso) {
+        try { dateStr = fmtDate(archivedIso); } catch (e) { /* ignore */ }
+      }
+    }
     const shortId = w.wwuid ? w.wwuid.slice(0, 8) : '—';
+    // For outbox rows, show To: <recipient>, for inbox show From: <sender>
+    const addrDisplay = activeTab === 'outbox' ? ('To: ' + esc(w.to || '—')) : ('From: ' + esc(w.from || '—'));
     return '<div class="wire-row' + active + '" data-wwuid="' + esc(w.wwuid) + '">'
       + '<input type="checkbox" class="wire-check"' + checked + ' data-wwuid="' + esc(w.wwuid) + '">'
       + '<div class="wire-content">'
       + '<div class="subject">' + esc(w.subject || w.filename || '—') + '</div>'
-      + '<div class="meta">' + statusBadge + ' <span>' + esc(w.from || w.to || '') + '</span> <span>' + esc(dateStr) + '</span></div>'
+      + '<div class="meta">' + statusBadge + ' <span>' + addrDisplay + '</span> <span>' + esc(dateStr) + '</span></div>'
       + '<div class="meta" style="opacity:0.45;font-family:monospace">' + esc(shortId) + '</div>'
       + '</div>'
       + '</div>';
@@ -1151,9 +1347,12 @@ export class TelegraphPanel {
     html += '<div class="wire-body' + (bodyText ? '' : ' empty') + '">'
       + (bodyText ? esc(bodyText) : '(no body)') + '</div>';
 
-    // Status timeline
+    // Wire Id (show above timeline)
+    html += '<div style="font-family:monospace;font-size:11px;margin-top:12px;margin-bottom:8px;opacity:0.8">Wire Id: ' + esc(w.wwuid || '') + '</div>';
+
+    // Status timeline (include status_transitions and actor-specific archive overlay)
+    html += '<div><div class="section-label" style="margin-bottom:6px">Timeline</div><div class="timeline">';
     if (w.status_transitions && w.status_transitions.length > 0) {
-      html += '<div><div class="section-label" style="margin-bottom:6px">Timeline</div><div class="timeline">';
       for (const t of w.status_transitions) {
         const actor = [t.by, t.scope, t.alias].filter(Boolean).join(' · ');
         const source = [t.tool, t.source].filter(Boolean).join(' / ') || (t.repos && t.repos.length ? t.repos.join(', ') : '');
@@ -1163,11 +1362,17 @@ export class TelegraphPanel {
           + (source ? ' <span style="opacity:0.55">(' + esc(source) + ')</span>' : '')
           + '</div></div>';
       }
-      html += '</div></div>';
     }
-
-    // wwuid
-    html += '<div style="font-family:monospace;font-size:10px;opacity:0.5;word-break:break-all">' + esc(w.wwuid || '') + '</div>';
+    // Add archived overlay as timeline item if present for actor — show actual actor identity
+    const archivedIso = (activeTab === 'inbox' ? w.recipient_archived_at : (activeTab === 'outbox' ? w.sender_archived_at : (w.recipient_archived_at || w.sender_archived_at)));
+    if (archivedIso) {
+      const archivedActor = (activeTab === 'inbox') ? (w.to || 'recipient') : (activeTab === 'outbox') ? (w.from || 'sender') : (w.recipient || w.sender || w.from || w.to || 'actor');
+      html += '<div class="timeline-item"><div class="timeline-dot"></div><div>'
+        + '<strong>archived</strong> — ' + esc(fmtDate(archivedIso))
+        + (archivedActor ? ' <span style="opacity:0.7">by ' + esc(archivedActor) + '</span>' : '')
+        + '</div></div>';
+    }
+    html += '</div></div>';
 
     // Push bar + actions
     const status = w.status || 'received';
@@ -1178,6 +1383,7 @@ export class TelegraphPanel {
       + '<button class="btn btn-secondary" data-push="claude">→ Claude</button>'
       + '<button class="btn btn-secondary" data-push="codex">→ Codex</button>'
       + (status === 'draft' ? '<button class="btn" data-send-draft="' + esc(w.wwuid) + '">Send</button>' : '')
+      + (status === 'draft' && activeTab === 'outbox' ? '<button class="btn" data-edit="' + esc(w.wwuid) + '">Edit</button>' : '')
       + (status === 'failed' ? '<button class="btn" data-retry-wire="' + esc(w.wwuid) + '">Retry Now</button>' : '')
       + (isInboxWire && !isArchivedActor && (status === 'sent' || status === 'received' || status === 'delivered') ? '<button class="btn" data-mark-read="' + esc(w.wwuid) + '">Mark Read</button>' : '')
       + (isInboxWire && !isArchivedActor && status !== 'draft' ? '<button class="btn" data-reply="' + esc(w.wwuid) + '">↻ Reply</button>' : '')
@@ -1255,6 +1461,18 @@ export class TelegraphPanel {
 
     // Store reply metadata for sending
     window.replyToWwuid = wire.wwuid;
+  }
+
+  function handleEdit(wire) {
+    // Prefill compose drawer with draft wire fields for editing
+    document.getElementById('cTo').value = wire.to || '';
+    document.getElementById('cSubject').value = wire.subject || '';
+    document.getElementById('cBody').value = wire.body || '';
+    document.getElementById('cType').value = wire.type || 'status-update';
+    document.getElementById('composeError').textContent = '';
+    toggleCompose(true);
+    document.getElementById('cBody').focus();
+    window.editingWire = wire.wwuid;
   }
 
   refresh();

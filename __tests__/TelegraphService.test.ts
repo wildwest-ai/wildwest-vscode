@@ -72,7 +72,8 @@ describe('telegraphISOTimestamp()', () => {
 
 describe('inboxPath() / outboxPath()', () => {
   it('appends inbox subdirectory', () => {
-    expect(inboxPath('/tmp/telegraph')).toBe(path.join('/tmp/telegraph', 'inbox'));
+    // inboxPath now maps to the flat cache directory
+    expect(inboxPath('/tmp/telegraph')).toBe(path.join('/tmp/telegraph', 'flat'));
   });
 
   it('appends outbox subdirectory', () => {
