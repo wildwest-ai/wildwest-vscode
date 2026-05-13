@@ -39,4 +39,20 @@ test('header and status filter visual snapshot', async ({ page }) => {
   await expect(header).toHaveScreenshot('header.png');
   const status = await page.locator('#statusFilter');
   await expect(status).toHaveScreenshot('status-filter.png');
+
+  // Accessibility: inject axe-core and run checks
+  const axePath = path.join(__dirname, '..', 'node_modules', 'axe-core', 'axe.min.js');
+  if (fs.existsSync(axePath)) {
+    await page.addScriptTag({ path: axePath });
+    const results = await page.evaluate(async () => {
+      // @ts-ignore
+      return await (window as any).axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] } });
+    });
+    const violations = results.violations || [];
+    if (violations.length > 0) {
+      const out = path.join(__dirname, 'axe-violations.json');
+      fs.writeFileSync(out, JSON.stringify(violations, null, 2));
+      throw new Error('Accessibility violations found; details written to ' + out);
+    }
+  }
 });
