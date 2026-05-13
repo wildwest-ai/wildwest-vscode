@@ -326,3 +326,97 @@ The extension UI is built around:
 - markdown preview session export,
 - command palette integration,
 - and output channel logging.
+
+## 8. Selectors & IDs
+
+Provide an authoritative mapping of DOM selectors and element IDs used by the Telegraph webview and other UI surfaces. This is useful for tests, automation, and designers.
+
+- `#badgeInbox` — Inbox tab badge (source: `src/TelegraphPanel.ts`).
+- `#badgeOutbox` — Outbox tab badge.
+- `#badgeAll` — All tab badge.
+- `#btnRefresh` — header refresh button.
+- `#btnCompose` — header compose button.
+- `.tab[data-tab="inbox"]`, `.tab[data-tab="outbox"]`, `.tab[data-tab="all"]` — tab elements.
+- `#searchInput` — search input in `all` tab.
+- `#composeDrawer` — compose drawer container; `.compose-form` fields inside.
+- `.wire-row[data-wwuid]` — wire list row selector (data attribute contains `wwuid`).
+- `.wire-check[data-wwuid]` — per-row checkbox.
+- `#listPane` / `#detailPane` — primary split panes.
+
+When adding or changing selectors, update this section as the single source of truth.
+
+## 9. CSS & Theming
+
+Document the CSS classes and theme tokens used for key visual semantics.
+
+- Badge styling: `.tab .badge` uses VS Code theme tokens: `var(--vscode-badge-background)` and `var(--vscode-badge-foreground)` so badge color is theme-aware and not a semantic alert color.
+- Status badges: `.badge-status.<status>` map to semantic styles (e.g., `badge-status.sent`, `badge-status.failed`). Keep these visually secondary and avoid using red/orange solely to indicate count metadata.
+- Use `color: var(--vscode-foreground)` and `background: transparent` for neutral metadata where appropriate.
+
+Guideline: badges must remain decorative/count-only; do not rely on color alone to communicate read/unread or error states (also see Accessibility).
+
+## 10. Accessibility & Keyboard
+
+Checklist for webview and side panel accessibility:
+
+- Tablist semantics: mark the tab container with `role="tablist"` and each `.tab` with `role="tab"`, include `aria-selected="true|false"` and `aria-controls` referencing the panel ID.
+- Keyboard navigation: Left/Right/Home/End should move focus between tabs; Enter/Space activates a tab.
+- Buttons: ensure all icon-only buttons have `aria-label` attributes (`#btnRefresh` → `aria-label="Refresh"`).
+- Focus management: when opening the compose drawer, move focus to the first form input and return focus when closed.
+- Color contrast: ensure badges, status badges, and important icons meet WCAG contrast requirements in light/dark/high-contrast themes.
+- Screen reader text: provide visually-hidden labels for content that is icon-only (e.g., compose, refresh, reply actions).
+
+Run automated accessibility checks (axe-core) against the webview HTML during PRs.
+
+## 11. Localization
+
+Plan for UI text localization:
+
+- Extract static strings from webview HTML/JS into a single message map (e.g., `i18n.json`) so translations can be added later.
+- Side panel labels, view titles, tooltips, placeholder text and button labels should reference the message map, not hard-coded English strings.
+- Document which strings are intentionally English-only (if any) and why.
+
+## 12. UI Tests & Automation
+
+Test guidance to prevent regressions:
+
+- Unit tests: assert that required selectors exist and that host <-> webview message contracts operate (expand `TelegraphPanel` tests to assert selectors listed in Section 8).
+- Visual regression: add Playwright/CSS snapshot tests for header, tabs, and detail view in light and dark themes.
+- Accessibility tests: integrate axe-core checks in CI for the webview HTML snapshot.
+- E2E: if feasible, create a Playwright scenario that opens the webview panel and exercises tab switching, compose flow, and bulk actions.
+
+## 13. PostMessage Contract (Host ↔ Webview)
+
+Document the message types and payload shapes used by `window.postMessage` between webview and extension host. Example (informal):
+
+- From host -> webview:
+  - `{ type: 'data:update', payload: { inbox: [...], outbox: [...] } }`
+  - `{ type: 'status:error', payload: { message: '...' } }`
+- From webview -> host:
+  - `{ type: 'telegraph:refresh' }`
+  - `{ type: 'telegraph:compose', payload: { to, type, subject, body } }`
+  - `{ type: 'telegraph:select', payload: { wwuid } }`
+
+Keep precise JSON schemas adjacent to the implementation (`src/TelegraphPanel.ts`) and update this doc on contract changes.
+
+## 14. Behavioral Edge Cases
+
+Document expected behavior for edge conditions:
+
+- Narrow widths: tabs should overflow gracefully and the detail pane should collapse below the list pane.
+- Long subject lines: truncate with ellipsis and expose full value on tooltip or via detail view.
+- Empty lists: render clear empty-state UI with a muted icon and action to compose or refresh.
+- Host disconnected / errors: show an inline error banner with retry link and a clear explainable message.
+
+## 15. Branch Implementation Checklist
+
+Use the following checklist when implementing the `feat/telegraph-ui-ux-improvement` branch. Each item should be done and reviewed in-branch before merging to `main`.
+
+- Add `Selectors & IDs` table in this doc (done).
+- Add or update CSS rules to ensure badge semantics remain neutral and use theme tokens.
+- Add `media/telegraph.svg` placeholder in-branch and a `contributes.commands` entry `wildwest.telegraph` (icon points to the placeholder).
+- Replace `📬` in the webview header with an icon-driven element and ensure accessible labeling.
+- Add unit tests asserting selectors and message contract behavior.
+- Add visual snapshots for header/tabs in light/dark themes.
+- Run accessibility checks and fix issues found.
+
