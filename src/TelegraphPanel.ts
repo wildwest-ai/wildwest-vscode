@@ -290,6 +290,9 @@ export class TelegraphPanel {
       case 'sendDraft':
         this.handleSendDraft(msg['wwuid'] as string);
         break;
+      case 'saveDraft':
+        this.handleSaveDraft(msg);
+        break;
       case 'retryWire':
         this.handleRetryWire(msg['wwuid'] as string);
         break;
@@ -346,6 +349,52 @@ export class TelegraphPanel {
     this.panel.webview.postMessage({ type: 'sent', wire });
     this.heartbeat?.deliverOutboxNow();
     this.sendWires();
+  }
+
+  private handleSaveDraft(msg: Record<string, unknown>): void {
+    const to = (msg['to'] as string ?? '').trim();
+    const type = (msg['wireType'] as string ?? 'status-update').trim();
+    const subject = (msg['subject'] as string ?? '').trim();
+    const body = (msg['body'] as string ?? '').trim();
+    const editingWwuid = (msg['wwuid'] as string) || null;
+
+    const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+    const alias = readRegistryAlias(path.join(wsPath, '.wildwest'));
+    const identity = vscode.workspace.getConfiguration('wildwest').get<string>('identity') ?? '';
+    const roleMatch = identity.match(/^([A-Za-z]+)/);
+    const role = roleMatch?.[1] ?? 'TM';
+    const fromActor = alias ? `${role}[${alias}]` : (identity || 'TM');
+
+    const transitionContext = this.getWireTransitionContext('telegraph-panel.save-draft');
+
+    try {
+      if (editingWwuid) {
+        const localFlatDir = path.join(wsPath, '.wildwest', 'telegraph', 'flat');
+        const localFile = path.join(localFlatDir, `${editingWwuid}.json`);
+        if (fs.existsSync(localFile)) {
+          const wire = JSON.parse(fs.readFileSync(localFile, 'utf8')) as FlatWire;
+          wire.to = to;
+          wire.type = type;
+          wire.subject = subject;
+          wire.body = body;
+          wire.status = 'draft';
+          const isoNow = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+          applyStatusUpdate(wire, 'draft', {}, transitionContext, isoNow, { dedupeStatus: true });
+          writeDraftWire(wire, wsPath);
+          this.panel.webview.postMessage({ type: 'saved', wire });
+          this.sendWires();
+          return;
+        }
+      }
+
+      // Create new draft wire
+      const wire = createFlatWire({ from: fromActor, to, type, subject, body, status: 'draft', transitionContext });
+      writeDraftWire(wire, wsPath);
+      this.panel.webview.postMessage({ type: 'saved', wire });
+      this.sendWires();
+    } catch (err) {
+      this.panel.webview.postMessage({ type: 'error', text: `Save draft failed — ${err}` });
+    }
   }
 
   private handleBulkStatus(wwuids: string[], status: string, perspective: 'recipient' | 'sender' = 'recipient'): void {
@@ -825,6 +874,7 @@ export class TelegraphPanel {
     <div class="compose-footer">
       <span class="error-bar" id="composeError"></span>
       <button class="btn btn-secondary" id="btnCancel">Cancel</button>
+      <button class="btn" id="btnSaveDraft">Save Draft</button>
       <button class="btn" id="btnSend">Send</button>
     </div>
   </div>
@@ -1075,6 +1125,7 @@ export class TelegraphPanel {
   document.getElementById('btnRefresh').addEventListener('click', () => refresh());
   document.getElementById('btnCompose').addEventListener('click', () => toggleCompose());
   document.getElementById('btnCancel').addEventListener('click', () => toggleCompose(false));
+  document.getElementById('btnSaveDraft').addEventListener('click', () => saveDraft());
   document.getElementById('btnSend').addEventListener('click', () => sendWire());
 
   document.getElementById('listPane').addEventListener('click', (e) => {
@@ -1136,6 +1187,12 @@ export class TelegraphPanel {
     if (data.type === 'sent') {
       toggleCompose(false);
       clearCompose();
+    }
+    if (data.type === 'saved') {
+      const w = data.wire || null;
+      if (w && w.wwuid) window.editingWire = w.wwuid;
+      document.getElementById('composeError').textContent = 'Draft saved';
+      refresh();
     }
     if (data.type === 'error') {
       document.getElementById('composeError').textContent = data.text;
@@ -1433,6 +1490,18 @@ export class TelegraphPanel {
     document.getElementById('composeError').textContent = '';
     vscode.postMessage({
       type: 'send',
+      to: document.getElementById('cTo').value,
+      wireType: document.getElementById('cType').value,
+      subject: document.getElementById('cSubject').value,
+      body: document.getElementById('cBody').value,
+    });
+  }
+
+  function saveDraft() {
+    document.getElementById('composeError').textContent = '';
+    vscode.postMessage({
+      type: 'saveDraft',
+      wwuid: window.editingWire || null,
       to: document.getElementById('cTo').value,
       wireType: document.getElementById('cType').value,
       subject: document.getElementById('cSubject').value,
