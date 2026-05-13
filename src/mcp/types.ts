@@ -62,6 +62,7 @@ export interface BoardOutput {
 }
 
 export interface DraftWireInput {
+  from: string;
   to: string;
   subject: string;
   body: string;
@@ -70,6 +71,7 @@ export interface DraftWireInput {
 }
 
 export interface SendWireInput {
+  from: string;
   to: string;
   subject: string;
   body: string;

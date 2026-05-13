@@ -123,13 +123,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       inputSchema: {
         type: 'object',
         properties: {
+          from: { type: 'string', description: 'Sender identity in Role[alias] format (e.g. TM[wildwest-vscode])' },
           to: { type: 'string', description: 'Recipient role in Role[alias] format' },
           subject: { type: 'string', description: 'Kebab-case wire subject slug' },
           body: { type: 'string', description: 'Wire body text' },
           type: { type: 'string', description: 'Wire type (default: status-update)' },
           re: { type: 'string', description: 'Reference wire wwuid' },
         },
-        required: ['to', 'subject', 'body'],
+        required: ['from', 'to', 'subject', 'body'],
       },
     },
     {
@@ -138,13 +139,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       inputSchema: {
         type: 'object',
         properties: {
+          from: { type: 'string', description: 'Sender identity in Role[alias] format (e.g. TM[wildwest-vscode])' },
           to: { type: 'string', description: 'Recipient role in Role[alias] format' },
           subject: { type: 'string', description: 'Kebab-case wire subject slug' },
           body: { type: 'string', description: 'Wire body text' },
           type: { type: 'string', description: 'Wire type (default: status-update)' },
           re: { type: 'string', description: 'Reference wire wwuid' },
         },
-        required: ['to', 'subject', 'body'],
+        required: ['from', 'to', 'subject', 'body'],
       },
     },
     {

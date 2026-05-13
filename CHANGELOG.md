@@ -4,6 +4,10 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.41.1] - 2026-05-13
+
+- Require explicit `from` parameter on `wildwest_draft_wire` and `wildwest_send_wire` tools — sender identity is no longer inferred from registry/scope; callers must pass `Role[alias]` (e.g. `TM[wildwest-vscode]`).
+
 ## [0.41.0] - 2026-05-12
 
 - Add `dist/mcp-standalone.js` — standalone stdio MCP server for Claude Code and non-VSCode clients. Spawnable via `node dist/mcp-standalone.js` with `WW_ROOT` and `WW_WORLD_ROOT` env vars; no VSCode extension required. Exposes all 7 tools: `wildwest_status`, `wildwest_inbox`, `wildwest_board`, `wildwest_telegraph_check`, `wildwest_draft_wire`, `wildwest_send_wire`, `wildwest_retry_wire`.

@@ -136,10 +136,9 @@ export function toolDraftWire(ctx: MCPScopeContext, input: DraftWireInput): Wire
   if (!fromAlias) {
     throw new Error('Missing registry alias in .wildwest/registry.json');
   }
-  const from = senderAddress(ctx, fromAlias);
 
   const wire = createFlatWire({
-    from,
+    from: input.from,
     to: input.to,
     type: input.type ?? 'status-update',
     subject: normalizeWireSubject(input.subject),
@@ -173,10 +172,9 @@ export function toolSendWire(ctx: MCPScopeContext, input: SendWireInput): WireWr
   if (!fromAlias) {
     throw new Error('Missing registry alias in .wildwest/registry.json');
   }
-  const from = senderAddress(ctx, fromAlias);
 
   const wire = createFlatWire({
-    from,
+    from: input.from,
     to: input.to,
     type: input.type ?? 'status-update',
     subject: normalizeWireSubject(input.subject),
