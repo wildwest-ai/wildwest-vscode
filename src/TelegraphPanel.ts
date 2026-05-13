@@ -662,7 +662,7 @@ export class TelegraphPanel {
   .tab { padding: 6px 14px; font-size: 12px; cursor: pointer; border-bottom: 2px solid transparent; color: var(--vscode-descriptionForeground); user-select: none; }
   .tab:hover { color: var(--vscode-foreground); }
   .tab.active { color: var(--vscode-foreground); border-bottom-color: var(--vscode-focusBorder); }
-  .tab .badge { display: inline-block; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); font-size: 10px; border-radius: 8px; padding: 0 5px; margin-left: 4px; }
+  .tab .badge { display: inline-block; background: transparent; color: var(--vscode-descriptionForeground); font-size: 10px; border-radius: 6px; padding: 0 3px; margin-left: 4px; }
 
   /* ── Search (All tab) ── */
   .search-bar { padding: 6px 10px; border-bottom: 1px solid var(--vscode-panel-border); flex-shrink: 0; display: none; }
@@ -709,14 +709,13 @@ export class TelegraphPanel {
   /* ── Status filter bar ── */
   .status-filter { display: none; gap: 6px; padding: 5px 10px; border-bottom: 1px solid var(--vscode-panel-border); flex-shrink: 0; }
   .status-filter.visible { display: flex; }
-  .sf-btn { background: transparent; border: 1px solid var(--vscode-panel-border); color: var(--vscode-descriptionForeground); font-size: 11px; padding: 4px 8px; border-radius: 10px; cursor: pointer; display:flex; align-items:center; gap:8px; }
+  .sf-btn { background: transparent; border: 1px solid var(--vscode-panel-border); color: var(--vscode-descriptionForeground); font-size: 11px; padding: 4px 8px; border-radius: 10px; cursor: pointer; display:flex; align-items:center; gap:6px; }
   .sf-btn:hover { color: var(--vscode-foreground); }
   /* active state should not use the global selection color; use subtle inset and badge emphasis */
   .sf-btn.active { background: rgba(0,0,0,0.06); border-color: rgba(0,0,0,0.12); }
-  .chip-checkbox { width:16px; height:16px; accent-color: var(--vscode-button-foreground); }
   .chip-checkbox { width:12px; height:12px; accent-color: var(--vscode-button-foreground); }
   .chip-label { font-size:11px; }
-  .chip-count { display: inline-block; font-size: 10px; padding: 0 4px; margin-left: 6px; border-radius: 10px; background: transparent; color: var(--vscode-descriptionForeground); }
+  .chip-count { display: inline-block; font-size: 10px; padding: 0 3px; margin-left: 4px; border-radius: 6px; background: transparent; color: var(--vscode-descriptionForeground); }
 
   /* ── Scope section headers ── */
   .scope-header { font-size: 10px; font-weight: 700; color: var(--vscode-descriptionForeground); text-transform: uppercase; letter-spacing: 0.07em; padding: 8px 10px 3px; opacity: 0.6; }
