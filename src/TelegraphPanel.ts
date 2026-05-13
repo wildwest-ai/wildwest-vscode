@@ -709,10 +709,10 @@ export class TelegraphPanel {
   /* ── Status filter bar ── */
   .status-filter { display: none; gap: 6px; padding: 5px 10px; border-bottom: 1px solid var(--vscode-panel-border); flex-shrink: 0; }
   .status-filter.visible { display: flex; }
-  .sf-btn { background: transparent; border: 1px solid var(--vscode-panel-border); color: var(--vscode-descriptionForeground); font-size: 11px; padding: 4px 8px; border-radius: 10px; cursor: pointer; display:flex; align-items:center; gap:6px; }
+  /* chips: compact, no rounded outline; active state shows a horizontal bottom bar like tabs */
+  .sf-btn { background: transparent; border: none; color: var(--vscode-descriptionForeground); font-size: 11px; padding: 6px 8px; border-radius: 0; cursor: pointer; display:flex; align-items:center; gap:4px; }
   .sf-btn:hover { color: var(--vscode-foreground); }
-  /* active state should not use the global selection color; use subtle inset and badge emphasis */
-  .sf-btn.active { background: rgba(0,0,0,0.06); border-color: rgba(0,0,0,0.12); }
+  .sf-btn.active { background: transparent; color: var(--vscode-foreground); border-bottom: 2px solid var(--vscode-focusBorder); padding-bottom: 4px; }
   .chip-checkbox { width:12px; height:12px; accent-color: var(--vscode-button-foreground); }
   .chip-label { font-size:11px; }
   .chip-count { display: inline-block; font-size: 10px; padding: 0 3px; margin-left: 4px; border-radius: 6px; background: transparent; color: var(--vscode-descriptionForeground); }
