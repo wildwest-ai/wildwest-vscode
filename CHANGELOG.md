@@ -4,6 +4,11 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.41.2] - 2026-05-13
+
+- `wildwest_draft_wire` now resolves the draft root dynamically from the `from` address — walks the territory registry to find the sender's local town path, so drafts land in the correct town's `.wildwest/telegraph/flat/` instead of the territory SSOT. Falls back to `localRoot` if alias not found.
+- Add `localRoot` to `MCPScopeContext` — separates draft write path from scope-detection root path.
+
 ## [0.41.1] - 2026-05-13
 
 - Require explicit `from` parameter on `wildwest_draft_wire` and `wildwest_send_wire` tools — sender identity is no longer inferred from registry/scope; callers must pass `Role[alias]` (e.g. `TM[wildwest-vscode]`).

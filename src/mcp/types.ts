@@ -15,6 +15,8 @@ export const TOOL_RETRY_WIRE = 'wildwest_retry_wire';
 export interface MCPScopeContext {
   /** Root path of the connecting workspace (town, county, etc.) */
   rootPath: string;
+  /** Local workspace root for draft writes — defaults to rootPath */
+  localRoot: string;
   scope: WildWestScope;
   worldRoot: string;
   countiesDir: string;

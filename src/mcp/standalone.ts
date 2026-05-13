@@ -68,7 +68,7 @@ if (!scope) {
   process.exit(1);
 }
 
-const ctx: MCPScopeContext = { rootPath, scope, worldRoot, countiesDir, identity };
+const ctx: MCPScopeContext = { rootPath, localRoot: rootPath, scope, worldRoot, countiesDir, identity };
 
 // ── Stub output channel (replaces vscode.OutputChannel) ──────────────────
 

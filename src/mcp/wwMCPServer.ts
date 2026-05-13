@@ -64,7 +64,7 @@ export class wwMCPServer {
     const countiesDir = config.get<string>('countiesDir') ?? 'counties';
     const identity = config.get<string>('identity') ?? '';
 
-    return { rootPath, scope, worldRoot, countiesDir, identity };
+    return { rootPath, localRoot: rootPath, scope, worldRoot, countiesDir, identity };
   }
 
   private registerHandlers(): void {

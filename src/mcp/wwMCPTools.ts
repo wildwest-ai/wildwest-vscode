@@ -148,8 +148,9 @@ export function toolDraftWire(ctx: MCPScopeContext, input: DraftWireInput): Wire
     transitionContext: transitionContext(ctx, fromAlias, 'wwmcp.draft-wire'),
   });
 
-  writeDraftWire(wire, ctx.rootPath);
-  const localFlatDir = path.join(ctx.rootPath, '.wildwest', 'telegraph', 'flat');
+  const draftRoot = resolveAliasToLocalRoot(input.from, ctx) ?? ctx.localRoot;
+  writeDraftWire(wire, draftRoot);
+  const localFlatDir = path.join(draftRoot, '.wildwest', 'telegraph', 'flat');
   const transition = wire.status_transitions?.[wire.status_transitions.length - 1];
   if (transition) {
     writeWireUpdatePacket(
@@ -163,7 +164,7 @@ export function toolDraftWire(ctx: MCPScopeContext, input: DraftWireInput): Wire
     filename: wire.filename,
     status: wire.status,
     date: wire.date,
-    path: path.join(ctx.rootPath, '.wildwest', 'telegraph', 'flat', `${wire.wwuid}.json`),
+    path: path.join(draftRoot, '.wildwest', 'telegraph', 'flat', `${wire.wwuid}.json`),
   };
 }
 
@@ -249,6 +250,50 @@ export function toolRetryWire(ctx: MCPScopeContext, input: RetryWireInput): Wire
   }
 
   throw new Error(`Failed wire not found: ${wwuid}`);
+}
+
+/**
+ * Given a Role[alias] address, walk the territory to find the local root for that alias.
+ * Searches: territory root, each county, each town under each county.
+ * Returns the matching root path or null if not found.
+ */
+function resolveAliasToLocalRoot(address: string, ctx: MCPScopeContext): string | null {
+  const alias = address.match(/\[([^\]]+)\]/)?.[1];
+  if (!alias) return null;
+
+  const check = (dir: string): string | null => {
+    try {
+      const reg = JSON.parse(fs.readFileSync(path.join(dir, '.wildwest', 'registry.json'), 'utf8')) as Record<string, unknown>;
+      if (reg['alias'] === alias) return dir;
+    } catch { /* skip */ }
+    return null;
+  };
+
+  // Check territory root itself
+  const atTerritory = check(ctx.worldRoot);
+  if (atTerritory) return atTerritory;
+
+  // Walk counties
+  const countiesPath = path.join(ctx.worldRoot, ctx.countiesDir);
+  let counties: string[] = [];
+  try { counties = fs.readdirSync(countiesPath); } catch { /* skip */ }
+
+  for (const county of counties) {
+    const countyPath = path.join(countiesPath, county);
+    const atCounty = check(countyPath);
+    if (atCounty) return atCounty;
+
+    // Walk towns within county
+    let towns: string[] = [];
+    try { towns = fs.readdirSync(countyPath); } catch { /* skip */ }
+    for (const town of towns) {
+      const townPath = path.join(countyPath, town);
+      const atTown = check(townPath);
+      if (atTown) return atTown;
+    }
+  }
+
+  return null;
 }
 
 function senderAddress(ctx: MCPScopeContext, alias: string): string {
