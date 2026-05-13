@@ -12,6 +12,12 @@ This document describes the actual Wild West extension UI elements implemented i
   - hosts the extension Tree View registered as `wildwest.sidepanel`.
   - appears in the Activity Bar as the Wild West side panel view.
 
+- **Activity Bar (View Container)**
+  - the Activity Bar hosts view containers; this extension registers the `Wild West` view container.
+  - contribution: `contributes.viewsContainers.activitybar` in `package.json` with `id: "wildwest-panel"`, `title: "Wild West"`, and `icon: media/wildwest-icon.svg`.
+  - correct UI term: this is a "view container" (Activity Bar item) that holds one or more "views"; the Side Bar `wildwest.sidepanel` is a view inside that container.
+  - view-title actions (icons in the view header) are provided via `contributes.commands` + `contributes.menus["view/title"]` and include `$(refresh)` and `$(mail)` for `wildwest.refreshSidePanel` and `wildwest.openTelegraphPanel` respectively.
+
 - **Status Bar**
   - two custom status bar items are created:
     - `wildwest-status`
