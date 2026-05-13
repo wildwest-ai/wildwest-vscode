@@ -1,0 +1,15 @@
+{
+  "servers": {
+    "wwmcp": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/Users/reneyap/.vscode/extensions/wildwest-ai.wildwest-vscode-0.41.3/dist/mcp-standalone.js"
+      ],
+      "env": {
+        "WW_ROOT": "/Users/reneyap/wildwest/counties/wildwest-ai/wildwest-vscode",
+        "WW_WORLD_ROOT": "/Users/reneyap/wildwest"
+      }
+    }
+  }
+}
