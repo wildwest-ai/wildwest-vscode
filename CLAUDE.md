@@ -3,7 +3,8 @@
 **Town:** wildwest-vscode  
 **County:** wildwest-ai  
 **Scope:** town  
-**Version:** 0.25.6  
+**Version:** 0.44.2  
+**Status:** Draft wire regression fixed (v0.44.1-2); validation requiring [scope] brackets enforced  
 
 ---
 
