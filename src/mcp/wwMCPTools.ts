@@ -219,9 +219,9 @@ export function toolSendWire(ctx: MCPScopeContext, input: SendWireInput): WireWr
     transitionContext: transitionContext(ctx, fromAlias, 'wwmcp.send-wire'),
   });
 
-  // Determine target scope root based on targetScope parameter (default: territory)
-  const targetScope = input.targetScope ?? 'territory';
-  let targetRoot = ctx.worldRoot;
+  // Determine target scope root based on targetScope parameter (default: town)
+  const targetScope = input.targetScope ?? 'town';
+  let targetRoot = ctx.rootPath;
   if (targetScope === 'town') {
     targetRoot = ctx.rootPath;
   } else if (targetScope === 'county') {

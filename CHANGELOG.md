@@ -4,6 +4,14 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.43.5] - 2026-05-14
+
+### Changed
+- wwMCP default scope changed from territory to town (minimum scope level).
+  - Actors now default to their own scope, not territory SSOT.
+  - town (local) is the minimum/default level; county and territory must be explicitly specified.
+  - Aligns with governance principle: work at your scope, escalate intentionally.
+
 ## [0.43.4] - 2026-05-14
 
 ### Enhanced
