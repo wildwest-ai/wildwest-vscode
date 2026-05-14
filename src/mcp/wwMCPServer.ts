@@ -107,7 +107,7 @@ export class wwMCPServer {
         },
         {
           name: TOOL_DRAFT_WIRE,
-          description: 'Create a draft wire in the local workspace .wildwest/telegraph/flat directory for review before dispatch.',
+          description: 'Create a draft wire in .wildwest/telegraph/flat for review before dispatch. Supports both local and county-level scope.',
           inputSchema: {
             type: 'object',
             properties: {
@@ -117,13 +117,14 @@ export class wwMCPServer {
               body: { type: 'string', description: 'Wire body text' },
               type: { type: 'string', description: 'Wire type (default: status-update)' },
               re: { type: 'string', description: 'Reference wire wwuid' },
+              targetScope: { type: 'string', enum: ['county', 'territory'], description: 'Target scope for draft (county/territory; default: local)' },
             },
             required: ['from', 'to', 'subject', 'body'],
           },
         },
         {
           name: TOOL_SEND_WIRE,
-          description: 'Create and immediately dispatch a wire to territory and local outbox.',
+          description: 'Create and dispatch a wire to target scope (county or territory) and local outbox. Supports scope-gated routing.',
           inputSchema: {
             type: 'object',
             properties: {
@@ -133,6 +134,7 @@ export class wwMCPServer {
               body: { type: 'string', description: 'Wire body text' },
               type: { type: 'string', description: 'Wire type (default: status-update)' },
               re: { type: 'string', description: 'Reference wire wwuid' },
+              targetScope: { type: 'string', enum: ['county', 'territory'], description: 'Target scope for wire (county/territory; default: territory)' },
             },
             required: ['from', 'to', 'subject', 'body'],
           },

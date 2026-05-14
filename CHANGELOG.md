@@ -4,6 +4,19 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.43.3] - 2026-05-14
+
+### Added
+- wwMCP scope routing: Add `targetScope` parameter to `wildwest_draft_wire` and `wildwest_send_wire` tools.
+  - County-scoped actors can now target county telegraph with `targetScope: 'county'` (e.g., aCD writing county memos).
+  - Territory actors use `targetScope: 'territory'` (default) for SSOT routing.
+  - Enables scope-gated telegraph operations per county rule 12.
+  - **Validation:** Tool rejects invalid scope transitions; county scope requires ancestor county registry.
+### Fixed
+- wwMCP validation gaps: `wildwest_send_wire` now respects scope hierarchy instead of hardcoding territory routing.
+  - Previous: All sends went to territory SSOT regardless of sender scope (violation of county law rule 12).
+  - Now: Scope-aware routing via `targetScope` parameter with ancestor lookup and validation.
+
 ## [0.43.2] - 2026-05-14
 
 ### Refactored

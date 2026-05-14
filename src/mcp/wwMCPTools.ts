@@ -158,7 +158,17 @@ export function toolDraftWire(ctx: MCPScopeContext, input: DraftWireInput): Wire
     transitionContext: transitionContext(ctx, fromAlias, 'wwmcp.draft-wire'),
   });
 
-  const draftRoot = resolveAliasToLocalRoot(input.from, ctx) ?? ctx.localRoot;
+  // Determine target scope root based on targetScope parameter (default: local)
+  let draftRoot = resolveAliasToLocalRoot(input.from, ctx) ?? ctx.localRoot;
+  if (input.targetScope === 'county') {
+    const countyRoot = findAncestorScopeRoot(ctx.rootPath, 'county');
+    if (countyRoot) {
+      draftRoot = countyRoot;
+    }
+  } else if (input.targetScope === 'territory') {
+    draftRoot = ctx.worldRoot;
+  }
+
   writeDraftWire(wire, draftRoot);
   const localFlatDir = path.join(draftRoot, '.wildwest', 'telegraph', 'flat');
   const transition = wire.status_transitions?.[wire.status_transitions.length - 1];
@@ -205,13 +215,24 @@ export function toolSendWire(ctx: MCPScopeContext, input: SendWireInput): WireWr
     transitionContext: transitionContext(ctx, fromAlias, 'wwmcp.send-wire'),
   });
 
-  const territoryFlatDir = path.join(ctx.worldRoot, 'telegraph', 'flat');
-  writeFlatWire(wire, territoryFlatDir);
+  // Determine target scope root based on targetScope parameter (default: territory)
+  const targetScope = input.targetScope ?? 'territory';
+  let targetRoot = ctx.worldRoot;
+  if (targetScope === 'county') {
+    const countyRoot = findAncestorScopeRoot(ctx.rootPath, 'county');
+    if (!countyRoot) {
+      throw new Error('targetScope=county requested but no county ancestor found');
+    }
+    targetRoot = countyRoot;
+  }
+
+  const flatDir = path.join(targetRoot, 'telegraph', 'flat');
+  writeFlatWire(wire, flatDir);
   const transition = wire.status_transitions?.[wire.status_transitions.length - 1];
   if (transition) {
     writeWireUpdatePacket(
       createWireStatusUpdatePacket(wire, { status: wire.status }, transition, transitionContext(ctx, fromAlias, 'wwmcp.send-wire')),
-      territoryFlatDir,
+      flatDir,
     );
   }
 
@@ -224,7 +245,7 @@ export function toolSendWire(ctx: MCPScopeContext, input: SendWireInput): WireWr
     filename: wire.filename,
     status: wire.status,
     date: wire.date,
-    path: path.join(territoryFlatDir, `${wire.wwuid}.json`),
+    path: path.join(flatDir, `${wire.wwuid}.json`),
   };
 }
 
