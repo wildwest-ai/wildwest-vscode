@@ -4,7 +4,7 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
-## [0.44.0] - 2026-05-14
+## [0.43.1] - 2026-05-13
 
 ### Added
 - Centralize address validation utilities in `src/mcp/validation.ts` and
