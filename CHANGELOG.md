@@ -4,6 +4,30 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.43.2] - 2026-05-14
+
+### Refactored
+- Telegraph architecture: Remove `outbox/history/` legacy directory.
+  - HeartbeatMonitor now deletes outbox wires immediately after updating territory SSOT (no local archival).
+  - DeliveryReceipts simplified: tracks pending/failed in local outbox only; delivered/archived status tracked via `wire.status` field in territory SSOT.
+  - SidePanelProvider history view now sources from territory flat/ (status filter, not physical directory).
+  - WildwestDoctor checks simplified: only requires `inbox/` and `outbox/` (not `outbox/history/`).
+  - TownInit scaffold no longer creates `outbox/history/` subdirectory.
+  - wwMCPTools & WildwestParticipant telegraph check counts updated to reflect new structure.
+  - **Rationale:** Flat/ is a cache layer; only territory SSOT at `~/wildwest/telegraph/flat/` is definitive. Archive state tracked in wire metadata, not filesystem.
+
+## [0.43.2] - 2026-05-14
+
+### Refactored
+- Telegraph architecture: Remove `outbox/history/` legacy directory.
+  - HeartbeatMonitor now deletes outbox wires immediately after updating territory SSOT (no local archival).
+  - DeliveryReceipts simplified: tracks pending/failed in local outbox only; delivered/archived status tracked via `wire.status` field in territory SSOT.
+  - SidePanelProvider history view now sources from territory flat/ (status filter, not physical directory).
+  - WildwestDoctor checks simplified: only requires `inbox/` and `outbox/` (not `outbox/history/`).
+  - TownInit scaffold no longer creates `outbox/history/` subdirectory.
+  - wwMCPTools & WildwestParticipant telegraph check counts updated to reflect new structure.
+  - **Rationale:** Flat/ is a cache layer; only territory SSOT at `~/wildwest/telegraph/flat/` is definitive. Archive state tracked in wire metadata, not filesystem.
+
 ## [0.43.1] - 2026-05-13
 
 ### Added

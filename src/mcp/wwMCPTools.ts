@@ -129,7 +129,7 @@ export function toolTelegraphCheck(ctx: MCPScopeContext): TelegraphCheckOutput {
     history: 0,  // History is a status view in territory SSOT, not a local directory
     deadLetter: count(outboxDir, (f) => f.startsWith('!')),
   };
-}}}
+}
 
 export function toolDraftWire(ctx: MCPScopeContext, input: DraftWireInput): WireWriteOutput {
   // Validate addressing format
