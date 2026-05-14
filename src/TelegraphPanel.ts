@@ -293,6 +293,18 @@ export class TelegraphPanel {
       case 'saveDraft':
         this.handleSaveDraft(msg);
         break;
+      case 'toSuggest': {
+        const q = (msg['query'] as string) || '';
+        const suggestions = this.handleToSuggest(q);
+        this.panel.webview.postMessage({ type: 'toSuggestions', suggestions });
+        break;
+      }
+      case 'cancelWire':
+        this.handleCancelWire(msg['wwuid'] as string);
+        break;
+      case 'deleteDraft':
+        this.handleDeleteDraft(msg['wwuid'] as string);
+        break;
       case 'retryWire':
         this.handleRetryWire(msg['wwuid'] as string);
         break;
@@ -394,6 +406,87 @@ export class TelegraphPanel {
       this.sendWires();
     } catch (err) {
       this.panel.webview.postMessage({ type: 'error', text: `Save draft failed — ${err}` });
+    }
+  }
+
+  private handleToSuggest(query: string): string[] {
+    // Provide simple suggestions based on workspace registry aliases and county roots
+    const results: string[] = [];
+    try {
+      const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+      // gather local alias
+      const localAlias = readRegistryAlias(path.join(wsPath, '.wildwest'));
+      if (localAlias) results.push(`TM[${localAlias}]`);
+
+      // scan scope roots for aliases
+      for (const root of this.getScopeRootsForOutboxRecovery()) {
+        const a = readRegistryAlias(path.join(root, '.wildwest'));
+        if (a && !results.includes(a)) results.push(`TM[${a}]`);
+      }
+
+      // Basic role-based suggestions for common roles — map some roles to example bracketed targets
+      const common = ['CD','TM','RA','G','S','M','ACD'];
+      for (const r of common) {
+        if (r.toLowerCase().startsWith(query.toLowerCase()) || query.toLowerCase().startsWith(r.toLowerCase())) {
+          // add a placeholder suggestion showing role + bracket
+          results.unshift(`${r}[example-${r.toLowerCase()}]`);
+        }
+      }
+    } catch (e) { this.log(`handleToSuggest error: ${String(e)}`); }
+    // Filter by query
+    return results.filter(s => s.toLowerCase().includes(query.toLowerCase())).slice(0, 12);
+  }
+
+  private handleCancelWire(wwuid: string): void {
+    if (!wwuid) return;
+    const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+    // find outbox file in workspace outbox
+    const outbox = path.join(wsPath, '.wildwest', 'telegraph', 'outbox');
+    const outPath = path.join(outbox, `${wwuid}.json`);
+    try {
+      if (fs.existsSync(outPath)) {
+        const wire = JSON.parse(fs.readFileSync(outPath, 'utf8')) as FlatWire;
+        // remove outbox file
+        try { fs.unlinkSync(outPath); } catch (e) { this.log(`unlink outPath failed: ${String(e)}`); }
+        // write as draft to local flat/
+        wire.status = 'draft';
+        writeDraftWire(wire, wsPath);
+        this.panel.webview.postMessage({ type: 'saved', wire });
+        this.sendWires();
+        return;
+      }
+      // fallback: look in scope roots for failed/! files
+      for (const root of this.getScopeRootsForOutboxRecovery()) {
+        const ob = path.join(root, '.wildwest', 'telegraph', 'outbox');
+        const failed = path.join(ob, `!${wwuid}.json`);
+        const normal = path.join(ob, `${wwuid}.json`);
+        const candidate = fs.existsSync(normal) ? normal : (fs.existsSync(failed) ? failed : null);
+        if (candidate) {
+          const wire = JSON.parse(fs.readFileSync(candidate, 'utf8')) as FlatWire & Record<string, unknown>;
+          try { fs.unlinkSync(candidate); } catch (e) { this.log(`unlink candidate failed: ${String(e)}`); }
+          wire.status = 'draft';
+          writeDraftWire(wire, wsPath);
+          this.panel.webview.postMessage({ type: 'saved', wire });
+          this.sendWires();
+          return;
+        }
+      }
+    } catch (err) {
+      this.panel.webview.postMessage({ type: 'error', text: `Cancel failed — ${err}` });
+    }
+  }
+
+  private handleDeleteDraft(wwuid: string): void {
+    if (!wwuid) return;
+    const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+    try {
+      const localFlat = path.join(wsPath, '.wildwest', 'telegraph', 'flat');
+      const p = path.join(localFlat, `${wwuid}.json`);
+      if (fs.existsSync(p)) { fs.unlinkSync(p); }
+      this.sendWires();
+      this.panel.webview.postMessage({ type: 'saved', wire: null });
+    } catch (err) {
+      this.panel.webview.postMessage({ type: 'error', text: `Delete draft failed — ${err}` });
     }
   }
 
@@ -855,6 +948,7 @@ export class TelegraphPanel {
 <div class="compose-drawer" id="composeDrawer">
   <div class="compose-form">
     <div class="compose-row"><label for="cTo">To</label><input id="cTo" placeholder="CD(RSn)" /></div>
+    <div id="toDropdown" style="display:none;position:absolute;z-index:120;left:52px;right:12px;margin-top:2px;max-height:160px;overflow:auto;background:var(--vscode-editorSuggestWidget-background,var(--vscode-input-background));border:1px solid var(--vscode-panel-border);"></div>
     <div class="compose-row"><label for="cType">Type</label>
       <select id="cType">
         <option>status-update</option>
@@ -1164,6 +1258,10 @@ export class TelegraphPanel {
     }
     const sendDraftBtn = e.target.closest('[data-send-draft]');
     if (sendDraftBtn) { vscode.postMessage({ type: 'sendDraft', wwuid: sendDraftBtn.dataset.sendDraft }); }
+    const cancelBtn = e.target.closest('[data-cancel]');
+    if (cancelBtn) { vscode.postMessage({ type: 'cancelWire', wwuid: cancelBtn.dataset.cancel }); return; }
+    const deleteDraftBtn = e.target.closest('[data-delete-draft]');
+    if (deleteDraftBtn) { vscode.postMessage({ type: 'deleteDraft', wwuid: deleteDraftBtn.dataset.deleteDraft }); return; }
   });
 
   // ── Messages from extension ───────────────────────────────────────────────
@@ -1207,6 +1305,27 @@ export class TelegraphPanel {
   let promptSearchTimer = null;
   const cBody = document.getElementById('cBody');
   const promptDropdown = document.getElementById('promptDropdown');
+  const toInput = document.getElementById('cTo');
+  const toDropdown = document.getElementById('toDropdown');
+
+  // To-field autocomplete
+  toInput.addEventListener('input', () => {
+    const q = toInput.value.trim();
+    if (!q || q.length < 1) { toDropdown.style.display = 'none'; return; }
+    vscode.postMessage({ type: 'toSuggest', query: q });
+  });
+
+  window.addEventListener('message', ({ data }) => {
+    if (data.type === 'toSuggestions') {
+      const items = data.suggestions || [];
+      if (!items.length) { toDropdown.style.display = 'none'; return; }
+      toDropdown.innerHTML = items.map((s, i) => '<div class="to-item" data-idx="'+i+'" style="padding:6px 8px;cursor:pointer;border-bottom:1px solid var(--vscode-panel-border)">' + esc(s) + '</div>').join('');
+      toDropdown.style.display = 'block';
+      toDropdown.querySelectorAll('.to-item').forEach(el => el.addEventListener('mousedown', (ev) => {
+        ev.preventDefault(); toInput.value = el.textContent || ''; toDropdown.style.display = 'none';
+      }));
+    }
+  });
 
   cBody.addEventListener('input', () => {
     clearTimeout(promptSearchTimer);
@@ -1440,8 +1559,12 @@ export class TelegraphPanel {
       + '<button class="btn btn-secondary" data-push="claude">→ Claude</button>'
       + '<button class="btn btn-secondary" data-push="codex">→ Codex</button>'
       + (status === 'draft' ? '<button class="btn" data-send-draft="' + esc(w.wwuid) + '">Send</button>' : '')
+      + (status === 'draft' && activeTab === 'outbox' ? '<button class="btn" data-delete-draft="' + esc(w.wwuid) + '">Delete</button>' : '')
       + (status === 'draft' && activeTab === 'outbox' ? '<button class="btn" data-edit="' + esc(w.wwuid) + '">Edit</button>' : '')
+      + (status === 'pending' ? '<button class="btn" data-cancel="' + esc(w.wwuid) + '">Cancel</button>' : '')
+      + (status === 'failed' ? '<button class="btn" data-edit="' + esc(w.wwuid) + '">Edit</button>' : '')
       + (status === 'failed' ? '<button class="btn" data-retry-wire="' + esc(w.wwuid) + '">Retry Now</button>' : '')
+      + (status === 'failed' ? '<button class="btn" data-cancel="' + esc(w.wwuid) + '">Cancel</button>' : '')
       + (isInboxWire && !isArchivedActor && (status === 'sent' || status === 'received' || status === 'delivered') ? '<button class="btn" data-mark-read="' + esc(w.wwuid) + '">Mark Read</button>' : '')
       + (isInboxWire && !isArchivedActor && status !== 'draft' ? '<button class="btn" data-reply="' + esc(w.wwuid) + '">↻ Reply</button>' : '')
       + (!isArchivedActor ? '<button class="btn btn-secondary" data-archive="' + esc(w.wwuid) + '">Archive</button>' : '')
@@ -1488,9 +1611,10 @@ export class TelegraphPanel {
 
   function sendWire() {
     document.getElementById('composeError').textContent = '';
+    const toVal = document.getElementById('cTo').value;
     vscode.postMessage({
       type: 'send',
-      to: document.getElementById('cTo').value,
+      to: toVal,
       wireType: document.getElementById('cType').value,
       subject: document.getElementById('cSubject').value,
       body: document.getElementById('cBody').value,
