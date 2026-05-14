@@ -16,7 +16,7 @@ export interface MCPScopeContext {
   /** Root path of the connecting workspace (town, county, etc.) */
   rootPath: string;
   /** Local workspace root for draft writes — defaults to rootPath */
-  localRoot: string;
+  localRoot?: string;
   scope: WildWestScope;
   worldRoot: string;
   countiesDir: string;
@@ -64,7 +64,7 @@ export interface BoardOutput {
 }
 
 export interface DraftWireInput {
-  from: string;
+  from?: string;
   to: string;
   subject: string;
   body: string;
@@ -73,7 +73,7 @@ export interface DraftWireInput {
 }
 
 export interface SendWireInput {
-  from: string;
+  from?: string;
   to: string;
   subject: string;
   body: string;
