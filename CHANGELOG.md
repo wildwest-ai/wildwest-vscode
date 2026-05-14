@@ -2,13 +2,10 @@
 
 ## [Unreleased]
 
-<!-- Write your What's New entry here before running release.sh -->
-
-## [0.44.0] - 2026-05-14
-
 - Centralize MCP validation and alias scanning; add authoritative alias checks in MCP and a webview alias-confirmation flow for missing aliases.
 - Fix `TelegraphPanel` syntax bug and improve `To:` role-aware autocomplete.
 - Add unit tests for validation and webview alias confirmation; ensure Jest suite passes.
+
 
 ## [0.43.0] - 2026-05-13
 
