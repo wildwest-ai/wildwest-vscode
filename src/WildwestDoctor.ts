@@ -88,7 +88,7 @@ function checkRegistry(wwDir: string): CheckResult {
 
 function checkTelegraphDirs(wwDir: string): CheckResult {
   const telegraphDir = path.join(wwDir, 'telegraph');
-  const required = ['inbox', 'outbox', path.join('outbox', 'history')];
+  const required = ['inbox', 'outbox'];
   const missing = required.filter((d) => !fs.existsSync(path.join(telegraphDir, d)));
   if (!fs.existsSync(telegraphDir)) {
     return { label: 'Telegraph dirs', status: 'fail', detail: 'telegraph/ directory missing' };
@@ -96,7 +96,7 @@ function checkTelegraphDirs(wwDir: string): CheckResult {
   if (missing.length > 0) {
     return { label: 'Telegraph dirs', status: 'warn', detail: `missing: ${missing.join(', ')}` };
   }
-  return { label: 'Telegraph dirs', status: 'ok', detail: 'inbox/ outbox/ outbox/history/' };
+  return { label: 'Telegraph dirs', status: 'ok', detail: 'inbox/ outbox/ (auto-created on demand)' };
 }
 
 function checkHeartbeat(wwDir: string, intervalMs: number): CheckResult {

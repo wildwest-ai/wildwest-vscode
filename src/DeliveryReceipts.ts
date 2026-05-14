@@ -4,9 +4,8 @@
  * Status lifecycle:
  *   pending      outbox/*.md (queued, not yet delivered)
  *   failed       outbox/!*.md (permanent delivery failure)
- *   delivered    outbox/history/*.md (delivered, no ack yet)
- *   acknowledged outbox/history/*.md + inbox(/history)/ack-done--<subject>
- *   blocked      outbox/history/*.md + inbox(/history)/ack-blocked--<subject>
+ *   delivered    flat/history/*.json (delivered, awaiting recipient read + archive)
+ *   read         flat/history/*.json (recipient has read)
  *
  * No vscode dependency — pure fs/path so it can be unit-tested without mocks.
  */
@@ -86,12 +85,12 @@ function findAckStatus(
 
 /**
  * Compute delivery receipts for all wires sent from the given telegraph directory.
- * Scans outbox/, outbox/!* (failed), and outbox/history/ (delivered/acked).
+ * Scans outbox/ (pending/draft) and outbox/!* (failed) only.
+ * Delivered/archived status is tracked via wire.status field in territory SSOT.
  */
 export function getDeliveryReceipts(telegraphDir: string): DeliveryReceipt[] {
   const receipts: DeliveryReceipt[] = [];
   const outboxDir = path.join(telegraphDir, 'outbox');
-  const outboxHistoryDir = path.join(outboxDir, 'history');
 
   // pending: outbox/*.md (no ! prefix)
   for (const file of listMdFiles(outboxDir)) {
@@ -121,25 +120,6 @@ export function getDeliveryReceipts(telegraphDir: string): DeliveryReceipt[] {
     }
   } catch {
     // outboxDir missing — ok
-  }
-
-  // delivered / acknowledged / blocked: outbox/history/*.md
-  for (const file of listMdFiles(outboxHistoryDir)) {
-    const subject = extractSubject(file);
-    if (!subject) continue;
-    const ackStatus = findAckStatus(telegraphDir, subject);
-    const deliveredAt = readDeliveredAt(path.join(outboxHistoryDir, file));
-    const status: WireStatus =
-      ackStatus === 'acknowledged' ? 'acknowledged' :
-      ackStatus === 'blocked' ? 'blocked' :
-      'delivered';
-    receipts.push({
-      filename: file,
-      subject,
-      status,
-      filePath: path.join(outboxHistoryDir, file),
-      deliveredAt,
-    });
   }
 
   return receipts;

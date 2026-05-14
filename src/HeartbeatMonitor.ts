@@ -756,7 +756,7 @@ function reasonCode(reason: string): string {
  * 4. Resolve destination scope (role → scope → path, with pattern for towns)
  * 5. Write delivered copy to destination inbox/
  * 6. Stamp delivered_at in original
- * 7. Archive original to outbox/history/
+ * 7. Update territory SSOT flat/history/ with delivery status
  * 
  * Supported formats:
  * - JSON wires only (schema v2) using `to`/`from` fields and role-based addressing.
@@ -887,12 +887,8 @@ function deliverPendingOutbox(
         // Update territory SSOT: sender's copy → status 'sent'.
         updateFlatWireDeliveryStatus(worldRoot, memoPath, memoFile, outputChannel);
 
-        // Archive the original outbox wire to outbox/history/.
-        const historyDir = path.join(outboxDir, 'history');
-        if (!fs.existsSync(historyDir)) {
-          fs.mkdirSync(historyDir, { recursive: true });
-        }
-        fs.renameSync(memoPath, path.join(historyDir, memoFile));
+        // Delete the outbox wire — territory flat/ is the record; local outbox is staging only.
+        try { fs.unlinkSync(memoPath); } catch { /* already gone */ }
 
         // Remove local flat copy if present — territory wins; panel reads SSOT.
         const localFlatFile = path.join(rootPath, '.wildwest', 'telegraph', 'flat', memoFile);

@@ -725,7 +725,7 @@ export class SidePanelProvider
     ];
   }
 
-  // ── Telegraph (inbox / outbox / history) ──────────────────────────────────
+  // ── Telegraph (inbox / outbox / history view) ────────────────────────────────
 
   private collectTelegraphFiles(
     section: 'inbox' | 'outbox' | 'history',
@@ -736,7 +736,7 @@ export class SidePanelProvider
         section === 'inbox'
           ? path.join(telegraphDir, 'flat')
           : section === 'history'
-            ? path.join(telegraphDir, 'outbox', 'history')
+            ? path.join(telegraphDir, 'flat')  // History is a status filter, not a dir
             : path.join(telegraphDir, section);
       for (const file of this.listMdFiles(targetDir)) {
         results.push({ dir: targetDir, file });

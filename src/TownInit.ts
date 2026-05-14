@@ -338,9 +338,7 @@ function createTelegraphDirs(wildwestDir: string, log: (msg: string) => void): v
   for (const sub of [
     'telegraph',
     'telegraph/inbox',
-    'telegraph/inbox/history',
     'telegraph/outbox',
-    'telegraph/outbox/history',
     'board',
     'board/branches',
     'board/branches/drafts',

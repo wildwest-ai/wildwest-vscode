@@ -222,7 +222,7 @@ export class TelegraphCommands {
       }
     }
 
-    // Archive original to inbox/history/
+    // Archive original to flat/history/ via heartbeat delivery
     const today = new Date().toISOString().split('T')[0];
     const historyDir = path.join(flatDir, 'history', today);
     archiveMemo(originalPath, historyDir);

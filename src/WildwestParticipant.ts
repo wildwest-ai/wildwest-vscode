@@ -21,8 +21,8 @@ import { PromptIndexService } from './PromptIndexService';
  *   @wildwest inbox                — town inbox only (scope-enforced); per-wire [Archive] button
  *   @wildwest send <role> "<msg>"  — draft wire → preview → [Confirm Send] button
  *   @wildwest ack <timestamp>      — generate ack for that timestamp → [Send Ack] button
- *   @wildwest archive <filename>   — move wire from inbox to inbox/history
- *   @wildwest telegraph check      — 4-dir sweep (inbox, outbox, history, dead-letter)
+ *   @wildwest archive <filename>  — mark wire as archived in flat/history (SSOT)
+ *   @wildwest telegraph check      — 4-dir sweep (inbox, outbox, flat/history, dead-letter)
  *   @wildwest board                — active branches
  *   @wildwest status               — identity, heartbeat, open wire count
  *   @wildwest help                 — command reference
@@ -309,11 +309,10 @@ async function handleTelegraphCheck(wwRoot: string, stream: vscode.ChatResponseS
 
   const flatDir   = path.join(telegraphDir, 'flat');
   const outboxDir  = path.join(telegraphDir, 'outbox');
-  const historyDir = path.join(outboxDir, 'history');
 
   const inbox      = count(flatDir,   (f) => (f.endsWith('.json') || f.endsWith('.md')) && !f.startsWith('!'));
   const outbox     = count(outboxDir,  (f) => (f.endsWith('.json') || f.endsWith('.md')) && !f.startsWith('!'));
-  const history    = count(historyDir, (f) => (f.endsWith('.json') || f.endsWith('.md')) && !f.startsWith('.'));
+  const history    = 0;  // History is a status view of territory SSOT wires with status='archived'
   const deadLetter = count(outboxDir, (f) => f.startsWith('!'));
 
   stream.markdown('**Telegraph check**\n\n');

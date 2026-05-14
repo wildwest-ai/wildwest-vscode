@@ -121,16 +121,15 @@ export function toolTelegraphCheck(ctx: MCPScopeContext): TelegraphCheckOutput {
 
   const flatDir = path.join(telegraphDir, 'flat');
   const outboxDir = path.join(telegraphDir, 'outbox');
-  const historyDir = path.join(outboxDir, 'history');
   const isWire = (f: string) => (f.endsWith('.json') || f.endsWith('.md')) && !f.startsWith('.');
 
   return {
     inbox: count(flatDir, (f) => isWire(f) && !f.startsWith('!')),
     outbox: count(outboxDir, (f) => isWire(f) && !f.startsWith('!')),
-    history: count(historyDir, isWire),
+    history: 0,  // History is a status view in territory SSOT, not a local directory
     deadLetter: count(outboxDir, (f) => f.startsWith('!')),
   };
-}
+}}}
 
 export function toolDraftWire(ctx: MCPScopeContext, input: DraftWireInput): WireWriteOutput {
   // Validate addressing format
