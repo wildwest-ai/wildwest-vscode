@@ -11,6 +11,7 @@ import {
 import {
   readRegistryAlias,
 } from '../TelegraphService';
+import validation from './validation';
 import {
   BoardInput,
   BoardOutput,
@@ -133,11 +134,11 @@ export function toolTelegraphCheck(ctx: MCPScopeContext): TelegraphCheckOutput {
 
 export function toolDraftWire(ctx: MCPScopeContext, input: DraftWireInput): WireWriteOutput {
   // Validate addressing format
-  const fromValidation = validateAddress(input.from);
+  const fromValidation = validation.validateAddress(input.from);
   if (!fromValidation.valid) {
     throw new Error(`Invalid 'from' address: ${fromValidation.error}`);
   }
-  const toValidation = validateAddress(input.to);
+  const toValidation = validation.validateAddress(input.to);
   if (!toValidation.valid) {
     throw new Error(`Invalid 'to' address: ${toValidation.error}`);
   }
@@ -180,11 +181,11 @@ export function toolDraftWire(ctx: MCPScopeContext, input: DraftWireInput): Wire
 
 export function toolSendWire(ctx: MCPScopeContext, input: SendWireInput): WireWriteOutput {
   // Validate addressing format
-  const fromValidation = validateAddress(input.from);
+  const fromValidation = validation.validateAddress(input.from);
   if (!fromValidation.valid) {
     throw new Error(`Invalid 'from' address: ${fromValidation.error}`);
   }
-  const toValidation = validateAddress(input.to);
+  const toValidation = validation.validateAddress(input.to);
   if (!toValidation.valid) {
     throw new Error(`Invalid 'to' address: ${toValidation.error}`);
   }
@@ -363,20 +364,9 @@ function resolveAliasToLocalRoot(address: string, ctx: MCPScopeContext): string 
   return null;
 }
 
-function senderAddress(ctx: MCPScopeContext, alias: string): string {
-  const role = ctx.identity?.match(/^([A-Za-z]+)/)?.[1] ?? defaultRoleForScope(ctx.scope);
-  return `${role}[${alias}]`;
-}
-
-function defaultRoleForScope(scope: MCPScopeContext['scope']): string {
-  if (scope === 'county') return 'CD';
-  if (scope === 'territory') return 'RA';
-  return 'TM';
-}
-
 function transitionContext(ctx: MCPScopeContext, alias: string, source: string) {
   return {
-    by: ctx.identity || senderAddress(ctx, alias),
+    by: ctx.identity || validation.senderAddress(ctx, alias),
     scope: ctx.scope,
     alias,
     tool: 'wwmcp',
