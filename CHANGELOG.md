@@ -1,12 +1,15 @@
 # Changelog
 
 ## [Unreleased]
-### Added
 
+<!-- Write your What's New entry here before running release.sh -->
+
+## [0.44.0] - 2026-05-14
+
+### Added
 - Centralize address validation utilities in `src/mcp/validation.ts` and
 	integrate `validateAddress` into MCP tools and `TelegraphPanel` compose/save
 	flows. Added unit tests for validation and fixed lint warnings.
-
 
 ## [0.43.0] - 2026-05-13
 
