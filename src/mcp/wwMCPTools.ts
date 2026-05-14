@@ -158,13 +158,17 @@ export function toolDraftWire(ctx: MCPScopeContext, input: DraftWireInput): Wire
     transitionContext: transitionContext(ctx, fromAlias, 'wwmcp.draft-wire'),
   });
 
-  // Determine target scope root based on targetScope parameter (default: local)
+  // Determine target scope root based on targetScope parameter (default: local/town)
   let draftRoot = resolveAliasToLocalRoot(input.from, ctx) ?? ctx.localRoot;
-  if (input.targetScope === 'county') {
+  if (input.targetScope === 'town') {
+    // Town scope: use current workspace (local)
+    draftRoot = ctx.localRoot;
+  } else if (input.targetScope === 'county') {
     const countyRoot = findAncestorScopeRoot(ctx.rootPath, 'county');
-    if (countyRoot) {
-      draftRoot = countyRoot;
+    if (!countyRoot) {
+      throw new Error('targetScope=county requested but no county ancestor found');
     }
+    draftRoot = countyRoot;
   } else if (input.targetScope === 'territory') {
     draftRoot = ctx.worldRoot;
   }
@@ -218,7 +222,9 @@ export function toolSendWire(ctx: MCPScopeContext, input: SendWireInput): WireWr
   // Determine target scope root based on targetScope parameter (default: territory)
   const targetScope = input.targetScope ?? 'territory';
   let targetRoot = ctx.worldRoot;
-  if (targetScope === 'county') {
+  if (targetScope === 'town') {
+    targetRoot = ctx.rootPath;
+  } else if (targetScope === 'county') {
     const countyRoot = findAncestorScopeRoot(ctx.rootPath, 'county');
     if (!countyRoot) {
       throw new Error('targetScope=county requested but no county ancestor found');

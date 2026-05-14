@@ -70,7 +70,7 @@ export interface DraftWireInput {
   body: string;
   type?: string;
   re?: string;
-  targetScope?: 'county' | 'territory';
+  targetScope?: 'town' | 'county' | 'territory';
 }
 
 export interface SendWireInput {
@@ -80,7 +80,7 @@ export interface SendWireInput {
   body: string;
   type?: string;
   re?: string;
-  targetScope?: 'county' | 'territory';
+  targetScope?: 'town' | 'county' | 'territory';
 }
 
 export interface RetryWireInput {

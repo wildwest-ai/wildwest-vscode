@@ -4,6 +4,16 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.43.4] - 2026-05-14
+
+### Enhanced
+- wwMCP scope routing extended to full 3-level hierarchy: `targetScope: 'town' | 'county' | 'territory'`
+  - Town-scoped actors can now target town scope (local), county scope (ancestor), or territory scope (SSOT)
+  - County-scoped actors can target county scope (self) or territory scope
+  - Territory actors use `targetScope: 'territory'` (default)
+  - Full scope-gated telegraph operations per county rule 12 and territory hierarchy
+  - Validation: Tool rejects invalid scope transitions with clear errors for non-existent ancestors
+
 ## [0.43.3] - 2026-05-14
 
 ### Added
