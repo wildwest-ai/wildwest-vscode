@@ -278,7 +278,7 @@ export class SidePanelProvider
     const countyTownWwuids = info.scope === 'county' ? this.collectTownWwuidsInCounty(countyRoot) : new Set<string>();
 
     return (session: Record<string, unknown>): boolean => {
-      const projectPath = (session['project_path'] as string) || '';
+      const _projectPath = (session['project_path'] as string) || '';
       const workspaceWwuids = Array.isArray(session['workspace_wwuids'])
         ? session['workspace_wwuids'] as string[]
         : [];

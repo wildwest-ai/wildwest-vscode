@@ -14,6 +14,7 @@ import {
 import { readRegistryAlias } from './TelegraphService';
 import { PromptIndexService } from './PromptIndexService';
 import type { HeartbeatMonitor } from './HeartbeatMonitor';
+import validation from './mcp/validation';
 
 /** New protocol: wire files are always {wwuid}.json */
 const UUID_FILE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.json$/;
@@ -346,6 +347,18 @@ export class TelegraphPanel {
     const role = roleMatch?.[1] ?? 'TM';
     const fromActor = alias ? `${role}[${alias}]` : (identity || 'TM');
 
+    // Validate addressing format before creating wire
+    const fromValidation = validation.validateAddress(fromActor);
+    if (!fromValidation.valid) {
+      this.panel.webview.postMessage({ type: 'error', text: `Invalid from address: ${fromValidation.error}` });
+      return;
+    }
+    const toValidation = validation.validateAddress(to);
+    if (!toValidation.valid) {
+      this.panel.webview.postMessage({ type: 'error', text: `Invalid to address: ${toValidation.error}` });
+      return;
+    }
+
     const transitionContext = this.getWireTransitionContext('telegraph-panel.compose');
     const wire = createFlatWire({ from: fromActor, to, type, subject, body, status: 'pending', transitionContext });
 
@@ -385,6 +398,12 @@ export class TelegraphPanel {
         const localFile = path.join(localFlatDir, `${editingWwuid}.json`);
         if (fs.existsSync(localFile)) {
           const wire = JSON.parse(fs.readFileSync(localFile, 'utf8')) as FlatWire;
+          // Validate addressing format
+          const toValidation = validation.validateAddress(to);
+          if (!toValidation.valid) {
+            this.panel.webview.postMessage({ type: 'error', text: `Invalid to address: ${toValidation.error}` });
+            return;
+          }
           wire.to = to;
           wire.type = type;
           wire.subject = subject;

@@ -300,7 +300,7 @@ async function handleArchive(wwRoot: string, filenameArg: string, stream: vscode
 
 async function handleTelegraphCheck(wwRoot: string, stream: vscode.ChatResponseStream): Promise<void> {
   const telegraphDir = path.join(wwRoot, 'telegraph');
-  const isMd = (f: string) => f.endsWith('.md') && !f.startsWith('.');
+  const _isMd = (f: string) => f.endsWith('.md') && !f.startsWith('.');
 
   const count = (dir: string, pred: (f: string) => boolean): number => {
     if (!fs.existsSync(dir)) return 0;
