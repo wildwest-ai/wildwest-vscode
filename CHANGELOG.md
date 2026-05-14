@@ -4,6 +4,11 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.44.1] - 2026-05-14
+
+### Fixed
+- Draft wires now correctly persist in `.wildwest/telegraph/outbox/` (local workspace) instead of being written to the read-only `flat/` cache. When editing, sending, deleting, or retrying draft wires via Telegraph Panel, operations now target the correct outbox directory. Drafts stay in outbox/ until the heartbeat delivers them to destination scope, resolving issue where drafts appeared to disappear and reappear during panel refresh.
+
 ## [0.44.0] - 2026-05-14
 
 ### Fixed

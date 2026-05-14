@@ -216,6 +216,26 @@ export class TelegraphPanel {
     return [...byWwuid.values()].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }
 
+  private readDraftOutboxWires(): FlatWire[] {
+    const byWwuid = new Map<string, FlatWire>();
+    for (const rootPath of this.getScopeRootsForOutboxRecovery()) {
+      const outboxDir = path.join(rootPath, '.wildwest', 'telegraph', 'outbox');
+      let entries: string[];
+      try { entries = fs.readdirSync(outboxDir); } catch { continue; }
+      for (const f of entries) {
+        if (f.startsWith('!') || !f.endsWith('.json') || f.startsWith('.')) continue;
+        if (!UUID_FILE_RE.test(f.replace('.json', ''))) continue;
+        try {
+          const filePath = path.join(outboxDir, f);
+          const wire = JSON.parse(fs.readFileSync(filePath, 'utf8')) as FlatWire;
+          const key = wire.wwuid ?? f.replace('.json', '');
+          byWwuid.set(key, wire);
+        } catch { /* skip corrupt */ }
+      }
+    }
+    return [...byWwuid.values()].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }
+
   private readFailedOutboxWires(): FlatWire[] {
     const byWwuid = new Map<string, FlatWire>();
     for (const rootPath of this.getScopeRootsForOutboxRecovery()) {
@@ -249,7 +269,7 @@ export class TelegraphPanel {
   // ── Outbound to webview ───────────────────────────────────────────────────
 
   private sendWires(): void {
-    const all = [...this.readAllFlatWires(), ...this.readFailedOutboxWires()];
+    const all = [...this.readAllFlatWires(), ...this.readDraftOutboxWires(), ...this.readFailedOutboxWires()];
     const alias = this.getActorAlias();
     const identity = vscode.workspace.getConfiguration('wildwest').get<string>('identity') ?? '';
     const { inbox, outbox } = this.filterWires(all, alias, identity);
@@ -394,8 +414,8 @@ export class TelegraphPanel {
 
     try {
       if (editingWwuid) {
-        const localFlatDir = path.join(wsPath, '.wildwest', 'telegraph', 'flat');
-        const localFile = path.join(localFlatDir, `${editingWwuid}.json`);
+        const localOutboxDir = path.join(wsPath, '.wildwest', 'telegraph', 'outbox');
+        const localFile = path.join(localOutboxDir, `${editingWwuid}.json`);
         if (fs.existsSync(localFile)) {
           const wire = JSON.parse(fs.readFileSync(localFile, 'utf8')) as FlatWire;
           // Validate addressing format
@@ -499,8 +519,8 @@ export class TelegraphPanel {
     if (!wwuid) return;
     const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
     try {
-      const localFlat = path.join(wsPath, '.wildwest', 'telegraph', 'flat');
-      const p = path.join(localFlat, `${wwuid}.json`);
+      const outboxDir = path.join(wsPath, '.wildwest', 'telegraph', 'outbox');
+      const p = path.join(outboxDir, `${wwuid}.json`);
       if (fs.existsSync(p)) { fs.unlinkSync(p); }
       this.sendWires();
       this.panel.webview.postMessage({ type: 'saved', wire: null });
@@ -546,11 +566,11 @@ export class TelegraphPanel {
   }
 
   private handleSendDraft(wwuid: string): void {
-    // Draft lives in local flat/; promote to pending and move to outbox for heartbeat pickup.
+    // Draft lives in local outbox/; promote to pending and keep in outbox for heartbeat pickup.
     // Call deliverOutboxNow() immediately so there's no waiting for the next tick.
     const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
-    const localFlatDir = path.join(wsPath, '.wildwest', 'telegraph', 'flat');
-    const localFilePath = path.join(localFlatDir, `${wwuid}.json`);
+    const outboxDir = path.join(wsPath, '.wildwest', 'telegraph', 'outbox');
+    const localFilePath = path.join(outboxDir, `${wwuid}.json`);
     if (!wwuid || !fs.existsSync(localFilePath)) return;
     try {
       const wire = JSON.parse(fs.readFileSync(localFilePath, 'utf8')) as FlatWire;
@@ -558,13 +578,9 @@ export class TelegraphPanel {
       const transitionContext = this.getWireTransitionContext('telegraph-panel.send-draft');
       const patch = { status: 'pending' };
       const transition = applyStatusUpdate(wire, 'pending', patch, transitionContext, isoNow);
-      // Update local flat/ so Outbox shows Pending while delivery runs
+      // Update wire in outbox/ to pending status
       fs.writeFileSync(localFilePath, JSON.stringify(wire, null, 2), 'utf8');
-      writeWireUpdatePacket(createWireStatusUpdatePacket(wire, patch, transition, transitionContext), localFlatDir);
-      // Drop in workspace outbox/ for heartbeat pickup
-      const outboxDir = path.join(wsPath, '.wildwest', 'telegraph', 'outbox');
-      fs.mkdirSync(outboxDir, { recursive: true });
-      fs.writeFileSync(path.join(outboxDir, `${wire.wwuid}.json`), JSON.stringify(wire, null, 2), 'utf8');
+      writeWireUpdatePacket(createWireStatusUpdatePacket(wire, patch, transition, transitionContext), outboxDir);
       this.heartbeat?.deliverOutboxNow();
       this.sendWires();
     } catch (err) {
@@ -594,11 +610,6 @@ export class TelegraphPanel {
         applyStatusUpdate(wire, 'pending', { status: 'pending' }, transitionContext, isoNow);
         fs.writeFileSync(restoredPath, JSON.stringify(wire, null, 2), 'utf8');
         fs.unlinkSync(failedPath);
-
-        const localFlatDir = path.join(rootPath, '.wildwest', 'telegraph', 'flat');
-        fs.mkdirSync(localFlatDir, { recursive: true });
-        fs.writeFileSync(path.join(localFlatDir, `${wwuid}.json`), JSON.stringify(wire, null, 2), 'utf8');
-
         this.heartbeat?.deliverOutboxNow();
         this.sendWires();
         return;

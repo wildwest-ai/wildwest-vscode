@@ -30,6 +30,7 @@ describe('wwMCP wire write tools', () => {
 
     ctx = {
       rootPath: tempDir,
+      localRoot: tempDir,
       scope: 'town',
       worldRoot,
       countiesDir: 'counties',
@@ -43,7 +44,8 @@ describe('wwMCP wire write tools', () => {
 
   it('creates a draft wire file and returns a summary', () => {
     const result = toolDraftWire(ctx, {
-      to: 'CD(RSn)',
+      from: 'TM[wildwest-vscode]',
+      to: 'CD[wildwest-ai]',
       subject: 'Hello World Subject',
       body: 'This is a draft wire.',
       type: 'status-update',
@@ -53,9 +55,9 @@ describe('wwMCP wire write tools', () => {
     expect(result.status).toBe('draft');
     expect(result.wwuid).toMatch(/^[0-9a-fA-F-]{36}$/);
     expect(result.filename).toContain('hello-world-subject');
-    expect(result.path).toContain(path.join('.wildwest', 'telegraph', 'flat'));
+    expect(result.path).toContain(path.join('.wildwest', 'telegraph', 'outbox'));
 
-    const draftPath = path.join(tempDir, '.wildwest', 'telegraph', 'flat', `${result.wwuid}.json`);
+    const draftPath = path.join(tempDir, '.wildwest', 'telegraph', 'outbox', `${result.wwuid}.json`);
     expect(fs.existsSync(draftPath)).toBe(true);
 
     const wire = JSON.parse(fs.readFileSync(draftPath, 'utf8'));
@@ -67,7 +69,8 @@ describe('wwMCP wire write tools', () => {
 
   it('creates a sent wire in territory and writes a local outbox copy', () => {
     const result = toolSendWire(ctx, {
-      to: 'CD(RSn)',
+      from: 'TM[wildwest-vscode]',
+      to: 'CD[wildwest-ai]',
       subject: 'Wire Subject 123',
       body: 'Send this wire now.',
     });
@@ -88,7 +91,7 @@ describe('wwMCP wire write tools', () => {
     expect(territoryWire.status).toBe('sent');
     expect(outboxWire.status).toBe('sent');
     expect(territoryWire.filename).toBe(outboxWire.filename);
-    expect(territoryWire.from).toBe('TM(wildwest-vscode)');
+    expect(territoryWire.from).toBe('TM[wildwest-vscode]');
   });
 
   it('throws when registry alias is missing', () => {
@@ -99,7 +102,8 @@ describe('wwMCP wire write tools', () => {
     );
 
     expect(() => toolDraftWire(ctx, {
-      to: 'CD(RSn)',
+      from: 'TM[unknown]',
+      to: 'CD[wildwest-ai]',
       subject: 'No Alias',
       body: 'Missing alias test.',
     })).toThrow('Missing registry alias');

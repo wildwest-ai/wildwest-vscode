@@ -4,6 +4,7 @@ import type { MCPScopeContext } from './types';
 
 /**
  * Pure format validation for Wild West addresses.
+ * County/town roles MUST have scope brackets: Role[scope] or Role(dyad)[scope]
  * Returns { valid, error }.
  */
 export function validateAddress(address: string): { valid: boolean; error?: string } {
@@ -13,17 +14,24 @@ export function validateAddress(address: string): { valid: boolean; error?: stri
 
   if (!address || typeof address !== 'string') return { valid: false, error: 'empty address' };
 
-  // Role[(dyad)][scope]  or Role[scope] or Role(dyad)
+  // Role[(dyad)][scope] or Role[scope]
   const match = address.match(/^([A-Za-z]+)(?:\(([^)]+)\))?(?:\[([^\]]+)\])?$/);
   if (!match) return { valid: false, error: `Invalid address format: '${address}'` };
 
-  const [, role, dyad] = match;
-  if (countyRoles.includes(role)) return { valid: true };
-  if (townRoles.includes(role)) {
-    if (dyad) return { valid: false, error: `Town role '${role}' must not include dyad parens` };
+  const [, role, dyad, scope] = match;
+
+  if (countyRoles.includes(role)) {
+    if (!scope) return { valid: false, error: `County role '${role}' requires scope bracket [scope]` };
     return { valid: true };
   }
-  if (territoryRoles.includes(role)) return { valid: true };
+  if (townRoles.includes(role)) {
+    if (dyad) return { valid: false, error: `Town role '${role}' must not include dyad parens` };
+    if (!scope) return { valid: false, error: `Town role '${role}' requires scope bracket [scope]` };
+    return { valid: true };
+  }
+  if (territoryRoles.includes(role)) {
+    return { valid: true };
+  }
   return { valid: false, error: `Unknown role: '${role}'` };
 }
 

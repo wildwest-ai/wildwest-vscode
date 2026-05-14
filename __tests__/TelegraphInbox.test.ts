@@ -75,7 +75,7 @@ describe('TelegraphInbox', () => {
     fs.writeFileSync(path.join(telegraphDir, '20260507-2253Z-to-TM-from-CD--legacy.md'), 'legacy');
     fs.writeFileSync(path.join(inboxDir, '20260507-2253Z-to-CD-from-TM--ack-done--review.md'), 'ack');
 
-    const pending = new TelegraphInbox(outputChannel).getPendingMemos();
+    const pending = new TelegraphInbox(outputChannel).getPendingWires();
 
     expect(pending).toEqual([
       { dir: inboxDir, filename: memo },

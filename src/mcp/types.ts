@@ -4,6 +4,7 @@ import { WildWestScope } from '../HeartbeatMonitor';
 
 export const TOOL_STATUS = 'wildwest_status';
 export const TOOL_INBOX = 'wildwest_inbox';
+export const TOOL_OUTBOX = 'wildwest_outbox';
 export const TOOL_BOARD = 'wildwest_board';
 export const TOOL_TELEGRAPH_CHECK = 'wildwest_telegraph_check';
 export const TOOL_DRAFT_WIRE = 'wildwest_draft_wire';

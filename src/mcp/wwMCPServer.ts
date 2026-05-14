@@ -11,6 +11,7 @@ import {
   toolBoard,
   toolDraftWire,
   toolInbox,
+  toolOutbox,
   toolRetryWire,
   toolSendWire,
   toolStatus,
@@ -26,6 +27,7 @@ import {
   TOOL_BOARD,
   TOOL_DRAFT_WIRE,
   TOOL_INBOX,
+  TOOL_OUTBOX,
   TOOL_RETRY_WIRE,
   TOOL_SEND_WIRE,
   TOOL_STATUS,
@@ -79,6 +81,16 @@ export class wwMCPServer {
         {
           name: TOOL_INBOX,
           description: 'List unprocessed wires from the identity inbox (scope-filtered).',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              limit: { type: 'number', description: 'Max wires to return (default 20)' },
+            },
+          },
+        },
+        {
+          name: TOOL_OUTBOX,
+          description: 'List draft and pending wires in local outbox.',
           inputSchema: {
             type: 'object',
             properties: {
@@ -175,6 +187,10 @@ export class wwMCPServer {
           }
           case TOOL_INBOX: {
             const result = toolInbox(ctx, args as InboxInput);
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+          }
+          case TOOL_OUTBOX: {
+            const result = toolOutbox(ctx, args as InboxInput);
             return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
           }
           case TOOL_BOARD: {

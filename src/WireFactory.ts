@@ -218,16 +218,16 @@ export function writeFlatWire(wire: FlatWire, flatDir: string): void {
 }
 
 /**
- * Write a draft wire to the LOCAL workspace flat/ directory.
+ * Write a draft wire to the LOCAL workspace outbox/ directory.
  * Draft wires are local-only — never written to territory until sent.
  * @param wire    FlatWire with status 'draft'
  * @param wsPath  Workspace root path (parent of .wildwest/)
  */
 export function writeDraftWire(wire: FlatWire, wsPath: string): void {
-  const localFlatDir = path.join(wsPath, '.wildwest', 'telegraph', 'flat');
-  fs.mkdirSync(localFlatDir, { recursive: true });
+  const localOutboxDir = path.join(wsPath, '.wildwest', 'telegraph', 'outbox');
+  fs.mkdirSync(localOutboxDir, { recursive: true });
   fs.writeFileSync(
-    path.join(localFlatDir, `${wire.wwuid}.json`),
+    path.join(localOutboxDir, `${wire.wwuid}.json`),
     JSON.stringify(wire, null, 2),
     'utf8',
   );

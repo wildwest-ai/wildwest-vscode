@@ -78,6 +78,30 @@ export function toolInbox(ctx: MCPScopeContext, input: InboxInput): InboxOutput 
   return { wires, total: wires.length };
 }
 
+// ── wildwest_outbox ──────────────────────────────────────────────────────────
+
+export function toolOutbox(ctx: MCPScopeContext, input: InboxInput): InboxOutput {
+  const limit = input.limit ?? 20;
+  const outboxDir = path.join(ctx.rootPath, '.wildwest', 'telegraph', 'outbox');
+
+  if (!fs.existsSync(outboxDir)) {
+    return { wires: [], total: 0 };
+  }
+
+  const files = fs
+    .readdirSync(outboxDir)
+    .filter((f) => (f.endsWith('.json') || f.endsWith('.md')) && !f.startsWith('.') && !f.startsWith('!'))
+    .sort()
+    .slice(0, limit);
+
+  const wires: WireSummary[] = files.map((filename) => {
+    const filePath = path.join(outboxDir, filename);
+    return parseWireSummary(filePath, filename);
+  });
+
+  return { wires, total: wires.length };
+}
+
 // ── wildwest_board ──────────────────────────────────────────────────────────
 
 export function toolBoard(ctx: MCPScopeContext, input: BoardInput): BoardOutput {
@@ -175,12 +199,12 @@ export function toolDraftWire(ctx: MCPScopeContext, input: DraftWireInput): Wire
   }
 
   writeDraftWire(wire, draftRoot);
-  const localFlatDir = path.join(draftRoot, '.wildwest', 'telegraph', 'flat');
+  const localOutboxDir = path.join(draftRoot, '.wildwest', 'telegraph', 'outbox');
   const transition = wire.status_transitions?.[wire.status_transitions.length - 1];
   if (transition) {
     writeWireUpdatePacket(
       createWireStatusUpdatePacket(wire, { status: wire.status }, transition, transitionContext(ctx, fromAlias, 'wwmcp.draft-wire')),
-      localFlatDir,
+      localOutboxDir,
     );
   }
 
@@ -189,7 +213,7 @@ export function toolDraftWire(ctx: MCPScopeContext, input: DraftWireInput): Wire
     filename: wire.filename,
     status: wire.status,
     date: wire.date,
-    path: path.join(draftRoot, '.wildwest', 'telegraph', 'flat', `${wire.wwuid}.json`),
+    path: path.join(draftRoot, '.wildwest', 'telegraph', 'outbox', `${wire.wwuid}.json`),
   };
 }
 

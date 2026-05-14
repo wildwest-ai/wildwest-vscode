@@ -10,7 +10,7 @@ describe('validation.validateAddress', () => {
   });
 
   test('valid county role with dyad', () => {
-    const r = validation.validateAddress('CD(mycounty)');
+    const r = validation.validateAddress('CD(RSn)[wildwest-ai]');
     expect(r.valid).toBe(true);
   });
 
