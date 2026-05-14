@@ -792,11 +792,20 @@ function deliverPendingOutbox(
       try {
         const memoPath = path.join(outboxDir, memoFile);
         const frontmatter = parseMemoFrontmatter(memoPath);
+        const status = (frontmatter['status'] as string | undefined) ?? 'pending';
         const toField = frontmatter['to'] as string | undefined;
         const fromField = (frontmatter['from'] as string | undefined) ?? '';
         outputChannel.appendLine(
-          `[HeartbeatMonitor] processing memo=${memoFile} from=${fromField || '<none>'} to=${toField || '<none>'} scope=${scope}`,
+          `[HeartbeatMonitor] processing memo=${memoFile} from=${fromField || '<none>'} to=${toField || '<none>'} status=${status} scope=${scope}`,
         );
+
+        // Skip draft wires — only deliver pending/sent wires
+        if (status === 'draft') {
+          outputChannel.appendLine(
+            `[HeartbeatMonitor] skipping draft wire=${memoFile} (waiting for explicit send)`,
+          );
+          continue;
+        }
 
         // Warn if from: is bare role with no town specifier in multi-town county
         if (scope === 'county' && /^TM$/i.test(fromField.trim())) {

@@ -4,6 +4,11 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.44.2] - 2026-05-14
+
+### Fixed
+- Heartbeat no longer auto-sends draft-status wires. Drafts remain in outbox/ with draft status until explicitly sent by user. Previously, heartbeat would auto-promote drafts to sent status without user action.
+
 ## [0.44.1] - 2026-05-14
 
 ### Fixed

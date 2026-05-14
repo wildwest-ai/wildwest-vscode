@@ -224,7 +224,7 @@ export class TelegraphPanel {
       try { entries = fs.readdirSync(outboxDir); } catch { continue; }
       for (const f of entries) {
         if (f.startsWith('!') || !f.endsWith('.json') || f.startsWith('.')) continue;
-        if (!UUID_FILE_RE.test(f.replace('.json', ''))) continue;
+        if (!UUID_FILE_RE.test(f)) continue;
         try {
           const filePath = path.join(outboxDir, f);
           const wire = JSON.parse(fs.readFileSync(filePath, 'utf8')) as FlatWire;
