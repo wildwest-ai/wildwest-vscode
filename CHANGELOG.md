@@ -4,6 +4,15 @@
 
 <!-- Write your What's New entry here before running release.sh -->
 
+## [0.44.0] - 2026-05-14
+
+### Fixed
+- wwMCP scope auto-detection: Tools now default to `ctx.scope` instead of hardcoded `'town'`.
+  - When `targetScope` parameter is not provided, both `wildwest_draft_wire` and `wildwest_send_wire` now use the detected scope from context.
+  - County-scoped actors (aCD, CD) sending wires without explicit `targetScope` now auto-route to county scope instead of territory.
+  - Town-scoped actors default to town scope, territory actors default to territory scope.
+  - Fixes governance principle: actors work at their own scope by default.
+
 ## [0.43.5] - 2026-05-14
 
 ### Changed
