@@ -4,5 +4,4 @@ out/
 *.vsix
 .DS_Store
 .wildwest/worktrees/
-
-.wildwest/telegraph/.last-beat
+.wildwest/telegraph/
