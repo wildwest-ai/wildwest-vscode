@@ -6,4 +6,3 @@ out/
 .wildwest/worktrees/
 
 .wildwest/telegraph/.last-beat
-.wildwest/telegraph/flat/  # Local cache layer; synced from territory SSOT on heartbeat
