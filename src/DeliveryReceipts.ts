@@ -16,9 +16,6 @@ import * as path from 'path';
 
 export type WireStatus = 'pending' | 'delivered' | 'acknowledged' | 'failed' | 'blocked';
 
-// Backwards-compatible alias used by older tests
-export type MemoStatus = WireStatus;
-
 export interface DeliveryReceipt {
   filename: string;     // canonical wire filename (no ! prefix)
   subject: string;      // extracted from filename (last --<subject> segment)
@@ -71,12 +68,9 @@ function findAckStatus(
   telegraphDir: string,
   subject: string,
 ): 'acknowledged' | 'blocked' | null {
-  // Search both flat/ and inbox/ locations for ack files (history and root)
   const searchDirs = [
     path.join(telegraphDir, 'flat'),
     path.join(telegraphDir, 'flat', 'history'),
-    path.join(telegraphDir, 'inbox'),
-    path.join(telegraphDir, 'inbox', 'history'),
   ];
   for (const dir of searchDirs) {
     try {

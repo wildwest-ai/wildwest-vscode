@@ -11,7 +11,6 @@ import {
 import {
   readRegistryAlias,
 } from '../TelegraphService';
-import { validateAddress, senderAddress, normalizeFromForTerritory, aliasExistsInTerritory } from './validation';
 import {
   BoardInput,
   BoardOutput,
@@ -133,12 +132,6 @@ export function toolTelegraphCheck(ctx: MCPScopeContext): TelegraphCheckOutput {
 }
 
 export function toolDraftWire(ctx: MCPScopeContext, input: DraftWireInput): WireWriteOutput {
-  // If caller didn't provide a from address, derive from local registry alias
-  if (!input.from) {
-    const fromAlias = readRegistryAlias(path.join(ctx.rootPath, '.wildwest'));
-    if (!fromAlias) throw new Error('Missing registry alias');
-    input.from = senderAddress(ctx, fromAlias);
-  }
   // Validate addressing format
   const fromValidation = validateAddress(input.from);
   if (!fromValidation.valid) {
@@ -165,7 +158,7 @@ export function toolDraftWire(ctx: MCPScopeContext, input: DraftWireInput): Wire
     transitionContext: transitionContext(ctx, fromAlias, 'wwmcp.draft-wire'),
   });
 
-  const draftRoot = resolveAliasToLocalRoot(input.from, ctx) ?? (ctx.localRoot ?? ctx.rootPath);
+  const draftRoot = resolveAliasToLocalRoot(input.from, ctx) ?? ctx.localRoot;
   writeDraftWire(wire, draftRoot);
   const localFlatDir = path.join(draftRoot, '.wildwest', 'telegraph', 'flat');
   const transition = wire.status_transitions?.[wire.status_transitions.length - 1];
@@ -186,12 +179,6 @@ export function toolDraftWire(ctx: MCPScopeContext, input: DraftWireInput): Wire
 }
 
 export function toolSendWire(ctx: MCPScopeContext, input: SendWireInput): WireWriteOutput {
-  // If caller didn't provide a from address, derive from local registry alias
-  if (!input.from) {
-    const fromAlias = readRegistryAlias(path.join(ctx.rootPath, '.wildwest'));
-    if (!fromAlias) throw new Error('Missing registry alias');
-    input.from = senderAddress(ctx, fromAlias);
-  }
   // Validate addressing format
   const fromValidation = validateAddress(input.from);
   if (!fromValidation.valid) {
@@ -219,21 +206,15 @@ export function toolSendWire(ctx: MCPScopeContext, input: SendWireInput): WireWr
   });
 
   const territoryFlatDir = path.join(ctx.worldRoot, 'telegraph', 'flat');
-
-  // Territory view uses legacy paren alias format in the 'from' field for readability.
-  const territoryWire = { ...wire, from: normalizeFromForTerritory(wire.from ?? '') } as typeof wire;
-
-  // Write territory wire (with paren 'from')
-  writeFlatWire(territoryWire, territoryFlatDir);
-  const transition = territoryWire.status_transitions?.[territoryWire.status_transitions.length - 1];
+  writeFlatWire(wire, territoryFlatDir);
+  const transition = wire.status_transitions?.[wire.status_transitions.length - 1];
   if (transition) {
     writeWireUpdatePacket(
-      createWireStatusUpdatePacket(territoryWire, { status: territoryWire.status }, transition, transitionContext(ctx, fromAlias, 'wwmcp.send-wire')),
+      createWireStatusUpdatePacket(wire, { status: wire.status }, transition, transitionContext(ctx, fromAlias, 'wwmcp.send-wire')),
       territoryFlatDir,
     );
   }
 
-  // Local outbox keeps the original wire representation (bracket alias)
   const localOutboxDir = path.join(ctx.rootPath, '.wildwest', 'telegraph', 'outbox');
   fs.mkdirSync(localOutboxDir, { recursive: true });
   fs.writeFileSync(path.join(localOutboxDir, wire.filename), JSON.stringify(wire, null, 2), 'utf8');
@@ -292,25 +273,51 @@ export function toolRetryWire(ctx: MCPScopeContext, input: RetryWireInput): Wire
 }
 
 /**
- * MCP-backed alias existence check for UI confirmation flows.
- */
-export function toolAliasExists(ctx: MCPScopeContext, alias: string): boolean {
-  try {
-    return aliasExistsInTerritory(ctx.worldRoot, alias);
-  } catch (err) {
-    // treat errors as 'not found' for safety
-    return false;
-  }
-}
-
-/**
  * Validate addressing format per wildwest spec:
  * - County roles (CD, S, RA, aCD, DS): Role(dyad)[scope] or Role[scope]
  * - Town roles (TM, DM, HG): Role[town] or Role[*pattern] — no dyad parens allowed
  * - Territory roles (G, RA): Role[territory]
  * Returns { valid: boolean, error?: string }
  */
-// Address validation moved to src/mcp/validation.ts
+function validateAddress(address: string): { valid: boolean; error?: string } {
+  const countyRoles = ['CD', 'S', 'RA', 'aCD', 'DS'];
+  const townRoles = ['TM', 'DM', 'HG'];
+  const territoryRoles = ['G', 'RA'];
+
+  // Parse: Role[(dyad)][scope]
+  const match = address.match(/^([A-Za-z]+)(?:\(([^)]+)\))?\[([^\]]+)\]$/);
+  if (!match) {
+    return { valid: false, error: `Invalid address format: '${address}'. Expected Role[(dyad)][scope] or Role[scope]` };
+  }
+
+  const [, role, dyad, scope] = match;
+
+  // Check role + dyad + scope rules
+  if (countyRoles.includes(role)) {
+    // County roles: dyad optional, scope required
+    if (!scope || scope.length === 0) {
+      return { valid: false, error: `County role '${role}' requires scope: '${role}${dyad ? `(${dyad})` : ''}[scope]'` };
+    }
+    return { valid: true };
+  } else if (townRoles.includes(role)) {
+    // Town roles: dyad NOT allowed, scope required
+    if (dyad) {
+      return { valid: false, error: `Town role '${role}' does not use dyad parens: use '${role}[${scope}]' not '${role}(${dyad})[${scope}]'` };
+    }
+    if (!scope || scope.length === 0) {
+      return { valid: false, error: `Town role '${role}' requires scope: '${role}[town]' or '${role}[*pattern]'` };
+    }
+    return { valid: true };
+  } else if (territoryRoles.includes(role)) {
+    // Territory roles: dyad optional, scope required
+    if (!scope || scope.length === 0) {
+      return { valid: false, error: `Territory role '${role}' requires scope: '${role}${dyad ? `(${dyad})` : ''}[territory]'` };
+    }
+    return { valid: true };
+  } else {
+    return { valid: false, error: `Unknown role: '${role}'` };
+  }
+}
 
 /**
  * Given a Role[alias] address, walk the territory to find the local root for that alias.
@@ -356,7 +363,16 @@ function resolveAliasToLocalRoot(address: string, ctx: MCPScopeContext): string 
   return null;
 }
 
-// senderAddress and defaultRoleForScope are provided by src/mcp/validation.ts
+function senderAddress(ctx: MCPScopeContext, alias: string): string {
+  const role = ctx.identity?.match(/^([A-Za-z]+)/)?.[1] ?? defaultRoleForScope(ctx.scope);
+  return `${role}[${alias}]`;
+}
+
+function defaultRoleForScope(scope: MCPScopeContext['scope']): string {
+  if (scope === 'county') return 'CD';
+  if (scope === 'territory') return 'RA';
+  return 'TM';
+}
 
 function transitionContext(ctx: MCPScopeContext, alias: string, source: string) {
   return {

@@ -57,11 +57,6 @@ export class TelegraphInbox {
     return result;
   }
 
-  // Backwards-compatible shim for older callers/tests
-  getPendingMemos(): Array<{ dir: string; filename: string }> {
-    return this.getPendingWires();
-  }
-
   private listPendingWires(dir: string): Array<{ dir: string; filename: string }> {
     const result: Array<{ dir: string; filename: string }> = [];
     let entries: string[];

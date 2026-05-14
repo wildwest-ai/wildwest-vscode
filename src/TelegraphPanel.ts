@@ -11,9 +11,6 @@ import {
   writeWireUpdatePacket,
   parseFilenameActors,
 } from './WireFactory';
-import { toolDraftWire, toolSendWire, toolAliasExists } from './mcp/wwMCPTools';
-import { validateAddress } from './mcp/validation';
-import type { MCPScopeContext } from './mcp/types';
 import { readRegistryAlias } from './TelegraphService';
 import { PromptIndexService } from './PromptIndexService';
 import type { HeartbeatMonitor } from './HeartbeatMonitor';
@@ -54,7 +51,6 @@ export class TelegraphPanel {
 
   private readonly panel: vscode.WebviewPanel;
   private disposables: vscode.Disposable[] = [];
-  private pendingAliasConfirm: Map<string, (accepted: boolean) => void> = new Map();
   private static outputChannel = vscode.window.createOutputChannel('Wild West Telegraph');
 
   static open(exportPath: string, promptIndex?: PromptIndexService, heartbeat?: HeartbeatMonitor): void {
@@ -167,20 +163,6 @@ export class TelegraphPanel {
     }
   }
 
-  private resolveMCPContext(): MCPScopeContext | null {
-    const folders = vscode.workspace.workspaceFolders;
-    if (!folders || folders.length === 0) return null;
-    const rootPath = folders[0].uri.fsPath;
-    const config = vscode.workspace.getConfiguration('wildwest');
-    const home = process.env.HOME ?? '';
-    const worldRoot = (config.get<string>('worldRoot') ?? '~/wildwest').replace(/^~/, home);
-    const countiesDir = config.get<string>('countiesDir') ?? 'counties';
-    const identity = config.get<string>('identity') ?? '';
-    const scope = this.heartbeat?.detectScope() ?? this.readRegistryScope(rootPath);
-    if (!scope) return null;
-    return { rootPath, localRoot: rootPath, scope: scope as any, worldRoot, countiesDir, identity };
-  }
-
   /**
    * True if a `to`/`from` address field belongs to this actor.
    */
@@ -287,69 +269,62 @@ export class TelegraphPanel {
   private async onMessage(msg: Record<string, unknown>): Promise<void> {
     this.log(`onMessage: type=${msg['type']} wwuid=${msg['wwuid'] ?? ''} wwuids=${JSON.stringify(msg['wwuids'] ?? '')} status=${msg['status'] ?? ''}`);
     switch (msg['type']) {
-            case 'send':
-              await this.handleSend(msg);
-              break;
-            case 'pushToCopilot':
-              await this.pushToCopilot(msg['formatted'] as string);
-              break;
-            case 'pushToTerminal':
-              await this.pushToTerminal(msg['formatted'] as string, msg['label'] as string);
-              break;
-            case 'archive':
-              this.handleArchiveWire(msg['wwuid'] as string, (msg['perspective'] as 'recipient' | 'sender') ?? 'recipient');
-              break;
-            case 'markRead':
-              this.handleMarkRead(msg['wwuid'] as string);
-              break;
-            case 'sendDraft':
-              this.handleSendDraft(msg['wwuid'] as string);
-              break;
-            case 'saveDraft':
-              this.handleSaveDraft(msg);
-              break;
-            case 'toSuggest': {
-              const q = (msg['query'] as string) || '';
-              const suggestions = this.handleToSuggest(q);
-              this.panel.webview.postMessage({ type: 'toSuggestions', suggestions });
-              break;
-            }
-            case 'cancelWire':
-              this.handleCancelWire(msg['wwuid'] as string);
-              break;
-            case 'deleteDraft':
-              this.handleDeleteDraft(msg['wwuid'] as string);
-              break;
-            case 'retryWire':
-              this.handleRetryWire(msg['wwuid'] as string);
-              break;
-            case 'bulkStatus': {
-              const wwuids = msg['wwuids'] as string[];
-              const status = msg['status'] as string;
-              const perspective = (msg['perspective'] as 'recipient' | 'sender') ?? 'recipient';
-              this.handleBulkStatus(wwuids, status, perspective);
-              break;
-            }
-            case 'promptSearch': {
-              const query = (msg['query'] as string) ?? '';
-              const results = this.promptIndex?.search(query, undefined, 10, {
-                excludeKinds: ['terminal_output', 'authorization', 'continuation'],
-                includeGlobalFallback: false,
-                includeScopeLineage: true,
-              }) ?? [];
-              this.panel.webview.postMessage({ type: 'promptResults', results });
-              break;
-            }
-            case 'aliasConfirmResponse': {
-              const id = msg['id'] as string;
-              const accept = Boolean(msg['accept']);
-              const cb = this.pendingAliasConfirm.get(id);
-              if (cb) {
-                cb(accept);
-                this.pendingAliasConfirm.delete(id);
-              }
-              break;
-            }
+      case 'refresh':
+        this.sendWires();
+        break;
+      case 'send':
+        await this.handleSend(msg);
+        break;
+      case 'pushToCopilot':
+        await this.pushToCopilot(msg['formatted'] as string);
+        break;
+      case 'pushToTerminal':
+        await this.pushToTerminal(msg['formatted'] as string, msg['label'] as string);
+        break;
+      case 'archive':
+        this.handleArchiveWire(msg['wwuid'] as string, (msg['perspective'] as 'recipient' | 'sender') ?? 'recipient');
+        break;
+      case 'markRead':
+        this.handleMarkRead(msg['wwuid'] as string);
+        break;
+      case 'sendDraft':
+        this.handleSendDraft(msg['wwuid'] as string);
+        break;
+      case 'saveDraft':
+        this.handleSaveDraft(msg);
+        break;
+      case 'toSuggest': {
+        const q = (msg['query'] as string) || '';
+        const suggestions = this.handleToSuggest(q);
+        this.panel.webview.postMessage({ type: 'toSuggestions', suggestions });
+        break;
+      }
+      case 'cancelWire':
+        this.handleCancelWire(msg['wwuid'] as string);
+        break;
+      case 'deleteDraft':
+        this.handleDeleteDraft(msg['wwuid'] as string);
+        break;
+      case 'retryWire':
+        this.handleRetryWire(msg['wwuid'] as string);
+        break;
+      case 'bulkStatus': {
+        const wwuids = msg['wwuids'] as string[];
+        const status = msg['status'] as string;
+        const perspective = (msg['perspective'] as 'recipient' | 'sender') ?? 'recipient';
+        this.handleBulkStatus(wwuids, status, perspective);
+        break;
+      }
+      case 'promptSearch': {
+        const query = (msg['query'] as string) ?? '';
+        const results = this.promptIndex?.search(query, undefined, 10, {
+          excludeKinds: ['terminal_output', 'authorization', 'continuation'],
+          includeGlobalFallback: false,
+          includeScopeLineage: true,
+        }) ?? [];
+        this.panel.webview.postMessage({ type: 'promptResults', results });
+        break;
+      }
     }
   }
 
@@ -371,61 +346,18 @@ export class TelegraphPanel {
     const role = roleMatch?.[1] ?? 'TM';
     const fromActor = alias ? `${role}[${alias}]` : (identity || 'TM');
 
-    // Prefer wwMCP send tool for authoritative validation and writes
-    try {
-      const ctx = this.resolveMCPContext();
-      const validation = validateAddress(to);
-      if (!validation.valid) {
-        this.panel.webview.postMessage({ type: 'error', text: `Invalid 'to' address: ${validation.error}` });
-        return;
-      }
-
-      if (ctx) {
-        // Confirm target alias exists in territory before attempting authoritative send
-        const aliasMatch = to.match(/\[([^\]]+)\]/);
-        const targetAlias = aliasMatch?.[1] ?? null;
-        if (targetAlias) {
-          const exists = await Promise.resolve(toolAliasExists(ctx, targetAlias));
-          if (!exists) {
-            // Ask the webview for confirmation instead of hard error
-            const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-            this.panel.webview.postMessage({ type: 'aliasConfirm', id, alias: targetAlias, action: 'send' });
-            const accepted = await new Promise<boolean>((resolve) => {
-              const timer = setTimeout(() => { this.pendingAliasConfirm.delete(id); resolve(false); }, 30000);
-              this.pendingAliasConfirm.set(id, (a: boolean) => { clearTimeout(timer); resolve(a); });
-            });
-            if (!accepted) {
-              this.panel.webview.postMessage({ type: 'aborted', reason: `Target alias not found: ${targetAlias}` });
-              return;
-            }
-          }
-        }
-
-        const result = toolSendWire(ctx, { from: fromActor, to, subject, body, type });
-        // Read local outbox copy if present for UI payload
-        const localOut = path.join(wsPath, '.wildwest', 'telegraph', 'outbox', result.filename);
-        let wire: FlatWire | null = null;
-        if (fs.existsSync(localOut)) {
-          wire = JSON.parse(fs.readFileSync(localOut, 'utf8')) as FlatWire;
-        } else if (fs.existsSync(result.path)) {
-          wire = JSON.parse(fs.readFileSync(result.path, 'utf8')) as FlatWire;
-        }
-        this.panel.webview.postMessage({ type: 'sent', wire });
-        this.heartbeat?.deliverOutboxNow();
-        this.sendWires();
-        return;
-      }
-    } catch (err) {
-      this.log(`wwMCP send failed: ${String(err)} — falling back to local send`);
-    }
-
-    // Fallback: local send as before
     const transitionContext = this.getWireTransitionContext('telegraph-panel.compose');
     const wire = createFlatWire({ from: fromActor, to, type, subject, body, status: 'pending', transitionContext });
+
+    // Write to local outbox for heartbeat pickup → heartbeat promotes to SSOT.
+    // Call deliverOutboxNow() immediately so there's no waiting for the next tick.
     const outboxDir = path.join(wsPath, '.wildwest', 'telegraph', 'outbox');
     fs.mkdirSync(outboxDir, { recursive: true });
     fs.writeFileSync(path.join(outboxDir, `${wire.wwuid}.json`), JSON.stringify(wire, null, 2), 'utf8');
+
+    // Also save to local flat/ so it shows in Outbox > Pending while delivery runs
     writeDraftWire(wire, wsPath);
+
     this.panel.webview.postMessage({ type: 'sent', wire });
     this.heartbeat?.deliverOutboxNow();
     this.sendWires();
@@ -448,13 +380,6 @@ export class TelegraphPanel {
     const transitionContext = this.getWireTransitionContext('telegraph-panel.save-draft');
 
     try {
-      const ctx = this.resolveMCPContext();
-      const validation = validateAddress(to);
-      if (!validation.valid) {
-        this.panel.webview.postMessage({ type: 'error', text: `Invalid 'to' address: ${validation.error}` });
-        return;
-      }
-
       if (editingWwuid) {
         const localFlatDir = path.join(wsPath, '.wildwest', 'telegraph', 'flat');
         const localFile = path.join(localFlatDir, `${editingWwuid}.json`);
@@ -474,24 +399,7 @@ export class TelegraphPanel {
         }
       }
 
-      // Create new draft via wwMCP tool when available (ensures validation and consistent write location)
-      if (ctx) {
-        try {
-          const result = toolDraftWire(ctx, { from: fromActor, to, subject, body, type });
-          // toolDraftWire writes the file to local draftRoot — read created wire for UI
-          if (fs.existsSync(result.path)) {
-            const wire = JSON.parse(fs.readFileSync(result.path, 'utf8')) as FlatWire;
-            this.panel.webview.postMessage({ type: 'saved', wire });
-            this.sendWires();
-            return;
-          }
-        } catch (err) {
-          this.panel.webview.postMessage({ type: 'error', text: `Save draft failed — ${err}` });
-          return;
-        }
-      }
-
-      // Fallback: Create new draft wire locally
+      // Create new draft wire
       const wire = createFlatWire({ from: fromActor, to, type, subject, body, status: 'draft', transitionContext });
       writeDraftWire(wire, wsPath);
       this.panel.webview.postMessage({ type: 'saved', wire });
@@ -502,54 +410,31 @@ export class TelegraphPanel {
   }
 
   private handleToSuggest(query: string): string[] {
+    // Provide simple suggestions based on workspace registry aliases and county roots
     const results: string[] = [];
     try {
-      const cfg = vscode.workspace.getConfiguration('wildwest');
-      const home = process.env['HOME'] ?? '~';
-      const worldRoot = (cfg.get<string>('worldRoot') ?? '~/wildwest').replace(/^~/, home);
-
-      // gather aliases: workspace, territory, and scope roots
-      const seen = new Set<string>();
       const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+      // gather local alias
       const localAlias = readRegistryAlias(path.join(wsPath, '.wildwest'));
-      if (localAlias) { seen.add(localAlias); results.push(`TM[${localAlias}]`); }
-
-      // territory alias (world root)
-      try {
-        const terrAlias = readRegistryAlias(path.join(worldRoot, '.wildwest'));
-        if (terrAlias && !seen.has(terrAlias)) { seen.add(terrAlias); results.push(`RA[${terrAlias}]`); }
-      } catch (err) { this.log(`handleToSuggest terrAlias read error: ${String(err)}`); }
+      if (localAlias) results.push(`TM[${localAlias}]`);
 
       // scan scope roots for aliases
       for (const root of this.getScopeRootsForOutboxRecovery()) {
         const a = readRegistryAlias(path.join(root, '.wildwest'));
-        if (a && !seen.has(a)) { seen.add(a); results.push(`TM[${a}]`); }
+        if (a && !results.includes(a)) results.push(`TM[${a}]`);
       }
 
-      // Provide role-prefixed suggestions. If user starts with a role token, prioritize that role.
-      const rolePrefixes = ['CD','TM','RA','G','S','M','ACD'];
-      const q = query.trim();
-      const qRoleMatch = q.match(/^([A-Za-z]{1,4})/);
-      const preferredRole = qRoleMatch ? qRoleMatch[1].toUpperCase() : null;
-
-      const roleResults: string[] = [];
-      for (const alias of [...seen]) {
-        for (const r of rolePrefixes) {
-          const candidate = `${r}[${alias}]`;
-          if (preferredRole && r === preferredRole) roleResults.unshift(candidate);
-          else roleResults.push(candidate);
+      // Basic role-based suggestions for common roles — map some roles to example bracketed targets
+      const common = ['CD','TM','RA','G','S','M','ACD'];
+      for (const r of common) {
+        if (r.toLowerCase().startsWith(query.toLowerCase()) || query.toLowerCase().startsWith(r.toLowerCase())) {
+          // add a placeholder suggestion showing role + bracket
+          results.unshift(`${r}[example-${r.toLowerCase()}]`);
         }
       }
-
-      // Merge prefixed role results ahead of generic results
-      const merged = [...roleResults, ...results.filter((s) => !roleResults.includes(s))];
-
-      // Filter by query (loose contains) and limit
-      return merged.filter((s) => s.toLowerCase().includes(q.toLowerCase())).slice(0, 12);
-    } catch (e) {
-      this.log(`handleToSuggest error: ${String(e)}`);
-      return [];
-    }
+    } catch (e) { this.log(`handleToSuggest error: ${String(e)}`); }
+    // Filter by query
+    return results.filter(s => s.toLowerCase().includes(query.toLowerCase())).slice(0, 12);
   }
 
   private handleCancelWire(wwuid: string): void {
@@ -1429,7 +1314,7 @@ export class TelegraphPanel {
     if (!q || q.length < 1) { toDropdown.style.display = 'none'; return; }
     vscode.postMessage({ type: 'toSuggest', query: q });
   });
-    const editingWwuid = (msg['wwuid'] as string) ?? null;
+
   window.addEventListener('message', ({ data }) => {
     if (data.type === 'toSuggestions') {
       const items = data.suggestions || [];
