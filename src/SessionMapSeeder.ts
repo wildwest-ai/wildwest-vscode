@@ -151,7 +151,7 @@ export class SessionMapSeeder {
 
   // ─── Territory ──────────────────────────────────────────────────────────────
 
-  private seedTerritory(territoryPath: string, territoryReg: RegistryRef): SeedResult[] {
+  private seedTerritory(territoryPath: string, _territoryReg: RegistryRef): SeedResult[] {
     const results: SeedResult[] = [];
     let countiesDirs: fs.Dirent[] = [];
     try {

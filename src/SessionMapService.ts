@@ -28,7 +28,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { ScopeRef, WildWestScope } from './sessionPipeline/types';
+import { ScopeRef } from './sessionPipeline/types';
 
 export interface ScopeRefKey {
   scope: string;
